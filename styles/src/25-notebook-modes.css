@@ -1,0 +1,15 @@
+    /* Notebook: shared notes or independently saved per-calculator notes. */
+    .notes-mode { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:3px; padding:3px;
+      background:#e4d9ca; border:1px solid #d5c5b1; border-radius:10px; margin-top:11px; flex:0 0 auto; }
+    .notes-mode button { min-width:0; border:1px solid transparent; border-radius:7px; padding:8px 5px;
+      background:transparent; color:#6e6254; font-size:12px; font-weight:650; cursor:pointer;
+      transition:background-color .2s ease,box-shadow .2s ease,transform .2s ease,color .2s ease; }
+    .notes-mode button:hover { background:#f4ebdf; color:#3b332b; }
+    .notes-mode button:active { transform:scale(.98); }
+    .notes-mode button[aria-pressed="true"] { background:#fffaf3; color:#322a22;
+      border-color:#d6c7b5; box-shadow:0 1px 4px #493c2e1a; }
+    .notes-context { flex:0 0 auto; font-size:10px; color:#7f705f; margin:7px 2px 0;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-height:14px; }
+    .notes-body .notes-input { margin-top:8px; }
+    @media (max-width:540px) { .notes-mode button { padding:9px 5px; } }
+

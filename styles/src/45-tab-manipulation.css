@@ -1,0 +1,23 @@
+    /* Direct drag-and-edit tabs; no arrangement panel. */
+    .tabs-bar { display:flex;align-items:center; }
+    .tabs { flex:1;min-width:0; }
+    .tab-slot { position:relative; }
+    .field-heading label { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .tab-slot .tab { padding-inline-start:31px;padding-inline-end:30px; }
+    .tab-grip { position:absolute;z-index:2;inset-inline-start:4px;top:50%;transform:translateY(-50%);
+      width:24px;height:26px;border:0;border-radius:6px;background:transparent;
+      color:#a39586;display:grid;place-items:center;font-size:17px;letter-spacing:-3px;
+      opacity:.63;cursor:grab;touch-action:none;transition:background .18s,color .18s,opacity .18s; }
+    .tab-grip:hover,.tab-grip:focus-visible { color:var(--accent);background:var(--accent-soft);opacity:1; }
+    .tab-rename { z-index:2; }
+    .tab-slot:hover .tab-grip,.tab-slot:focus-within .tab-grip { opacity:1; }
+    .tab-slot.is-placeholder .tab { border-style:dashed;border-color:#b2a38f;background:#eee6da;box-shadow:none;opacity:.33; }
+    .tab-slot.is-placeholder .tab-grip,.tab-slot.is-placeholder .tab-rename { opacity:0; }
+    .tab-sort-ghost { position:fixed!important;z-index:9999;pointer-events:none!important;opacity:.97;
+      margin:0!important;box-shadow:0 14px 36px #32261e25;will-change:transform; }
+    .tab-sort-ghost .tab { background:#fffdfa!important;border-color:#b6a38d!important;box-shadow:0 9px 22px #32261e27!important; }
+    .tab-slot.is-editing .tab,.tab-slot.is-editing .tab-grip,.tab-slot.is-editing .tab-rename { visibility:hidden; }
+    .tab-slot > .tab-inline-edit { position:absolute;inset:2px;z-index:4;display:block;
+      width:calc(100% - 4px);max-width:none;height:calc(100% - 4px);box-sizing:border-box; }
+    @media (pointer:coarse) { .tab-grip { opacity:1; } }
+

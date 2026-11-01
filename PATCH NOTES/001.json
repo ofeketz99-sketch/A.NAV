@@ -1,0 +1,10 @@
+{
+  "version": "001",
+  "date": "2026-11-01",
+  "notes": [
+    "נוצר ענף dev נפרד; ענף main נשאר ללא שינוי.",
+    "גרסת GitHub העדכנית חולקה למבנה HTML, קוד מקור JS ו-CSS, תוך שימור סדר הטעינה.",
+    "נוספו גיבוי מדויק, הוראות פיתוח, בנייה דטרמיניסטית ובדיקות בסיס."
+  ],
+  "technical": "Source-based structural refactor. Generated CSS and JS equal original inline source; browser runtime testing is separate."
+}

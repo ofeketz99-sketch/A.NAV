@@ -1,0 +1,55 @@
+    /* A measured accordion instead of the quick max-height expansion.
+       The grid row follows the calculator's actual height from 0fr to 1fr. */
+    .calc-dock .calc-clip,
+    .calc-dock.is-open .calc-clip {
+      display:grid;
+      max-height:none;
+      overflow:hidden;
+      visibility:visible;
+      transition:grid-template-rows .58s cubic-bezier(.45,0,.22,1),
+        opacity .40s ease;
+    }
+    .calc-dock .calc-clip {
+      grid-template-rows:0fr;
+      opacity:0;
+      pointer-events:none;
+    }
+    .calc-dock.is-open .calc-clip {
+      grid-template-rows:1fr;
+      opacity:1;
+      pointer-events:auto;
+    }
+    .calc-dock .quick-calc {
+      min-height:0;
+      overflow:hidden;
+      transform:translateY(-7px);
+      opacity:0;
+      padding-top:0;
+      padding-bottom:0;
+      transition:transform .58s cubic-bezier(.22,1,.36,1),
+        opacity .42s ease,padding-top .58s cubic-bezier(.45,0,.22,1),
+        padding-bottom .58s cubic-bezier(.45,0,.22,1);
+    }
+    .calc-dock.is-open .quick-calc {
+      transform:translateY(0);
+      opacity:1;
+      padding-top:4px;
+      padding-bottom:12px;
+    }
+    .calc-dock .calc-chevron {
+      transition:transform .52s cubic-bezier(.45,0,.22,1);
+    }
+    @media (max-width:1050px) {
+      .calc-dock.is-open .quick-calc {padding-top:7px;padding-bottom:13px;}
+      .side-rail .notes-input {
+        transition:height .58s cubic-bezier(.45,0,.22,1),
+          min-height .58s cubic-bezier(.45,0,.22,1);
+      }
+    }
+    @media (prefers-reduced-motion:reduce) {
+      .hero-result,.calc-dock .calc-clip,.calc-dock .quick-calc,
+      .calc-dock .calc-chevron,.side-rail .notes-input {transition:none!important;}
+      .hero-result:hover {transform:none!important;filter:none!important;}
+    }
+
+

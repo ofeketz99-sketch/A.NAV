@@ -1,0 +1,183 @@
+    /* v27: concise notebook and pocket calculator headers. */
+    .notes-body .notes-input {margin-top:11px;}
+    .calc-dock .quick-calc-trigger {
+      grid-template-columns:28px minmax(0,1fr) 28px;
+      column-gap:11px;
+      align-items:center;
+      min-height:48px;
+      padding:9px 12px;
+    }
+    .calc-dock .calc-toggle-copy {
+      justify-content:center;
+      align-items:flex-start;
+    }
+    .calc-dock .calc-toggle-label {
+      font-size:14px;
+      font-weight:750;
+      line-height:1.3;
+    }
+    @media(max-width:540px) {
+      .calc-dock .quick-calc-trigger {
+        grid-template-columns:26px minmax(0,1fr) 26px;
+        column-gap:9px;
+        padding:9px 11px;
+        min-height:45px;
+      }
+    }
+
+    /* v28: keep the closed calculator a single, compact header row.
+       v26 introduced 8px + 13px padding and a 1px top border on the
+       hidden content, leaving a visible 22px strip despite 0fr grid. */
+    .calc-dock:not(.is-open) .quick-calc {
+      padding-top:0;
+      padding-bottom:0;
+      border-top-width:0;
+    }
+    .calc-dock.is-open .quick-calc {
+      padding-top:8px;
+      padding-bottom:13px;
+      border-top:1px solid #dbcab5;
+    }
+    @media (max-width:1050px) {
+      .calc-dock.is-open .quick-calc {
+        padding-top:8px;
+        padding-bottom:13px;
+      }
+    }
+
+
+
+    /* v29 · Accent surfaces. Subtle, coordinated tonal hierarchy without neon or borders. */
+    .shell {
+      --surface-tint-quiet: color-mix(in srgb,var(--accent) 4%,#fffdf9);
+      --surface-tint-soft: color-mix(in srgb,var(--accent) 7%,#fffdf9);
+      --surface-tint-rich: color-mix(in srgb,var(--accent) 10%,#fffdf9);
+      --surface-ink: color-mix(in srgb,var(--accent) 65%,#231f1a);
+    }
+    /* Input panel: lightly colored paper in place of flat white. */
+    .controls {
+      background:linear-gradient(165deg,
+        color-mix(in srgb,var(--accent) 5.5%,#fffdf9) 0%,
+        #fffdf9 64%);
+    }
+    .controls .panel-head h2,
+    .chart-title,
+    .notes-title {color:var(--surface-ink);}
+    .controls .controls-foot {
+      border-top-color:color-mix(in srgb,var(--accent) 13%,#e7ddd1);
+    }
+    .value-box {
+      background:color-mix(in srgb,var(--accent-soft) 31%,#faf5ee);
+    }
+    .select-field select {
+      background:color-mix(in srgb,var(--accent-soft) 29%,#faf7f2);
+    }
+
+    /* Four stats form a measured palette: the lead and last one get the most color. */
+    .stat {
+      position:relative;
+      isolation:isolate;
+      background:linear-gradient(150deg,
+        var(--surface-tint-soft) 0%,
+        color-mix(in srgb,var(--accent) 2%,#fffdf9) 100%);
+      border-color:color-mix(in srgb,var(--accent) 10%,#d7cab9);
+    }
+    .stat:nth-child(1) {
+      background:linear-gradient(145deg,var(--surface-tint-rich),var(--surface-tint-soft));
+    }
+    .stat:nth-child(4) {
+      background:linear-gradient(145deg,
+        color-mix(in srgb,var(--accent) 9%,#fffdf9),
+        var(--surface-tint-quiet));
+    }
+    .stat-label {color:color-mix(in srgb,var(--accent) 30%,#65594b);}
+    .stat-mini {color:#756e66;}
+
+    /* Graph: a mild tinted canvas and a clearer separation from the KPI cards. */
+    .chart-panel {
+      background:linear-gradient(155deg,
+        color-mix(in srgb,var(--accent) 5%,#fffdf9) 0%,
+        color-mix(in srgb,var(--accent) 2%,#fffdf9) 75%);
+      border-color:color-mix(in srgb,var(--accent) 9%,#d7cab9);
+    }
+    .chart-bottom {
+      border-top-color:color-mix(in srgb,var(--accent) 13%,#e8e0d5);
+    }
+    .composition-track {
+      background:color-mix(in srgb,var(--accent) 10%,#ece5dc);
+    }
+    .chart-mode[aria-pressed=true] {
+      background:color-mix(in srgb,var(--accent-soft) 65%,#fffdf9);
+    }
+
+    /* Notebook and calculator share the same cream canvas with a measured tint. */
+    .notes-panel {
+      background:linear-gradient(180deg,
+        color-mix(in srgb,var(--accent) 6%,#fffdf9),
+        color-mix(in srgb,var(--accent) 2%,#fffdf9));
+    }
+    .notes-mode {
+      background:color-mix(in srgb,var(--accent) 9%,#e9dfd2);
+      border-color:color-mix(in srgb,var(--accent) 12%,#d8c9b8);
+    }
+    .notes-mode button[aria-pressed="true"] {
+      background:color-mix(in srgb,var(--accent-soft) 45%,#fffaf3);
+      color:var(--surface-ink);
+    }
+    .notes-input {border-color:color-mix(in srgb,var(--accent) 11%,#d1c3b1);}
+    .calc-dock {
+      background:linear-gradient(160deg,
+        color-mix(in srgb,var(--accent) 10%,#f2eadf),
+        color-mix(in srgb,var(--accent) 4%,#ede3d6));
+    }
+    .calc-dock .calc-toggle-badge,
+    .calc-dock .calc-chevron {
+      background:color-mix(in srgb,var(--accent-soft) 30%,#faf5ed);
+      color:var(--surface-ink);
+    }
+    .calc-dock .calc-toggle-label {color:var(--surface-ink);}
+    .calc-dock .quick-calc-trigger:hover {
+      background:color-mix(in srgb,var(--accent) 6%,#f6eee4);
+    }
+    .calc-dock .quick-calc {
+      background:linear-gradient(180deg,
+        color-mix(in srgb,var(--accent) 6%,#f8f2e9),
+        color-mix(in srgb,var(--accent) 3%,#f5ede2));
+    }
+    .calc-dock .calc-keys .calc-equals {
+      background:color-mix(in srgb,var(--accent-soft) 75%,#fffdf9);
+    }
+
+    /* The same accent language in lightweight editing overlays. */
+    .tool-head,.schedule-head {
+      background:color-mix(in srgb,var(--accent) 5%,#fffdf9);
+    }
+    .tab[aria-selected="true"] {
+      background:color-mix(in srgb,var(--accent) 7%,#fffdf9);
+    }
+
+    @media(hover:hover) and (pointer:fine) {
+      .stat:hover {
+        background:linear-gradient(145deg,
+          color-mix(in srgb,var(--accent) 13%,#fffdf9),
+          color-mix(in srgb,var(--accent) 6%,#fffdf9));
+        border-color:color-mix(in srgb,var(--accent) 16%,#d7cab9);
+        transform:translateY(-2px); /* Keeps the lift inside comfortable bounds. */
+        box-shadow:0 11px 24px rgba(41,32,21,.11);
+      }
+      .chart-panel:hover {
+        background:linear-gradient(155deg,
+          color-mix(in srgb,var(--accent) 8%,#fffdf9),
+          color-mix(in srgb,var(--accent) 3%,#fffdf9));
+      }
+      .notes-panel:hover {
+        background:linear-gradient(180deg,
+          color-mix(in srgb,var(--accent) 8%,#fffdf9),
+          color-mix(in srgb,var(--accent) 3%,#fffdf9));
+      }
+    }
+    @media (prefers-reduced-motion:reduce) {
+      .stat:hover {transform:none;}
+    }
+
+

@@ -1,0 +1,62 @@
+    /* Mouse-only lift; no permanent focus-based field highlight or outline. */
+    @media (hover:hover) and (pointer:fine) {
+      .field:not(.goal-pinned):not(.goal-computed):not(.goal-locked):hover {
+        background:var(--field-hover);
+        transform:translateY(-2px);
+        box-shadow:0 7px 17px rgba(41,32,21,.10);
+      }
+      .stat:hover {
+        transform:translateY(-3px) scale(1.006);
+        background:var(--card-hover);
+        border-color:#d7cab9;
+        box-shadow:0 12px 26px rgba(41,32,21,.15);
+      }
+      .panel:hover,.notes-panel:hover,.calc-dock:hover {
+        transform:translateY(-2px);
+        border-color:#d7cab9;
+        box-shadow:0 10px 25px rgba(41,32,21,.11);
+      }
+      .panel:hover,.notes-panel:hover {background:var(--card-hover);}
+      .tab:hover:not([aria-selected="true"]) {
+        background:color-mix(in srgb,var(--accent-soft) 38%,#fffdf9);
+        transform:translateY(-3px);
+      }
+      .tab[aria-selected="true"]:hover {
+        background:color-mix(in srgb,var(--accent-soft) 29%,#fffdf9);
+        transform:translateY(-2px);
+      }
+    }
+    /* Focusing a range must never leave its row highlighted after mouseleave. */
+    .field:not(.goal-pinned):not(.goal-computed):not(.goal-locked):focus-within:not(:hover) {
+      background:transparent;
+      box-shadow:none;
+      transform:none;
+    }
+    .field.goal-field:not(.goal-locked):not(.goal-computed):not(.goal-pinned):focus-within:not(:hover) {
+      background:rgba(190,176,156,.09);
+    }
+    @media (hover:none),(pointer:coarse) {
+      .field,.stat,.panel,.notes-panel,.calc-dock,.tab {
+        transform:none!important;
+      }
+    }
+    @media (prefers-reduced-motion:reduce) {
+      .shell,.field,.stat,.panel,.notes-panel,.calc-dock {transition:none!important;}
+      .stat:hover,.field:hover,.panel:hover,.notes-panel:hover,.calc-dock:hover {transform:none!important;}
+    }
+
+
+    /* v18: responsive, quiet lift of the colored hero card. */
+    .hero-result {
+      transition: transform .34s cubic-bezier(.22,1,.36,1),
+        box-shadow .34s ease, filter .34s ease, background-color .34s ease;
+      transform:translateY(0);
+    }
+    @media (hover:hover) and (pointer:fine) {
+      .hero-result:hover {
+        transform:translateY(-3px) scale(1.004);
+        box-shadow:inset 0 1px 0 #ffffff2d,0 15px 34px rgba(34,29,22,.20);
+        filter:brightness(1.042);
+      }
+    }
+

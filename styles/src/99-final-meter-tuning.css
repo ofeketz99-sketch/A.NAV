@@ -1,0 +1,23 @@
+    /* v30: the meter's center text stays inside its inner 100% ring.
+       The font size is fitted to the available circular aperture in JS. */
+    .hero-meter .meter-center {overflow:visible;}
+    .hero-meter .meter-center strong {
+      white-space:nowrap;
+      max-width:none;
+      flex-shrink:0;
+      transform:none;
+      transition:none;
+    }
+    .hero-meter .meter-center small {
+      max-width:100%;
+      overflow-wrap:normal;
+      font-size:clamp(8px,.78vw,10px);
+      line-height:1.15;
+    }
+    @media (max-width:540px) {
+      .hero-meter .meter-center small {font-size:8px;}
+    }
+    @media (prefers-reduced-motion:reduce) {
+      .hero-meter .meter-center strong {transition:none!important;}
+    }
+

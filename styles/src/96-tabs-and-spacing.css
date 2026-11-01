@@ -1,0 +1,45 @@
+    /* v21: RTL composition matches its labels and longer comparison caption. */
+    .composition-track {direction:rtl;}
+    .hero-baseline-label {text-wrap:balance;overflow-wrap:normal;line-height:1.45;}
+
+
+    /* v25: Allow vertical room for lift and shadow within the horizontal tab scrollport.
+       Without padding, overflow-x:auto also clips the tab's vertical hover paint. */
+    .tabs-bar { position:relative; z-index:8; overflow:visible; }
+    .tabs-bar .tabs {
+      align-items:center;
+      scrollbar-width:none;
+      scroll-padding-inline:8px;
+      padding-inline:8px;
+      padding-block:12px 19px;
+      box-sizing:border-box;
+    }
+    @media (min-width:1051px) {
+      /* The tab row is fixed-height on desktop; let only the transparent scrollport
+         extend beyond that row, without reducing space for the calculators. */
+      .tabs-bar .tabs {
+        align-self:center;
+        flex:1 1 0;
+        min-width:0;
+        height:auto;
+        transform:translateY(5px);
+        pointer-events:none;
+      }
+      .tabs-bar .tab-slot,
+      .tabs-bar .tab-slot * { pointer-events:auto; }
+    }
+    @media (max-width:1050px) {
+      .tabs-bar .tabs {
+        padding-block:10px 17px;
+        margin-block:-6px -10px;
+      }
+    }
+    @media (hover:hover) and (pointer:fine) {
+      .tab-slot:hover { z-index:2; }
+      .tab:hover {box-shadow:0 6px 12px rgba(43,34,25,.15);}
+      .tab[aria-selected="true"]:hover {
+        box-shadow:0 7px 13px rgba(43,34,25,.19),inset 0 -2px 0 var(--accent);
+      }
+    }
+
+

@@ -1,0 +1,62 @@
+    /* v9.6: highlight only while pointer is over a field.
+       A clicked range remains focused after mouseleave, so focus-within must
+       not leave a persistent background. Keyboard focus remains visible on
+       the focused control via the global :focus-visible styling. */
+    .field:focus-within {
+      background:transparent;
+      box-shadow:none;
+      transform:none;
+    }
+    .field:hover {
+      background:#eee7db;
+      box-shadow:none;
+      transform:none;
+    }
+    .field { transition:background-color .18s var(--ease-ui),opacity .18s ease; }
+    .field.is-placeholder:hover,.field-sort-ghost:hover { background:#eee6da; }
+    .range-control .default-tick {
+      height:11px;
+      width:3px;
+      z-index:1;
+      pointer-events:none;
+      border-color:#fffdfa;
+      transform:translate(-50%,-50%);
+    }
+    .field-reset-point,.field-reset-original {
+      border:0;
+      border-radius:6px;
+      background:transparent;
+      color:#827363;
+      flex:0 0 auto;
+      width:22px;
+      height:23px;
+      padding:0;
+      display:grid;
+      place-items:center;
+      line-height:1;
+      font-size:17px;
+      cursor:pointer;
+      transition:opacity .18s ease,color .18s ease,background-color .18s ease;
+    }
+    .field-reset-point:hover,.field-reset-original:hover,
+    .field-reset-point:focus-visible,.field-reset-original:focus-visible {
+      background:var(--accent-soft);
+      color:var(--accent);
+    }
+    .field-reset-point.is-custom { color:var(--accent); }
+    .field-reset-original[hidden]{display:none!important;}
+    @media (hover:hover) and (pointer:fine){
+      .field-reset-point,.field-reset-original{opacity:0;}
+      .field:hover .field-reset-point,.field:hover .field-reset-original,
+      .field:focus-within .field-reset-point,.field:focus-within .field-reset-original {opacity:1;}
+    }
+    @media (hover:none),(pointer:coarse){
+      .field-reset-point,.field-reset-original{display:none!important;}
+      .field:hover {background:transparent;}
+      .field:focus-within {background:transparent;}
+    }
+    .field.is-secondary input[type="range"]::-moz-range-thumb {width:14px;height:14px;}
+    @media (prefers-reduced-motion:reduce){
+      .field,.field-reset-point,.field-reset-original{transition:none!important;}
+    }
+
