@@ -1,0 +1,14 @@
+{
+  "version": 6,
+  "date": "2026-11-03",
+  "branch": "dev",
+  "title": "Stage 1 regression tests",
+  "changes": [
+    "Test that normal reset preserves locked inputs, locked target, scheduled deposits, computed values and manual history",
+    "Test that explicit full reset releases locks and clears schedules",
+    "Test saved scenario lock state round-trip and legacy scenario compatibility",
+    "Check locked target blocks both slider and numeric input updates"
+  ],
+  "parent": "Stage 1 fixes in patch 005",
+  "backup": "backups/2026-11-03-stage-01-locks-and-scenarios/tests/core.test.cjs"
+}

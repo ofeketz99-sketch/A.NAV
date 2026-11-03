@@ -58,3 +58,78 @@ test('dated deposits are counted exactly once',()=>{
 test('mortgage funding limits preserved',()=>{
  assert.deepEqual([model.limits.first,model.limits.upgrade,model.limits.invest],[.75,.7,.5]);
 });
+
+test('standard reset preserves locked fields, locked goal and deposit schedule',()=>{
+ const source=fs.readFileSync(path.join(root,'scripts/src/90-notes-and-activation.js'),'utf8');
+ const a=source.indexOf('  function resetCalculatorValues('),b=source.indexOf("  q('resetBtn').addEventListener",a);
+ assert.ok(a>=0&&b>a,'Reset function must be independently testable');
+ const ctx={
+  states:{savings:{initial:700,monthly:1000,years:10,rate:5,goal:1000000}},
+  configs:{savings:{fields:[['initial'],['monthly'],['years'],['rate'],['goal']]}},
+  goalPinned:{savings:['initial','rate']},goalPlans:{savings:{locked:true,solve:'monthly'}},
+  goalManuals:{savings:{initial:700,monthly:850,years:10,rate:5}},goalFeedback:{savings:null},
+  goalSolveChoices:[['monthly'],['years'],['initial'],['rate']],
+  contributions:{savings:[{month:6,amount:300}]},compareIds:{savings:'previous'},
+  advanced:{mortgage:{},index:{},budget:{}},
+  getResetPoint:(_,id)=>({initial:10,monthly:250,years:20,rate:3,goal:50000})[id],
+  goalSolver(tab){ctx.states[tab].monthly=750;ctx.solved=true;}
+ };
+ const reset=vm.runInNewContext(source.slice(a,b)+'\nresetCalculatorValues',ctx);
+ reset('savings',false);
+ assert.equal(ctx.states.savings.initial,700);
+ assert.equal(ctx.states.savings.rate,5);
+ assert.equal(ctx.states.savings.goal,1000000);
+ assert.equal(ctx.states.savings.years,20);
+ assert.equal(ctx.states.savings.monthly,750);
+ assert.equal(ctx.goalManuals.savings.monthly,850);
+ assert.equal(ctx.goalPlans.savings.locked,true);
+ assert.equal(ctx.contributions.savings.length,1);
+ assert.equal(ctx.solved,true);
+ reset('savings',true);
+ assert.equal(ctx.states.savings.initial,10);
+ assert.equal(ctx.states.savings.goal,50000);
+ assert.equal(ctx.states.savings.monthly,250);
+ assert.equal(ctx.goalPlans.savings.locked,false);
+ assert.equal(ctx.goalPinned.savings.length,0);
+ assert.equal(ctx.contributions.savings.length,0);
+ assert.equal(ctx.compareIds.savings,null);
+});
+test('saved scenario locks round-trip and legacy scenarios clear unrelated locks',()=>{
+ const normal=fs.readFileSync(path.join(root,'scripts/src/15-snapshots-and-storage.js'),'utf8');
+ const scenario=fs.readFileSync(path.join(root,'scripts/src/94-scenarios-and-settings.js'),'utf8');
+ const a=normal.indexOf('  function normalizeScenarioLockState('),b=normal.indexOf('  function restoreSnapshot(',a);
+ const c=scenario.indexOf('  function snapshotFor('),d=scenario.indexOf('  function renderScenarioList(',c);
+ assert.ok(a>=0&&b>a&&c>=0&&d>c,'Helpers must be individually testable');
+ const ctx={
+  configs:{savings:{fields:[['initial','',0,500000],['monthly','',0,15000],['years','',1,80],['rate','',0,12],['goal','',1000,50000000]]}},
+  states:{savings:{initial:100,monthly:500,years:20,rate:4,goal:100000}},
+  contributions:{savings:[{month:10,amount:400}]},
+  advanced:{savings:{}},goalPlans:{savings:{locked:true,solve:'monthly'}},
+  goalPinned:{savings:['initial']},goalManuals:{savings:{initial:100,monthly:450,years:20,rate:4}},
+  goalFeedback:{savings:null},
+  goalSolveChoices:[['monthly'],['years'],['initial'],['rate']],
+  structuredClone,clamp:(x,low,high)=>Math.max(low,Math.min(high,x)),
+  allowedKinds:[],goalSolver(){ctx.solveCalls=(ctx.solveCalls||0)+1;}
+ };
+ const api=vm.runInNewContext(normal.slice(a,b)+scenario.slice(c,d)+'\n({snapshotFor,loadScenarioRecord})',ctx);
+ const saved=api.snapshotFor('savings');
+ assert.equal(saved.lockState.locked,true);
+ assert.equal(saved.lockState.solve,'monthly');
+ assert.equal(saved.lockState.pinned.join(','),'initial');
+ ctx.goalPinned.savings=[];ctx.goalPlans.savings.locked=false;
+ api.loadScenarioRecord('savings',saved);
+ assert.equal(ctx.goalPlans.savings.locked,true);
+ assert.equal(ctx.goalPinned.savings[0],'initial');
+ assert.equal(ctx.solveCalls,1);
+ api.loadScenarioRecord('savings',{values:{...saved.values},events:[],advanced:{}});
+ assert.equal(ctx.goalPlans.savings.locked,false);
+ assert.equal(ctx.goalPinned.savings.length,0);
+ assert.equal(ctx.contributions.savings.length,0);
+});
+test('a locked target rejects manual mutations in both input and slider paths',()=>{
+ const source=fs.readFileSync(path.join(root,'scripts/src/32-goal-solving.js'),'utf8');
+ const edits=fs.readFileSync(path.join(root,'scripts/src/45-touch-sliders.js'),'utf8');
+ assert.match(source,/lockedTarget=locked&&id==='goal'/);
+ assert.match(source,/r\.disabled=n\.disabled=computed\|\|pinned\|\|lockedTarget/);
+ assert.match(edits,/if\(goalIsActive\(\)&&id==='goal'\)return;/);
+});
