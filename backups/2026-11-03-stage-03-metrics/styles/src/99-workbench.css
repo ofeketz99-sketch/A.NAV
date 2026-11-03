@@ -1,0 +1,91 @@
+
+/* Framed workbench extension */
+html,body{background:#e9e1d5}
+body{padding:8px}
+#financeApp.shell{background:linear-gradient(150deg,#fcfaf6,#f7f2ea 72%,#f8f3ec);border:1px solid #c6b6a1;border-radius:21px;box-shadow:0 14px 44px #3b2c1b1b,inset 0 1px 0 #ffffffbd;position:relative;padding:10px 16px 9px;isolation:isolate}
+#financeApp.shell::after{content:"";position:absolute;inset:4px;pointer-events:none;border-radius:17px;border:1px solid #ffffffac;z-index:-1}
+.frame-chrome{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto;padding:0 8px 9px;margin-bottom:9px;min-height:39px;border-bottom:1px solid #d8ccbc}
+.frame-identity{display:flex;align-items:center;gap:9px}
+.frame-monogram{display:grid;place-items:center;width:28px;height:28px;background:#292923;color:#fffaf1;border-radius:9px;font-weight:800;font-size:17px}
+.frame-identity strong{display:block;font-size:13px;font-weight:800}
+.frame-identity small{font-size:10px;color:#786f63}
+.frame-state{display:flex;align-items:center;gap:8px;color:#7a705f;font-size:10.5px}
+.frame-state-dot{height:7px;width:7px;background:#73856c;border-radius:50%;box-shadow:0 0 0 3px #e0e8dc}
+.tabs-bar{background:#f5efe7;border:1px solid #e0d5c8;border-radius:12px;padding:4px 6px;gap:8px}
+.tabs-bar .tab{border-color:transparent;background:transparent;box-shadow:none}
+.tabs-bar .tab[aria-selected=true]{background:#fffdf8;border-color:#cbbdaa;box-shadow:0 2px 8px #45311a16,inset 0 -2px 0 var(--accent)}
+.stat{position:relative;display:block;width:100%;font:inherit;text-align:right;cursor:pointer;appearance:none;outline-offset:3px}
+.stat::after{content:"↗";position:absolute;inset-inline-end:11px;top:7px;font-size:15px;color:#867765;opacity:0;transition:opacity .15s ease}
+.stat:hover::after,.stat:focus-visible::after{opacity:1}
+.stat:hover{background:#faf5ed}
+.stat-detail-value{font-size:clamp(29px,5vw,46px);font-weight:800;color:var(--accent);direction:ltr;text-align:right;margin:9px 0 15px}
+.stat-detail-info{color:#494035;font-size:14px;line-height:1.8}
+.stat-detail-footer{border-top:1px solid #e3d9c8;margin-top:16px;padding-top:11px;color:#86796b;font-size:11px}
+.bar-row[data-budget-field]{cursor:pointer;border-radius:8px;padding:3px 5px;margin-inline:-5px;transition:background .18s}
+.bar-row[data-budget-field]:hover,.bar-row[data-budget-field]:focus-visible{background:#f0e8dc;outline:2px solid var(--accent-soft);outline-offset:1px}
+.field.field-attention{animation:field-attention .55s ease 2}
+@keyframes field-attention{50%{background:#ece2d0;box-shadow:inset 0 0 0 2px #bba18b}}
+@media(min-width:1051px){#financeApp.shell{height:calc(100dvh - 16px);padding:9px 15px 7px}.frame-chrome{min-height:33px;padding-bottom:6px;margin-bottom:7px}}
+@media(max-width:1050px){body{padding:7px}#financeApp.shell{padding:11px;border-radius:17px}}
+@media(max-width:540px){body{padding:4px}#financeApp.shell{padding:8px;border-radius:13px}.frame-state{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.field.field-attention{animation:none}}
+
+/* Stage 2 — bounded internal scroll; never hide working controls on short monitors. */
+@media (min-width:1051px) {
+  #financeApp.shell {min-height:0;max-height:calc(100dvh - 16px);overflow:hidden;}
+  .content-layout,.main-column,.workspace,.controls,.results{min-height:0;min-width:0;}
+  .workspace{overflow:hidden;}
+  .controls{overflow:hidden;}
+  #controlsBody {
+    min-height:0;overflow-y:auto;overflow-x:hidden;
+    display:flex;flex-direction:column;justify-content:flex-start;
+    gap:clamp(8px,1.3vh,17px);padding:4px 6px 10px 3px;
+    overscroll-behavior:contain;scrollbar-gutter:stable;
+  }
+  #controlsBody .field,#controlsBody .select-field{flex:0 0 auto;min-height:0}
+  .results{
+    overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;
+    align-content:start;grid-template-rows:minmax(132px,auto) minmax(146px,auto) minmax(207px,1fr) minmax(54px,auto);
+    padding:3px 6px 9px 3px;gap:10px;
+  }
+  .results .hero-result{min-height:132px;flex-shrink:0;}
+  .results .stat-grid{min-height:146px;}
+  .results .chart-panel{min-height:207px;overflow:visible;}
+  .results .chart-panel #chart{min-height:154px;}
+  .results .insight{min-height:54px;}
+  .controls,.results,.notes-panel{scrollbar-color:#bbaa94 transparent;scrollbar-width:thin;}
+  #controlsBody{scrollbar-color:#bbaa94 transparent;scrollbar-width:thin;}
+}
+@media (min-width:1051px) and (max-height:680px) {
+  #financeApp.shell {padding-block:7px 5px;}
+  .frame-chrome{padding-bottom:3px;margin-bottom:4px;min-height:29px;}
+  .tabs-bar{margin-bottom:5px;}
+  .controls .panel-head{margin-bottom:5px;}
+  .results{grid-template-rows:minmax(124px,auto) minmax(138px,auto) minmax(190px,1fr) minmax(50px,auto);}
+  .results .chart-panel{min-height:190px;}
+}
+@media (min-width:1051px) and (max-width:1370px) {
+  .controls .panel-head{flex-wrap:wrap;gap:5px;}
+  .controls .panel-actions{flex-wrap:wrap;justify-content:flex-start;}
+  .controls .panel-actions > button{max-width:100%;}
+}
+@media (max-width:1050px) {
+  #financeApp.shell{max-height:none;overflow:visible;}
+  .main-column,.workspace,.controls,.results{min-width:0;min-height:0;}
+  .tabs-bar{height:auto;min-height:43px;}
+  .tabs-bar .tabs{max-width:100%;min-width:0;}
+  .workspace-tools{max-width:100%;flex-wrap:wrap;gap:5px;}
+  .field-heading{min-width:0;}
+  .hero-result,.stat,.chart-panel{max-width:100%;}
+  .stat-number,.hero-number{overflow-wrap:anywhere;}
+  .tool-overlay .tool-dialog{max-height:calc(100dvh - 24px);}
+  .tool-content{overscroll-behavior:contain;}
+}
+@media (max-width:540px) {
+  .frame-chrome{flex-wrap:wrap;gap:4px;}
+  .frame-state{font-size:9px;}
+  .panel-actions{gap:5px;flex-wrap:wrap;}
+  .panel-actions > button{min-height:32px;}
+  .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .bar-row{min-width:0;}
+}
