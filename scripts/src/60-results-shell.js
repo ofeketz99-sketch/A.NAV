@@ -10,7 +10,7 @@
     heroStatus.dataset.tone=tone||'info';
     heroStatus.title=insight||status||'';
     heroStatus.setAttribute('aria-label',(status||'')+(insight?': '+insight:''));
-    updateHeroSecondary();
+    updateHeroSecondary();updateTransferActions();
     const chartToggle=q('chartModeToggle'),isInvest=active==='savings'||active==='index';
     chartToggle.hidden=!isInvest;if(isInvest){chartToggle.setAttribute('aria-pressed',String(chartModes[active]));chartToggle.textContent=chartModes[active]?'הסתר הפקדות':'הצג הפקדות';}
   }

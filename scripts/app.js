@@ -1057,7 +1057,7 @@
     heroStatus.dataset.tone=tone||'info';
     heroStatus.title=insight||status||'';
     heroStatus.setAttribute('aria-label',(status||'')+(insight?': '+insight:''));
-    updateHeroSecondary();
+    updateHeroSecondary();updateTransferActions();
     const chartToggle=q('chartModeToggle'),isInvest=active==='savings'||active==='index';
     chartToggle.hidden=!isInvest;if(isInvest){chartToggle.setAttribute('aria-pressed',String(chartModes[active]));chartToggle.textContent=chartModes[active]?'הסתר הפקדות':'הצג הפקדות';}
   }
@@ -2162,6 +2162,61 @@
     changeValue(id,states[active][id]+sign*f[4],'chart-keyboard');
     const target=chart.querySelector(handle?'[data-chart-drag]':'[data-budget-field="'+id+'"]');
     target?.focus();
+  });
+
+  // Stage 7: explicit, one-time transfers. Never couple calculator values implicitly.
+  function availableTransfers(tab){
+    if(tab==='mortgage')return [{id:'mortgage-budget',to:'budget',field:'housing',label:'העבר החזר לתקציב',hint:'שכירות / משכנתא'}];
+    if(tab==='budget')return [
+      {id:'budget-savings',to:'savings',field:'monthly',label:'שלח חיסכון לתוכנית חיסכון',hint:'הפקדה חודשית'},
+      {id:'budget-index',to:'index',field:'monthly',label:'שלח חיסכון להשקעות',hint:'השקעה חודשית'}
+    ];
+    if(tab==='savings')return [{id:'savings-index',to:'index',field:'monthly',label:'העבר הפקדה להשקעות',hint:'השקעה חודשית'}];
+    return [];
+  }
+  function transferValue(tab,route){
+    if(tab==='mortgage'){
+      const s=states.mortgage,r=schedule(Math.max(0,s.price-s.equity),s.rate,s.years,s.extra);
+      return Math.round(r.payment+advanced.mortgage.insurance);
+    }
+    if(tab==='budget')return states.budget.savings;
+    if(tab==='savings')return states.savings.monthly;
+    return 0;
+  }
+  function updateTransferActions(){
+    const holder=q('transferActions'),routes=availableTransfers(active);
+    holder.hidden=!routes.length;
+    if(!routes.length){holder.innerHTML='';return;}
+    holder.innerHTML='<span class="transfer-prefix">העבר נתונים בין מחשבונים (בהסכמה בלבד):</span>'+
+      routes.map(route=>'<button type="button" class="transfer-button" data-transfer="'+route.id+'" title="העברת ערך חד־פעמית עם אישור">'+escapeHtml(route.label)+'</button>').join('');
+  }
+  q('transferActions').addEventListener('click',event=>{
+    const button=event.target.closest('[data-transfer]');if(!button)return;
+    const source=active,route=availableTransfers(source).find(x=>x.id===button.dataset.transfer);
+    if(!route)return;
+    const f=configs[route.to].fields.find(x=>x[0]===route.field);if(!f)return;
+    const value=transferValue(source,route);
+    if(!Number.isFinite(value)||value<f[2]||value>f[3]){
+      alert('לא ניתן להעביר '+money(value)+' · הערך מחוץ לטווח הקלט של המחשבון המקבל. ניתן להזין ערך מתאים ידנית.');
+      return;
+    }
+    if(goalPinned[route.to]?.includes(route.field)||
+      (goalPlans[route.to]?.locked&&goalPlans[route.to].solve===route.field)){
+      alert('המשתנה במחשבון המקבל נעול או מחושב אוטומטית. יש לשחרר את הנעילה לפני העברה.');
+      return;
+    }
+    const old=states[route.to][route.field],label=fieldLabels[route.to][route.field]||f[1];
+    if(!confirm('להעביר '+money(value)+' מ־'+tabLabels[source]+' אל '+tabLabels[route.to]+'?'+
+      '\nהשדה: '+label+'\nערך קודם: '+money(old)+
+      '\nהעברה זו חד־פעמית ולא תיצור סנכרון אוטומטי.'))return;
+    states[route.to][route.field]=value;
+    if(goalPlans[route.to]?.locked){
+      if(!goalManuals[route.to])goalManuals[route.to]=Object.fromEntries(goalSolveChoices.map(([id])=>[id,states[route.to][id]]));
+      goalManuals[route.to][route.field]=value;
+      goalSolver(route.to);
+    }
+    activate(route.to);
+    q('saveStatus').textContent='הועבר '+money(value)+' אל '+tabLabels[route.to]+' · ניתן לבטל באמצעות ביטול פעולה';
   });
   // Double click a slider, including its surrounding track, restores its factory default.
   controlList.addEventListener('dblclick',e=>{

@@ -1,0 +1,8 @@
+
+/* Stage 7: opt-in copies between calculators, with explicit user confirmation. */
+.transfer-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-top:1px solid #e9dfd2;padding:8px 1px 2px;margin-top:5px}
+.transfer-actions[hidden]{display:none!important}
+.transfer-prefix{font-size:9px;color:#827361}
+.transfer-button{border:1px solid #cbbda9;background:#faf5ed;color:#4b3d30;padding:5px 8px;font-size:10px;font-weight:640;border-radius:7px;white-space:nowrap}
+.transfer-button:hover,.transfer-button:focus-visible{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+@media(min-width:1051px){.chart-panel:has(.transfer-actions:not([hidden])){min-height:258px}}

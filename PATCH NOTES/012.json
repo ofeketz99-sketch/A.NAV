@@ -1,0 +1,16 @@
+{
+  "version": 12,
+  "stage": 7,
+  "branch": "dev",
+  "date": "2026-11-03",
+  "title": "Optional transfers between financial calculators",
+  "changes": [
+    "Mortgage payment can be copied to monthly budget housing costs",
+    "Budget savings contributions can be copied to savings or index investment calculators",
+    "Savings monthly contribution can be copied to index investments",
+    "Transfer requires user confirmation, checks constraints and switches to receiving calculator",
+    "Existing locked or auto-computed target inputs cannot be overwritten",
+    "Transfer is explicitly one-time, not automatic synchronization"
+  ],
+  "backup": "backups/2026-11-03-stage-07-transfers/"
+}

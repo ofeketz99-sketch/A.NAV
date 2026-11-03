@@ -2446,3 +2446,11 @@ body{padding:8px}
 .flow-legend-item[data-budget-field]{cursor:pointer;padding:3px;border-radius:5px}
 .flow-legend-item[data-budget-field]:hover,.flow-legend-item[data-budget-field]:focus-visible{background:#efe6d9;outline:1px solid #cebca8}
 @media(max-width:540px){.flow-legend{grid-template-columns:1fr 1fr;gap:4px}.flow-legend-item{font-size:9px}.flow-legend-item strong{font-size:9px}.budget-flow-head{flex-wrap:wrap}}
+
+/* Stage 7: opt-in copies between calculators, with explicit user confirmation. */
+.transfer-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-top:1px solid #e9dfd2;padding:8px 1px 2px;margin-top:5px}
+.transfer-actions[hidden]{display:none!important}
+.transfer-prefix{font-size:9px;color:#827361}
+.transfer-button{border:1px solid #cbbda9;background:#faf5ed;color:#4b3d30;padding:5px 8px;font-size:10px;font-weight:640;border-radius:7px;white-space:nowrap}
+.transfer-button:hover,.transfer-button:focus-visible{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+@media(min-width:1051px){.chart-panel:has(.transfer-actions:not([hidden])){min-height:258px}}
