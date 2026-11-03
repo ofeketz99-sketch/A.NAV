@@ -1,3 +1,6 @@
+  function compactTabName(value){
+    return value==='השקעה ב־S&P 500'?'S&P 500':value==='תקציב חודשי'?'תקציב':value;
+  }
   // Direct manipulation: each tab has its own grip and inline edit control.
   // No extra arrangement menu or nested editable input inside a button.
   const tabList=q('tabList');
@@ -6,7 +9,7 @@
     const slot=document.createElement('div');
     slot.className='tab-slot';slot.dataset.tab=id;slot.setAttribute('role','presentation');
     const label=document.createElement('span');label.className='tab-label';
-    label.textContent=tabLabels[id];btn.replaceChildren(label);
+    label.textContent=compactTabName(tabLabels[id]);btn.replaceChildren(label);
     const grip=document.createElement('button');grip.type='button';grip.className='tab-grip';
     grip.textContent='⠿';grip.title='גרור כדי לשנות סדר · חצים במקלדת';
     const edit=document.createElement('button');edit.type='button';edit.className='tab-rename';
@@ -17,7 +20,7 @@
   function refreshTabLabels(){
     for(const slot of tabList.querySelectorAll('.tab-slot')){
       const tab=slot.dataset.tab;
-      slot.querySelector('.tab-label').textContent=tabLabels[tab];
+      slot.querySelector('.tab-label').textContent=compactTabName(tabLabels[tab]);
       slot.querySelector('.tab-rename').setAttribute('aria-label','שנה שם '+tabLabels[tab]);
       slot.querySelector('.tab-grip').setAttribute('aria-label','גרור לסידור '+tabLabels[tab]+' או השתמש בחצים');
     }

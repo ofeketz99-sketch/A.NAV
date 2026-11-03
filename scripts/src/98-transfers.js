@@ -41,7 +41,7 @@
       return;
     }
     const old=states[route.to][route.field],label=fieldLabels[route.to][route.field]||f[1];
-    if(!confirm('להעביר '+money(value)+' מ־'+tabLabels[source]+' אל '+tabLabels[route.to]+'?'+
+    if(!confirm('להעביר '+money(value)+' מ־'+compactTabName(tabLabels[source])+' אל '+compactTabName(tabLabels[route.to])+'?'+
       '\nהשדה: '+label+'\nערך קודם: '+money(old)+
       '\nהעברה חד־פעמית.'))return;
     states[route.to][route.field]=value;
@@ -51,5 +51,5 @@
       goalSolver(route.to);
     }
     activate(route.to);
-    q('saveStatus').textContent='הועבר '+money(value)+' אל '+tabLabels[route.to]+' · ניתן לבטל באמצעות ביטול פעולה';
+    q('saveStatus').textContent='הועבר '+money(value)+' אל '+compactTabName(tabLabels[route.to])+' · ניתן לבטל באמצעות ביטול פעולה';
   });

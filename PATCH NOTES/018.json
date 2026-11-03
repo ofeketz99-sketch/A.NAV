@@ -1,0 +1,12 @@
+{
+  "version": 18,
+  "date": "2026-11-03",
+  "branch": "dev",
+  "title": "Concise labels for existing saved users",
+  "changes": [
+    "Shortened legacy default tab names at render time without overwriting user-defined names",
+    "Unified built-in field label shortening across inputs, charts and scenario editing",
+    "Preserved field values, stored settings, custom labels and calculator logic"
+  ],
+  "backup": "backups/2026-11-03T23-30-00Z-persisted-labels/"
+}

@@ -18,6 +18,25 @@
   const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fields=(...xs)=>xs;
 
+  // Default text is shortened for display only; custom labels remain untouched.
+  function compactFieldLabel(value){
+    const defaults={
+      'הכנסה נטו של משק הבית':'הכנסה נטו',
+      'שכירות / משכנתא':'דיור',
+      'חשבונות והוצאות בית':'חשבונות',
+      'מחיה, קניות ותחבורה':'מחיה ותחבורה',
+      'הפרשה חודשית לחיסכון':'חיסכון חודשי',
+      'תקופת המשכנתא':'תקופה',
+      'תקופת ההחזר':'תקופה',
+      'החזר נוסף בכל חודש':'החזר נוסף',
+      'ריבית שנתית משוערת':'ריבית שנתית',
+      'תשואה שנתית נומינלית':'תשואה שנתית',
+      'מספר שנות חיסכון':'תקופה',
+      'משך ההשקעה':'תקופה',
+      'יעד תיק השקעות':'יעד השקעה'
+    };
+    return defaults[value]||value;
+  }
   const helpText={
     mortgage:{price:'מחיר הנכס, לפני עלויות העסקה.',equity:'הון עצמי זמין, ללא הוצאות רכישה.',rate:'ריבית לסימולציה; בפועל תלויה במסלול הבנק.',years:'תקופה ארוכה מפחיתה החזר ומגדילה ריבית.',extra:'החזר נוסף עשוי לקצר את ההלוואה. לא כולל עמלת פירעון.'},
     savings:{rate:'תשואה שנתית משוערת עם צבירה חודשית; אינה מובטחת.',goal:'יעד נומינלי מחושב בהנחת תשואה קבועה. אפשר לנעול אותו ולפתור משתנה אחר.'},
@@ -651,13 +670,7 @@
     for(const id of fieldOrder[active]){
       const [,defaultLabel,min,max,step,,unit]=byId[id];
       const rawLabel=fieldLabels[active][id]||defaultLabel;
-      const compactLabels={'הכנסה נטו של משק הבית':'הכנסה נטו','שכירות / משכנתא':'דיור',
-        'חשבונות והוצאות בית':'חשבונות','מחיה, קניות ותחבורה':'מחיה ותחבורה',
-        'הפרשה חודשית לחיסכון':'חיסכון חודשי','תקופת המשכנתא':'תקופה',
-        'תקופת ההחזר':'תקופה','החזר נוסף בכל חודש':'החזר נוסף',
-        'ריבית שנתית משוערת':'ריבית שנתית','תשואה שנתית נומינלית':'תשואה שנתית',
-        'מספר שנות חיסכון':'תקופה','משך ההשקעה':'תקופה','יעד תיק השקעות':'יעד השקעה'};
-      const label=compactLabels[rawLabel]||rawLabel;
+      const label=compactFieldLabel(rawLabel);
       const upper=active==='mortgage'&&id==='equity'?Math.min(max,s.price):max;
       const val=clamp(s[id],min,upper);s[id]=val;
       const isCustom=Object.hasOwn(resetPoints[active],id);
@@ -1243,7 +1256,7 @@
       const housingShare=s.income?s.housing/s.income*100:0,saveShare=s.income?s.savings/s.income*100:0;
       show(left>=0?'יתרה פנויה בסוף החודש':'גירעון חודשי',money(left),'תקציב',left>=0?'הכנסה פחות הוצאות וחיסכון.':'הוצאות וחיסכון מעל ההכנסה.',[
         ['הוצאות',money(expenses),'ללא חיסכון'],['חיסכון שנתי',money(s.savings*12),'בקצב קבוע'],['דיור מסך ההכנסה',pct(housingShare),'דיור'],['שיעור החיסכון',pct(saveShare),'מהנטו']
-      ],'חלוקת הכנסה','חלוקת תקציב',(budgetFlowMode?budgetFlowChart([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[fieldLabels.budget[id]||label,s[id],id]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[]),s.income):budgetBars([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[fieldLabels.budget[id]||label,s[id],id]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[]))),`סה״כ הוצאות והפקדות מתוכננות: ${money(expenses+s.savings)} מתוך הכנסה של ${money(s.income)}.`,left<0?`גירעון של ${money(-left)} בחודש. כדאי לצמצם הוצאות או להתאים את החיסכון.`:`אם התקציב יישמר, עודף שנתי: ${money(left*12)}.`,left<0?'warn':left/s.income<.05?'info':'good',left<0?'גירעון חודשי':left/s.income<.05?'מרווח תקציבי נמוך':'עודף תקציבי');
+      ],'חלוקת הכנסה','חלוקת תקציב',(budgetFlowMode?budgetFlowChart([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[compactFieldLabel(fieldLabels.budget[id]||label),s[id],id]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[]),s.income):budgetBars([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[compactFieldLabel(fieldLabels.budget[id]||label),s[id],id]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[]))),`סה״כ הוצאות והפקדות מתוכננות: ${money(expenses+s.savings)} מתוך הכנסה של ${money(s.income)}.`,left<0?`גירעון של ${money(-left)} בחודש. כדאי לצמצם הוצאות או להתאים את החיסכון.`:`אם התקציב יישמר, עודף שנתי: ${money(left*12)}.`,left<0?'warn':left/s.income<.05?'info':'good',left<0?'גירעון חודשי':left/s.income<.05?'מרווח תקציבי נמוך':'עודף תקציבי');
     }
     const budgetToggle=q('budgetChartToggle');budgetToggle.hidden=active!=='budget';
     budgetToggle.setAttribute('aria-pressed',String(budgetFlowMode));
@@ -1399,6 +1412,9 @@
       ],{duration:direction==='x'?240:210,easing:'cubic-bezier(.22,1,.36,1)'});
     }
   }
+  function compactTabName(value){
+    return value==='השקעה ב־S&P 500'?'S&P 500':value==='תקציב חודשי'?'תקציב':value;
+  }
   // Direct manipulation: each tab has its own grip and inline edit control.
   // No extra arrangement menu or nested editable input inside a button.
   const tabList=q('tabList');
@@ -1407,7 +1423,7 @@
     const slot=document.createElement('div');
     slot.className='tab-slot';slot.dataset.tab=id;slot.setAttribute('role','presentation');
     const label=document.createElement('span');label.className='tab-label';
-    label.textContent=tabLabels[id];btn.replaceChildren(label);
+    label.textContent=compactTabName(tabLabels[id]);btn.replaceChildren(label);
     const grip=document.createElement('button');grip.type='button';grip.className='tab-grip';
     grip.textContent='⠿';grip.title='גרור כדי לשנות סדר · חצים במקלדת';
     const edit=document.createElement('button');edit.type='button';edit.className='tab-rename';
@@ -1418,7 +1434,7 @@
   function refreshTabLabels(){
     for(const slot of tabList.querySelectorAll('.tab-slot')){
       const tab=slot.dataset.tab;
-      slot.querySelector('.tab-label').textContent=tabLabels[tab];
+      slot.querySelector('.tab-label').textContent=compactTabName(tabLabels[tab]);
       slot.querySelector('.tab-rename').setAttribute('aria-label','שנה שם '+tabLabels[tab]);
       slot.querySelector('.tab-grip').setAttribute('aria-label','גרור לסידור '+tabLabels[tab]+' או השתמש בחצים');
     }
@@ -1832,7 +1848,7 @@
       fields.map(f=>{
         const id=f[0],value=Number.isFinite(source[id])?source[id]:f[5];
         const locked=side==='current'&&(goalPinned[active]?.includes(id)||(goalIsActive()&&goalPlans[active].solve===id));
-        const label=fieldLabels[active][id]||f[1];
+        const label=compactFieldLabel(fieldLabels[active][id]||f[1]);
         return '<label class="compare-edit-row"><span>'+escapeHtml(label)+'</span><input type="number" inputmode="decimal" data-compare-side="'+side+'" data-compare-id="'+id+'" min="'+f[2]+'" max="'+f[3]+'" step="any" value="'+value+'"'+(locked?' disabled title="ערך נעול או מחושב"':'')+'></label>';
       }).join('')+'</section>';
     }
@@ -2245,7 +2261,7 @@
       return;
     }
     const old=states[route.to][route.field],label=fieldLabels[route.to][route.field]||f[1];
-    if(!confirm('להעביר '+money(value)+' מ־'+tabLabels[source]+' אל '+tabLabels[route.to]+'?'+
+    if(!confirm('להעביר '+money(value)+' מ־'+compactTabName(tabLabels[source])+' אל '+compactTabName(tabLabels[route.to])+'?'+
       '\nהשדה: '+label+'\nערך קודם: '+money(old)+
       '\nהעברה חד־פעמית.'))return;
     states[route.to][route.field]=value;
@@ -2255,7 +2271,7 @@
       goalSolver(route.to);
     }
     activate(route.to);
-    q('saveStatus').textContent='הועבר '+money(value)+' אל '+tabLabels[route.to]+' · ניתן לבטל באמצעות ביטול פעולה';
+    q('saveStatus').textContent='הועבר '+money(value)+' אל '+compactTabName(tabLabels[route.to])+' · ניתן לבטל באמצעות ביטול פעולה';
   });
 
   // Stage 8: deterministic Monte Carlo illustration, not an investment forecast.

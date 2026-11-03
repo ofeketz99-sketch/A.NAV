@@ -15,13 +15,7 @@
     for(const id of fieldOrder[active]){
       const [,defaultLabel,min,max,step,,unit]=byId[id];
       const rawLabel=fieldLabels[active][id]||defaultLabel;
-      const compactLabels={'הכנסה נטו של משק הבית':'הכנסה נטו','שכירות / משכנתא':'דיור',
-        'חשבונות והוצאות בית':'חשבונות','מחיה, קניות ותחבורה':'מחיה ותחבורה',
-        'הפרשה חודשית לחיסכון':'חיסכון חודשי','תקופת המשכנתא':'תקופה',
-        'תקופת ההחזר':'תקופה','החזר נוסף בכל חודש':'החזר נוסף',
-        'ריבית שנתית משוערת':'ריבית שנתית','תשואה שנתית נומינלית':'תשואה שנתית',
-        'מספר שנות חיסכון':'תקופה','משך ההשקעה':'תקופה','יעד תיק השקעות':'יעד השקעה'};
-      const label=compactLabels[rawLabel]||rawLabel;
+      const label=compactFieldLabel(rawLabel);
       const upper=active==='mortgage'&&id==='equity'?Math.min(max,s.price):max;
       const val=clamp(s[id],min,upper);s[id]=val;
       const isCustom=Object.hasOwn(resetPoints[active],id);

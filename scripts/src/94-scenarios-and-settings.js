@@ -67,7 +67,7 @@
       fields.map(f=>{
         const id=f[0],value=Number.isFinite(source[id])?source[id]:f[5];
         const locked=side==='current'&&(goalPinned[active]?.includes(id)||(goalIsActive()&&goalPlans[active].solve===id));
-        const label=fieldLabels[active][id]||f[1];
+        const label=compactFieldLabel(fieldLabels[active][id]||f[1]);
         return '<label class="compare-edit-row"><span>'+escapeHtml(label)+'</span><input type="number" inputmode="decimal" data-compare-side="'+side+'" data-compare-id="'+id+'" min="'+f[2]+'" max="'+f[3]+'" step="any" value="'+value+'"'+(locked?' disabled title="ערך נעול או מחושב"':'')+'></label>';
       }).join('')+'</section>';
     }

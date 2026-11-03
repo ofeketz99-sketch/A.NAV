@@ -184,3 +184,13 @@ test('non-scrolling dialogs offer explicit pages and tab access on narrow screen
  assert.match(js,/MutationObserver/);
  assert.match(js,/data-modal-next/);
 });
+
+test('saved default labels remain concise without mutating user custom labels',()=>{
+ const config=fs.readFileSync(path.join(root,'scripts/src/05-config.js'),'utf8');
+ const tabs=fs.readFileSync(path.join(root,'scripts/src/80-tab-navigation.js'),'utf8');
+ const controls=fs.readFileSync(path.join(root,'scripts/src/40-input-controls.js'),'utf8');
+ assert.match(config,/function compactFieldLabel\(value\)/);
+ assert.match(controls,/compactFieldLabel\(rawLabel\)/);
+ assert.match(tabs,/compactTabName\(tabLabels\[id\]\)/);
+ assert.match(tabs,/value==='תקציב חודשי'\?'תקציב'/);
+});
