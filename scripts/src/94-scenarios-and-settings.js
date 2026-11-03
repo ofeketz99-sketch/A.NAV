@@ -33,7 +33,77 @@
   function renderScenarioList(){
     const list=q('scenarioList');const listItems=scenarios[active];
     list.innerHTML=listItems.length?listItems.map(x=>`<div class="scenario-row"><div><strong>${escapeHtml(x.name)}</strong><small>${x.events?.length||0} אירועי הפקדה</small></div><div class="scenario-actions"><button type="button" data-scenario="${x.id}" data-action="load">טען</button><button type="button" data-scenario="${x.id}" data-action="compare" aria-pressed="${compareIds[active]===x.id}">${compareIds[active]===x.id?'בטל השוואה':'השווה'}</button><button type="button" data-scenario="${x.id}" data-action="delete">מחק</button></div></div>`).join(''):'<p class="tool-small">עדיין לא שמרת תרחישים למחשבון הזה.</p>';
+    renderCompareWorkbench();
   }
+
+  // Stage 5: a two-column editable comparison. Draft edits never change the saved scenario.
+  const compareDrafts=Object.create(null);
+  const compareEditableIds={
+    mortgage:['price','equity','rate','years'],
+    savings:['initial','monthly','years','rate'],
+    index:['initial','monthly','years','rate'],
+    loan:['principal','rate','months','extra'],
+    budget:['income','housing','living','savings']
+  };
+  function updateCompareSummary(){
+    const container=q('compareWorkbench');
+    if(container.hidden)return;
+    const present=currentScenarioValue(),comparison=scenarioOutput(active,scenarioFor(active));
+    if(!present||!comparison)return;
+    const delta=present.value-comparison.value;
+    q('compareCurrentValue').textContent=money(present.value);
+    q('compareDraftValue').textContent=money(comparison.value);
+    q('compareDifference').textContent=(delta>=0?'+':'−')+money(Math.abs(delta));
+    q('compareDifference').dataset.tone=Math.abs(delta)<.5?'neutral':delta>=0?'positive':'negative';
+  }
+  function renderCompareWorkbench(){
+    const wrapper=q('compareWorkbench'),rec=scenarios[active].find(x=>x.id===compareIds[active]);
+    if(!rec){wrapper.hidden=true;wrapper.innerHTML='';delete compareDrafts[active];return;}
+    wrapper.hidden=false;
+    if(compareDrafts[active]?.id!==rec.id)compareDrafts[active]=structuredClone(rec);
+    const draft=compareDrafts[active],fields=compareEditableIds[active].map(id=>configs[active].fields.find(f=>f[0]===id)).filter(Boolean);
+    function pane(side,source,title){
+      return '<section class="compare-pane"><strong>'+escapeHtml(title)+'</strong>'+
+      fields.map(f=>{
+        const id=f[0],value=Number.isFinite(source[id])?source[id]:f[5];
+        const locked=side==='current'&&(goalPinned[active]?.includes(id)||(goalIsActive()&&goalPlans[active].solve===id));
+        const label=fieldLabels[active][id]||f[1];
+        return '<label class="compare-edit-row"><span>'+escapeHtml(label)+'</span><input type="number" inputmode="decimal" data-compare-side="'+side+'" data-compare-id="'+id+'" min="'+f[2]+'" max="'+f[3]+'" step="any" value="'+value+'"'+(locked?' disabled title="ערך נעול או מחושב"':'')+'></label>';
+      }).join('')+'</section>';
+    }
+    wrapper.innerHTML='<div class="compare-workbench-head"><strong>השוואה חיה</strong><span>עריכת הצד השמאלי אינה משנה את התרחיש המקורי עד לשמירה כעותק</span></div>'+
+      '<div class="compare-dual">'+pane('current',states[active],'הגיליון הנוכחי')+pane('draft',draft.values,rec.name+' · עותק לעריכה')+'</div>'+
+      '<div class="compare-summary"><div><small>נוכחי</small><strong id="compareCurrentValue"></strong></div><div><small>להשוואה</small><strong id="compareDraftValue"></strong></div><div><small>הפרש</small><strong id="compareDifference"></strong></div></div>'+
+      '<div class="compare-actions"><button type="button" class="tool-primary" id="compareSaveCopy">שמור את התרחיש הערוך כעותק</button><span>שינויי ההשוואה זמניים עד לשמירה</span></div>';
+    updateCompareSummary();
+  }
+  q('compareWorkbench').addEventListener('input',event=>{
+    const input=event.target.closest('[data-compare-id]');if(!input||input.value==='')return;
+    const tab=active,id=input.dataset.compareId,f=configs[tab].fields.find(x=>x[0]===id);
+    if(!f)return;
+    const val=Number(input.value);if(!Number.isFinite(val))return;
+    const limited=clamp(val,f[2],tab==='mortgage'&&id==='equity'?Math.min(f[3],input.dataset.compareSide==='draft'?compareDrafts[tab].values.price:states[tab].price):f[3]);
+    if(input.dataset.compareSide==='current'){
+      changeValue(id,limited,'compare-editor');
+    }else{
+      const draft=compareDrafts[tab];if(!draft)return;
+      draft.values[id]=limited;
+      if(tab==='mortgage')draft.values.equity=Math.min(draft.values.equity,draft.values.price);
+      renderResults();
+    }
+    updateCompareSummary();
+  });
+  q('compareWorkbench').addEventListener('click',event=>{
+    if(!event.target.closest('#compareSaveCopy'))return;
+    const tab=active,draft=compareDrafts[tab];if(!draft)return;
+    if(scenarios[tab].length>=12){q('scenarioMessage').textContent='יש מקום לעד 12 תרחישים. מחק תרחיש כדי לשמור עותק.';return;}
+    const copy=structuredClone(draft);copy.id='s'+Date.now()+Math.floor(Math.random()*10000);
+    copy.name=(draft.name+' · עותק').slice(0,42);
+    if(copy.lockState)copy.lockState={locked:false,solve:'monthly',pinned:[],manuals:null};
+    scenarios[tab].push(copy);compareIds[tab]=copy.id;delete compareDrafts[tab];
+    q('scenarioMessage').textContent='ההשוואה הערוכה נשמרה כתרחיש חדש.';
+    renderScenarioList();renderResults();saveState();
+  });
   q('scenarioSave').addEventListener('click',()=>{
     const name=q('scenarioName').value.trim();if(!name){q('scenarioMessage').textContent='יש להזין שם לתרחיש.';return;}
     if(scenarios[active].length>=12){q('scenarioMessage').textContent='אפשר לשמור עד 12 תרחישים למחשבון.';return;}
@@ -43,8 +113,8 @@
   q('scenarioList').addEventListener('click',e=>{
     const b=e.target.closest('button[data-scenario]');if(!b)return;
     const tab=active,rec=scenarios[tab].find(x=>x.id===b.dataset.scenario);if(!rec)return;
-    if(b.dataset.action==='compare'){compareIds[tab]=compareIds[tab]===rec.id?null:rec.id;renderScenarioList();renderResults();saveState();return;}
-    if(b.dataset.action==='delete'){scenarios[tab]=scenarios[tab].filter(x=>x.id!==rec.id);if(compareIds[tab]===rec.id)compareIds[tab]=null;renderScenarioList();renderResults();saveState();return;}
+    if(b.dataset.action==='compare'){compareIds[tab]=compareIds[tab]===rec.id?null:rec.id;delete compareDrafts[tab];renderScenarioList();renderResults();saveState();return;}
+    if(b.dataset.action==='delete'){scenarios[tab]=scenarios[tab].filter(x=>x.id!==rec.id);if(compareIds[tab]===rec.id){compareIds[tab]=null;delete compareDrafts[tab];}renderScenarioList();renderResults();saveState();return;}
     if(b.dataset.action==='load'){
       loadScenarioRecord(tab,rec);
       closeTool();activate(tab);saveState();

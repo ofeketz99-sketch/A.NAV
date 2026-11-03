@@ -2405,3 +2405,26 @@ body{padding:8px}
 .bar-chart-guide{font-size:9.5px;color:#7c6d5c;padding:4px 1px;line-height:1.4}
 @media(max-width:540px){.bar-chart-guide{font-size:9px}}
 @media(prefers-reduced-motion:reduce){.line-chart .chart-edit-halo{transition:none}}
+
+/* Stage 5 — editable two-scenario comparison, including numeric delta. */
+#scenarioOverlay .tool-dialog{width:min(860px,100%)}
+.compare-workbench{margin-top:18px;border-top:1px solid #e2d6c7;padding-top:14px}
+.compare-workbench[hidden]{display:none}
+.compare-workbench-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
+.compare-workbench-head strong{font-size:15px;color:#32281f}
+.compare-workbench-head span,.compare-actions span{color:#837362;font-size:10px;line-height:1.5}
+.compare-dual{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.compare-pane{min-width:0;background:#faf5ed;border:1px solid #ded2c2;border-radius:12px;padding:11px}
+.compare-pane>strong{font-size:12px;color:#463a2d}
+.compare-edit-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;font-size:10.5px;color:#655747}
+.compare-edit-row span{min-width:0}
+.compare-edit-row input{width:clamp(75px,38%,122px);min-width:65px;padding:6px 8px;border:1px solid #d6c9b8;border-radius:7px;background:#fffdf9;text-align:left;direction:ltr;font-variant-numeric:tabular-nums;font-size:11px}
+.compare-edit-row input:disabled{background:#ebe0d2;color:#736756;cursor:not-allowed}
+.compare-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.compare-summary>div{background:#f5efe6;border:1px solid #e4d9cb;border-radius:10px;padding:10px;min-width:0}
+.compare-summary small{display:block;color:#887866;font-size:9px;margin-bottom:5px}
+.compare-summary strong{display:block;color:#32271c;font-size:clamp(12px,1.3vw,17px);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.compare-summary strong[data-tone=negative]{color:#a35340}
+.compare-summary strong[data-tone=positive]{color:#52734a}
+.compare-actions{display:flex;gap:11px;align-items:center;flex-wrap:wrap}
+@media(max-width:600px){.compare-dual{grid-template-columns:1fr}.compare-workbench-head{display:block}.compare-summary strong{font-size:12px}.compare-pane{padding:9px}}

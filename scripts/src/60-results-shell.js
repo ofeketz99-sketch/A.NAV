@@ -15,7 +15,7 @@
     chartToggle.hidden=!isInvest;if(isInvest){chartToggle.setAttribute('aria-pressed',String(chartModes[active]));chartToggle.textContent=chartModes[active]?'הסתר הפקדות':'הצג הפקדות';}
   }
 
-  function scenarioFor(tab){return scenarios[tab].find(x=>x.id===compareIds[tab])||null;}
+  function scenarioFor(tab){const rec=scenarios[tab].find(x=>x.id===compareIds[tab])||null;return rec&&compareDrafts[tab]?.id===rec.id?compareDrafts[tab]:rec;}
   function scenarioOutput(tab,rec){
     if(!rec)return null;
     const s=rec.values||{};

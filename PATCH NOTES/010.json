@@ -1,0 +1,15 @@
+{
+  "version": 10,
+  "stage": 5,
+  "branch": "dev",
+  "date": "2026-11-03",
+  "title": "Live editable scenario comparison",
+  "changes": [
+    "Scenario modal now includes dual side-by-side numeric editors and result differences",
+    "Current and draft values can be changed independently; result chart and delta update immediately",
+    "Unsaved comparison draft does not overwrite the original saved scenario",
+    "Explicit option saves edited comparison as a new scenario",
+    "Clears draft when selected comparison is deleted or deselected"
+  ],
+  "backup": "backups/2026-11-03-stage-05-compare/"
+}
