@@ -31,6 +31,7 @@
   const compareIds=Object.fromEntries(defaultOrder.map(tab=>[tab,null]));
   const chartModes={savings:false,index:false};
   let budgetFlowMode=false;
+  const riskSettings={enabled:false,volatility:18};
   const goalPlans={savings:{locked:false,solve:'monthly'},index:{locked:false,solve:'monthly'}};
   const goalFeedback={savings:null,index:null};
   const goalManuals={savings:null,index:null};

@@ -99,6 +99,7 @@
   const compareIds=Object.fromEntries(defaultOrder.map(tab=>[tab,null]));
   const chartModes={savings:false,index:false};
   let budgetFlowMode=false;
+  const riskSettings={enabled:false,volatility:18};
   const goalPlans={savings:{locked:false,solve:'monthly'},index:{locked:false,solve:'monthly'}};
   const goalFeedback={savings:null,index:null};
   const goalManuals={savings:null,index:null};
@@ -179,6 +180,8 @@
     Object.assign(advanced.index,{taxEnabled:false,taxRate:25});advanced.budget.annualItems=[];
     chartModes.savings=false;chartModes.index=false;
     budgetFlowMode=saved.budgetFlowMode===true;
+    riskSettings.enabled=saved.riskSettings?.enabled===true;
+    riskSettings.volatility=Number.isFinite(saved.riskSettings?.volatility)?clamp(saved.riskSettings.volatility,5,40):18;
     for(const tab of ['savings','index']){goalPlans[tab]={locked:false,solve:'monthly'};goalFeedback[tab]=null;goalManuals[tab]=null;}
     for(const [tab,config] of Object.entries(configs)) {
       const inputs=saved.values[tab];
@@ -321,7 +324,7 @@
     q('saveStatus').textContent='הנתונים נשמרים במעבר בין לשוניות בלבד';
     q('saveDot').style.background='#bd9569';
   }
-  function snapshot(){return {version:1,active,values:states,tabOrder,tabLabels,fieldLabels,fieldOrder,resetPoints,notes:notesText,notesMode,notesByTab,notesCollapsed,contributions,advanced,scenarios,compareIds,chartModes,budgetFlowMode,goalPlans,goalManuals,goalPinned,tabColors};}
+  function snapshot(){return {version:1,active,values:states,tabOrder,tabLabels,fieldLabels,fieldOrder,resetPoints,notes:notesText,notesMode,notesByTab,notesCollapsed,contributions,advanced,scenarios,compareIds,chartModes,budgetFlowMode,riskSettings,goalPlans,goalManuals,goalPinned,tabColors};}
   const undoHistory=[];
   let undoGroup=0,lastRecordedGroup=-1,lastCommitted=JSON.stringify(snapshot()),restoring=false;
   const maxUndo=45;
@@ -1058,6 +1061,14 @@
     heroStatus.title=insight||status||'';
     heroStatus.setAttribute('aria-label',(status||'')+(insight?': '+insight:''));
     updateHeroSecondary();updateTransferActions();
+    const toggle=q('riskToggle'),volControl=q('riskVolWrap'),riskLine=q('riskSummary');
+    toggle.hidden=active!=='index';toggle.setAttribute('aria-pressed',String(riskSettings.enabled));
+    toggle.textContent=riskSettings.enabled?'הסתר טווח תרחישים':'הצג טווח תרחישים';
+    volControl.hidden=active!=='index'||!riskSettings.enabled;
+    q('riskVolatility').value=String(riskSettings.volatility);
+    riskLine.hidden=!(active==='index'&&riskSettings.enabled&&riskLast);
+    if(!riskLine.hidden)riskLine.textContent='הדמיה בלבד · טווח 10%–90%: '+money(riskLast.low.at(-1))+'–'+money(riskLast.high.at(-1))+
+      ' · חציון: '+money(riskLast.median.at(-1))+' · '+riskLast.goalShare+'% מהמסלולים המדומים הגיעו ליעד. לא הסתברות אמיתית.';
     const chartToggle=q('chartModeToggle'),isInvest=active==='savings'||active==='index';
     chartToggle.hidden=!isInvest;if(isInvest){chartToggle.setAttribute('aria-pressed',String(chartModes[active]));chartToggle.textContent=chartModes[active]?'הסתר הפקדות':'הצג הפקדות';}
   }
@@ -1086,7 +1097,9 @@
     const compare=scenarioFor(active),other=scenarioOutput(active,compare);
     const horizon=Math.max(.01,years,other?.years||0);
     const w=600,h=208,x0=28,x1=572,y0=170,y1=24;
-    const allValues=[...values,...(other?.series||[]),...(chartModes[active]&&principalSeries?principalSeries:[])];
+    const risk=active==='index'&&riskSettings.enabled?riskEnvelope(states.index,events,riskSettings.volatility):null;
+    riskLast=risk;
+    const allValues=[...values,...(other?.series||[]),...(chartModes[active]&&principalSeries?principalSeries:[]),...(risk?.high||[])];
     const max=Math.max(1,...allValues)*1.23;
     const coords=(series,length)=>series.map((v,i)=>[x0+(x1-x0)*(length/horizon)*(i/Math.max(1,series.length-1)),y0-(Math.max(0,v)/max)*(y0-y1)]);
     const coord=coords(values,years);
@@ -1120,11 +1133,19 @@
     }).join('');
     const principalPath=chartModes[active]&&principalSeries?.length===values.length
       ?`<path d="${linePath(coords(principalSeries,years))}" fill="none" stroke="#af8d68" stroke-width="2" stroke-dasharray="3 4" stroke-linecap="round" opacity=".95"/>`:'';
+    const riskArea=risk?(()=>{
+      const upper=risk.months.map((month,i)=>[x0+(x1-x0)*month/12/horizon,y0-Math.max(0,risk.high[i])/max*(y0-y1)]);
+      const lower=risk.months.map((month,i)=>[x0+(x1-x0)*month/12/horizon,y0-Math.max(0,risk.low[i])/max*(y0-y1)]);
+      const median=risk.months.map((month,i)=>[x0+(x1-x0)*month/12/horizon,y0-Math.max(0,risk.median[i])/max*(y0-y1)]);
+      const outline=linePath(upper)+' '+lower.reverse().map(p=>'L'+p[0].toFixed(2)+' '+p[1].toFixed(2)).join(' ')+' Z';
+      return '<path d="'+outline+'" fill="#7e9b86" opacity=".23"/>'+
+        '<path d="'+linePath(median)+'" fill="none" stroke="#577666" stroke-width="1.8" stroke-dasharray="5 4" opacity=".85"/>';
+    })():'';
     const otherPath=other?.series?`<path d="${linePath(coords(other.series,other.years))}" fill="none" stroke="#9a806c" stroke-width="2.2" stroke-dasharray="7 6" stroke-linecap="round" opacity=".78"/>`:'';
     hoverChartModel={values:[...values],years,horizon,x0,x1,y0,y1,max,
       principal:principalSeries?[...principalSeries]:null,
-      events:events.map(e=>({...e})),compare:other?.series?[...other.series]:null,compareYears:other?.years||0};
-    return `<svg class="line-chart" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="גרף שינוי סכום לאורך זמן משמאל לימין"><defs><linearGradient id="lineFill" x1="0" y1="0" x2="0" y2="1"><stop stop-color="var(--accent)" stop-opacity=".15"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><rect x="${x0}" y="${y1-12}" width="${x1-x0}" height="${y0-y1+26}" fill="transparent" pointer-events="all"/><path d="${area}" fill="url(#lineFill)"/><path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>${principalPath}${otherPath}${baseline}${axisMarkers}${eventDots}<circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="var(--accent)" stroke="#fffdf9" stroke-width="1.5"/>${(active==='savings'||active==='index')&&!goalPinned[active].includes('monthly')&&!(goalIsActive()&&goalPlans[active].solve==='monthly')&&!events.some(e=>e.type==='monthly'&&e.month===1)?`<circle class="chart-edit-halo" cx="${last[0]}" cy="${last[1]}" r="15" fill="var(--accent-soft)" stroke="var(--accent)" stroke-opacity=".44" stroke-width="1.5" tabindex="0" role="slider" aria-label="גרור כדי לשנות את ההפקדה החודשית" aria-valuemin="${configs[active].fields.find(f=>f[0]==='monthly')[2]}" aria-valuemax="${configs[active].fields.find(f=>f[0]==='monthly')[3]}" aria-valuenow="${states[active].monthly}" data-chart-drag="monthly"><title>גרור מעלה או מטה לשינוי ההפקדה החודשית</title></circle>`:''}<g class="chart-cursor" style="display:none" pointer-events="none"><line class="chart-cursor-line" x1="0" y1="${y0}" x2="0" y2="${y0}" stroke="var(--accent)" stroke-opacity=".38" stroke-dasharray="3 4" stroke-width="1.25"/><circle class="chart-cursor-dot" cx="0" cy="${y0}" r="4.5" fill="var(--accent)" stroke="#fffdfa" stroke-width="2"/></g></svg><div class="chart-axis"><span>${active==='loan'?'חודשים':'שנים'}${chartModes[active]?' · קו מנוקד חום: סך הפקדות':''}${other?' · קו מקווקו: '+escapeHtml(compare.name):''}</span></div>`;
+      events:events.map(e=>({...e})),risk:risk?{months:risk.months,low:risk.low,high:risk.high}:null,compare:other?.series?[...other.series]:null,compareYears:other?.years||0};
+    return `<svg class="line-chart" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="גרף שינוי סכום לאורך זמן משמאל לימין"><defs><linearGradient id="lineFill" x1="0" y1="0" x2="0" y2="1"><stop stop-color="var(--accent)" stop-opacity=".15"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><rect x="${x0}" y="${y1-12}" width="${x1-x0}" height="${y0-y1+26}" fill="transparent" pointer-events="all"/>${riskArea}<path d="${area}" fill="url(#lineFill)"/><path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>${principalPath}${otherPath}${baseline}${axisMarkers}${eventDots}<circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="var(--accent)" stroke="#fffdf9" stroke-width="1.5"/>${(active==='savings'||active==='index')&&!goalPinned[active].includes('monthly')&&!(goalIsActive()&&goalPlans[active].solve==='monthly')&&!events.some(e=>e.type==='monthly'&&e.month===1)?`<circle class="chart-edit-halo" cx="${last[0]}" cy="${last[1]}" r="15" fill="var(--accent-soft)" stroke="var(--accent)" stroke-opacity=".44" stroke-width="1.5" tabindex="0" role="slider" aria-label="גרור כדי לשנות את ההפקדה החודשית" aria-valuemin="${configs[active].fields.find(f=>f[0]==='monthly')[2]}" aria-valuemax="${configs[active].fields.find(f=>f[0]==='monthly')[3]}" aria-valuenow="${states[active].monthly}" data-chart-drag="monthly"><title>גרור מעלה או מטה לשינוי ההפקדה החודשית</title></circle>`:''}<g class="chart-cursor" style="display:none" pointer-events="none"><line class="chart-cursor-line" x1="0" y1="${y0}" x2="0" y2="${y0}" stroke="var(--accent)" stroke-opacity=".38" stroke-dasharray="3 4" stroke-width="1.25"/><circle class="chart-cursor-dot" cx="0" cy="${y0}" r="4.5" fill="var(--accent)" stroke="#fffdfa" stroke-width="2"/></g></svg><div class="chart-axis"><span>${active==='loan'?'חודשים':'שנים'}${chartModes[active]?' · קו מנוקד חום: סך הפקדות':''}${other?' · קו מקווקו: '+escapeHtml(compare.name):''}${risk?' · רצועה: טווח 10–90% מההדמיה':''}</span></div>`;
   }
   function budgetBars(items){hoverChartModel=null;
     const max=Math.max(1,...items.map(i=>i[1]))*1.15;
@@ -1920,6 +1941,10 @@
     let detail=`${active==='loan'?'חודש '+month:'שנה '+(month/12).toFixed(1).replace(/\.0$/,'')+' · חודש '+month} · ${active==='mortgage'||active==='loan'?'יתרה':'שווי'}: ${money(value)}`;
     if(m.principal){const invested=m.principal[index]??0;detail+=` · הפקדות: ${money(invested)} · ${value-invested>=0?'רווח':'הפסד'}: ${money(Math.abs(value-invested))}`;}
     if(m.compare){const j=Math.round(month/12/(m.compareYears||1)*(m.compare.length-1));if(j>=0&&j<m.compare.length)detail+=` · תרחיש להשוואה: ${money(m.compare[j])}`;}
+    if(m.risk&&active==='index'){
+      const i=m.risk.months.reduce((best,value,j)=>Math.abs(value-month)<Math.abs(m.risk.months[best]-month)?j:best,0);
+      detail+=' · תרחישים מדומים 10–90%: '+money(m.risk.low[i])+'–'+money(m.risk.high[i]);
+    }
     const nearby=m.events.filter(e=>Math.abs(e.month-month)<=.6);
     if(nearby.length)detail+=' · '+nearby.map(e=>e.type==='monthly'?`הפקדה חודשית עודכנה ל־${money(e.amount)}`:`הפקדה חד־פעמית ${money(e.amount)}`).join(' · ');
     const pp=svg.createSVGPoint();pp.x=x;pp.y=y;const screen=pp.matrixTransform(ctm);
@@ -2217,6 +2242,74 @@
     }
     activate(route.to);
     q('saveStatus').textContent='הועבר '+money(value)+' אל '+tabLabels[route.to]+' · ניתן לבטל באמצעות ביטול פעולה';
+  });
+
+  // Stage 8: deterministic Monte Carlo illustration, not an investment forecast.
+  let riskLast=null;
+  function riskEnvelope(s,events=[],volatility=18,samples=220){
+    const totalMonths=Math.round(s.years*12),months=[0];
+    for(let i=12;i<=totalMonths;i+=12)months.push(i);
+    if(months[months.length-1]!==totalMonths)months.push(totalMonths);
+    const buckets=months.map(()=>[]);
+    const monthIndex=new Map(months.map((month,i)=>[month,i]));
+    const byMonth=new Map();
+    for(const e of events){
+      if(!Number.isInteger(e.month)||e.month<1||e.month>totalMonths)continue;
+      if(!byMonth.has(e.month))byMonth.set(e.month,[]);
+      byMonth.get(e.month).push(e);
+    }
+    let hits=0;
+    for(let run=0;run<samples;run++){
+      let seed=(0x9E3779B9 ^ Math.imul(run+1,0x85EBCA6B))>>>0;
+      const random=()=>{
+        seed=(seed+0x6D2B79F5)>>>0;
+        let t=seed;
+        t=Math.imul(t^(t>>>15),t|1);
+        t^=t+Math.imul(t^(t>>>7),t|61);
+        return ((t^(t>>>14))>>>0)/4294967296;
+      };
+      let balance=s.initial,monthly=s.monthly,growth=1;
+      buckets[0].push(balance);
+      for(let month=1;month<=totalMonths;month++){
+        if((month-1)%12===0){
+          const u=Math.max(1e-9,random()),v=random();
+          const normal=Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+          const annualGross=Math.max(.03,1+(s.rate+volatility*normal)/100)*(1-s.fees/100);
+          growth=Math.pow(annualGross,1/12);
+        }
+        let extra=0;
+        for(const event of byMonth.get(month)||[]){
+          if(event.type==='monthly')monthly=event.amount;
+          else if(event.type==='once')extra+=event.amount;
+        }
+        balance=Math.max(0,balance*growth+monthly+extra);
+        const at=monthIndex.get(month);
+        if(at!==undefined)buckets[at].push(balance);
+      }
+      if(balance>=s.goal)hits++;
+    }
+    const percentile=(arr,p)=>{
+      const n=(arr.length-1)*p,i=Math.floor(n);
+      return arr[i]+(arr[Math.min(i+1,arr.length-1)]-arr[i])*(n-i);
+    };
+    const low=[],median=[],high=[];
+    for(const bucket of buckets){
+      bucket.sort((a,b)=>a-b);
+      low.push(percentile(bucket,.10));
+      median.push(percentile(bucket,.50));
+      high.push(percentile(bucket,.90));
+    }
+    return {months,low,median,high,goalShare:Math.round(100*hits/samples),runs:samples,volatility};
+  }
+  q('riskToggle').addEventListener('click',()=>{
+    if(active!=='index')return;
+    riskSettings.enabled=!riskSettings.enabled;
+    renderResults();saveState();
+  });
+  q('riskVolatility').addEventListener('change',event=>{
+    const v=Number(event.target.value);
+    if(!Number.isFinite(v)||v<5||v>40)return;
+    riskSettings.volatility=v;renderResults();saveState();
   });
   // Double click a slider, including its surrounding track, restores its factory default.
   controlList.addEventListener('dblclick',e=>{

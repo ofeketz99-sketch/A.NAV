@@ -1,0 +1,15 @@
+{
+  "version": 13,
+  "stage": 8,
+  "branch": "dev",
+  "date": "2026-11-03",
+  "title": "Optional investment return volatility illustration",
+  "changes": [
+    "Adds user-selectable annual volatility to Monte Carlo investment outcomes",
+    "Shows reproducible 10th–90th percentile ribbon and simulated median on the index growth chart",
+    "Displays sample share reaching target, clearly not a real-world probability",
+    "Keeps fixed-rate headline forecast unchanged and clearly distinguishes simulations from projections",
+    "Persists risk settings under existing snapshot schema and adds deterministic numerical regression test"
+  ],
+  "backup": "backups/2026-11-03-stage-08-risk-simulation/"
+}

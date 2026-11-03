@@ -2454,3 +2454,12 @@ body{padding:8px}
 .transfer-button{border:1px solid #cbbda9;background:#faf5ed;color:#4b3d30;padding:5px 8px;font-size:10px;font-weight:640;border-radius:7px;white-space:nowrap}
 .transfer-button:hover,.transfer-button:focus-visible{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 @media(min-width:1051px){.chart-panel:has(.transfer-actions:not([hidden])){min-height:258px}}
+
+/* Stage 8 — optional volatility fan and explicit uncertainty disclosure. */
+.risk-vol-control{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#665b4c;white-space:nowrap}
+.risk-vol-control[hidden],.risk-summary[hidden]{display:none!important}
+.risk-vol-control select{border:1px solid #d7c6b0;border-radius:6px;background:#faf6ef;padding:4px;color:#41362b;font-size:10px}
+.risk-summary{margin-top:4px;padding:7px 9px;border:1px solid #cfdbcf;border-radius:8px;background:#eff4ee;color:#526755;font-size:10px;line-height:1.55}
+.chart-tools{flex-wrap:wrap;gap:5px}
+@media(min-width:1051px){.chart-panel:has(.risk-summary:not([hidden])){min-height:280px}}
+@media(max-width:540px){.risk-summary{font-size:9px}}

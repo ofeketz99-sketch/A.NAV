@@ -31,6 +31,8 @@
     Object.assign(advanced.index,{taxEnabled:false,taxRate:25});advanced.budget.annualItems=[];
     chartModes.savings=false;chartModes.index=false;
     budgetFlowMode=saved.budgetFlowMode===true;
+    riskSettings.enabled=saved.riskSettings?.enabled===true;
+    riskSettings.volatility=Number.isFinite(saved.riskSettings?.volatility)?clamp(saved.riskSettings.volatility,5,40):18;
     for(const tab of ['savings','index']){goalPlans[tab]={locked:false,solve:'monthly'};goalFeedback[tab]=null;goalManuals[tab]=null;}
     for(const [tab,config] of Object.entries(configs)) {
       const inputs=saved.values[tab];

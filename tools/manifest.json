@@ -31,6 +31,7 @@
     "98-workbench",
     "98-direct-charts",
     "98-transfers",
+    "98-risk-model",
     "99-startup"
   ],
   "css": [
@@ -66,6 +67,7 @@
     "99-direct-charts",
     "99-live-compare",
     "99-budget-flow",
-    "99-transfers"
+    "99-transfers",
+    "99-risk-band"
   ]
 }

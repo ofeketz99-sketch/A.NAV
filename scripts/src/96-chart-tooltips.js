@@ -36,6 +36,10 @@
     let detail=`${active==='loan'?'חודש '+month:'שנה '+(month/12).toFixed(1).replace(/\.0$/,'')+' · חודש '+month} · ${active==='mortgage'||active==='loan'?'יתרה':'שווי'}: ${money(value)}`;
     if(m.principal){const invested=m.principal[index]??0;detail+=` · הפקדות: ${money(invested)} · ${value-invested>=0?'רווח':'הפסד'}: ${money(Math.abs(value-invested))}`;}
     if(m.compare){const j=Math.round(month/12/(m.compareYears||1)*(m.compare.length-1));if(j>=0&&j<m.compare.length)detail+=` · תרחיש להשוואה: ${money(m.compare[j])}`;}
+    if(m.risk&&active==='index'){
+      const i=m.risk.months.reduce((best,value,j)=>Math.abs(value-month)<Math.abs(m.risk.months[best]-month)?j:best,0);
+      detail+=' · תרחישים מדומים 10–90%: '+money(m.risk.low[i])+'–'+money(m.risk.high[i]);
+    }
     const nearby=m.events.filter(e=>Math.abs(e.month-month)<=.6);
     if(nearby.length)detail+=' · '+nearby.map(e=>e.type==='monthly'?`הפקדה חודשית עודכנה ל־${money(e.amount)}`:`הפקדה חד־פעמית ${money(e.amount)}`).join(' · ');
     const pp=svg.createSVGPoint();pp.x=x;pp.y=y;const screen=pp.matrixTransform(ctm);

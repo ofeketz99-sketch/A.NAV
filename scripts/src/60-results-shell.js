@@ -11,6 +11,14 @@
     heroStatus.title=insight||status||'';
     heroStatus.setAttribute('aria-label',(status||'')+(insight?': '+insight:''));
     updateHeroSecondary();updateTransferActions();
+    const toggle=q('riskToggle'),volControl=q('riskVolWrap'),riskLine=q('riskSummary');
+    toggle.hidden=active!=='index';toggle.setAttribute('aria-pressed',String(riskSettings.enabled));
+    toggle.textContent=riskSettings.enabled?'הסתר טווח תרחישים':'הצג טווח תרחישים';
+    volControl.hidden=active!=='index'||!riskSettings.enabled;
+    q('riskVolatility').value=String(riskSettings.volatility);
+    riskLine.hidden=!(active==='index'&&riskSettings.enabled&&riskLast);
+    if(!riskLine.hidden)riskLine.textContent='הדמיה בלבד · טווח 10%–90%: '+money(riskLast.low.at(-1))+'–'+money(riskLast.high.at(-1))+
+      ' · חציון: '+money(riskLast.median.at(-1))+' · '+riskLast.goalShare+'% מהמסלולים המדומים הגיעו ליעד. לא הסתברות אמיתית.';
     const chartToggle=q('chartModeToggle'),isInvest=active==='savings'||active==='index';
     chartToggle.hidden=!isInvest;if(isInvest){chartToggle.setAttribute('aria-pressed',String(chartModes[active]));chartToggle.textContent=chartModes[active]?'הסתר הפקדות':'הצג הפקדות';}
   }

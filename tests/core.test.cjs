@@ -133,3 +133,19 @@ test('a locked target rejects manual mutations in both input and slider paths',(
  assert.match(source,/r\.disabled=n\.disabled=computed\|\|pinned\|\|lockedTarget/);
  assert.match(edits,/if\(goalIsActive\(\)&&id==='goal'\)return;/);
 });
+
+test('illustrative volatility fan is deterministic and percentile-ordered',()=>{
+ const code=fs.readFileSync(path.join(root,'scripts/src/98-risk-model.js'),'utf8');
+ const a=code.indexOf('  function riskEnvelope('),b=code.indexOf("  q('riskToggle')",a);
+ assert.ok(a>=0&&b>a,'risk model must be independently testable');
+ const simulate=vm.runInNewContext(code.slice(a,b)+'\nriskEnvelope');
+ const input={initial:10000,monthly:400,years:8,rate:7,fees:.2,goal:100000};
+ const p=simulate(input,[],18,100),again=simulate(input,[],18,100);
+ assert.equal(p.low.length,p.high.length);
+ assert.equal(p.goalShare,again.goalShare);
+ assert.deepEqual(Array.from(p.low),Array.from(again.low));
+ assert.ok(p.low.every((v,i)=>v<=p.median[i]&&p.median[i]<=p.high[i]));
+ assert.ok(p.high.at(-1)>p.low.at(-1));
+ const fixed=simulate(input,[],0,30);
+ assert.ok(Math.abs(fixed.high.at(-1)-fixed.low.at(-1))<.01);
+});
