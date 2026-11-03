@@ -98,6 +98,7 @@
   const scenarios=Object.fromEntries(defaultOrder.map(tab=>[tab,[]]));
   const compareIds=Object.fromEntries(defaultOrder.map(tab=>[tab,null]));
   const chartModes={savings:false,index:false};
+  let budgetFlowMode=false;
   const goalPlans={savings:{locked:false,solve:'monthly'},index:{locked:false,solve:'monthly'}};
   const goalFeedback={savings:null,index:null};
   const goalManuals={savings:null,index:null};
@@ -177,6 +178,7 @@
     Object.assign(advanced.mortgage,{insurance:0,purchaseCosts:0,stressRise:0,income:0});
     Object.assign(advanced.index,{taxEnabled:false,taxRate:25});advanced.budget.annualItems=[];
     chartModes.savings=false;chartModes.index=false;
+    budgetFlowMode=saved.budgetFlowMode===true;
     for(const tab of ['savings','index']){goalPlans[tab]={locked:false,solve:'monthly'};goalFeedback[tab]=null;goalManuals[tab]=null;}
     for(const [tab,config] of Object.entries(configs)) {
       const inputs=saved.values[tab];
@@ -319,7 +321,7 @@
     q('saveStatus').textContent='הנתונים נשמרים במעבר בין לשוניות בלבד';
     q('saveDot').style.background='#bd9569';
   }
-  function snapshot(){return {version:1,active,values:states,tabOrder,tabLabels,fieldLabels,fieldOrder,resetPoints,notes:notesText,notesMode,notesByTab,notesCollapsed,contributions,advanced,scenarios,compareIds,chartModes,goalPlans,goalManuals,goalPinned,tabColors};}
+  function snapshot(){return {version:1,active,values:states,tabOrder,tabLabels,fieldLabels,fieldOrder,resetPoints,notes:notesText,notesMode,notesByTab,notesCollapsed,contributions,advanced,scenarios,compareIds,chartModes,budgetFlowMode,goalPlans,goalManuals,goalPinned,tabColors};}
   const undoHistory=[];
   let undoGroup=0,lastRecordedGroup=-1,lastCommitted=JSON.stringify(snapshot()),restoring=false;
   const maxUndo=45;
@@ -1129,6 +1131,44 @@
     const total=items.reduce((sum,item)=>sum+Math.max(0,item[1]),0);
     return `<div class="bar-chart">${items.map(([title,v,id],i)=>`<div class="bar-row" ${id?`data-budget-scale="${max}" data-budget-field="${id}" role="button" aria-label="עריכת ${escapeHtml(title)}"`:""} data-tip="${escapeHtml(title)}: ${money(v)} · ${pct(total?100*v/total:0)} מסך ההוצאות וההפקדות" tabindex="0"><div class="bar-name" title="${escapeHtml(title)}">${escapeHtml(title)}</div><div class="bar-track"><div class="bar-fill" style="width:${100*v/max}%;opacity:${1-i*.12}"></div></div><div class="bar-amount">${money(v)}</div></div>`).join('')}<div class="bar-chart-guide">אפשר לגרור את הסרגל כדי לשנות סעיף, או ללחוץ על השורה כדי לערוך מספר מדויק</div></div>`;
   }
+
+  // Stage 6: RTL cash-flow ribbon diagram; every band is derived from monthly budget fields.
+  function budgetFlowChart(items,income){
+    hoverChartModel=null;
+    const chosen=items.map(([title,value,id],i)=>({title:String(title),value:Math.max(0,Number(value)||0),id:id||null,i})).filter(e=>e.value>0);
+    const committed=chosen.reduce((sum,e)=>sum+e.value,0);
+    const surplus=Math.max(0,income-committed),shortfall=Math.max(0,committed-income);
+    if(surplus>0)chosen.push({title:'יתרה פנויה',value:surplus,id:null,i:chosen.length});
+    const overall=Math.max(1,committed,income);
+    const palette=['#97836c','#b29978','#81927b','#c0ab90','#ab8176','#72867f','#c5ba9f','#91a486'];
+    let sourceY=21,destinationY=21;
+    const spacing=5.5,totalHeight=154,available=Math.max(60,totalHeight-spacing*Math.max(0,chosen.length-1));
+    const parts=chosen.map((item,i)=>{
+      const thick=Math.max(1.1,item.value/overall*available);
+      const sy=sourceY,dy=destinationY;
+      sourceY+=thick;destinationY+=thick+spacing;
+      const fill=palette[i%palette.length],title=escapeHtml(item.title),value=money(item.value);
+      const path='M 507 '+sy+' C 380 '+sy+' 278 '+dy+' 157 '+dy+
+        ' L 157 '+(dy+thick)+' C 278 '+(dy+thick)+' 380 '+(sy+thick)+' 507 '+(sy+thick)+' Z';
+      const attr=item.id?' data-budget-field="'+item.id+'" tabindex="0" role="button" aria-label="ערוך '+title+'"':'';
+      return '<g class="budget-flow-band"'+attr+' data-tip="'+title+' · '+escapeHtml(value)+'">'+
+        '<path d="'+path+'" fill="'+fill+'" opacity=".8"/>'+
+        '<rect x="147" y="'+dy+'" width="10" height="'+thick+'" rx="1.5" fill="'+fill+'"/>'+
+        '<title>'+title+': '+escapeHtml(value)+'</title></g>';
+    }).join('');
+    const legend=chosen.map((item,i)=>
+      '<div class="flow-legend-item"'+(item.id?' data-budget-field="'+item.id+'" tabindex="0" role="button"':'')+'>'+
+      '<i style="background:'+palette[i%palette.length]+'"></i><span>'+escapeHtml(item.title)+'</span><strong>'+money(item.value)+'</strong></div>'
+    ).join('');
+    return '<div class="budget-flow">'+
+      '<div class="budget-flow-head"><strong>הכנסה: '+money(income)+'</strong><span>'+(shortfall?'חריגה מההכנסה: '+money(shortfall):'יתרה פנויה: '+money(surplus))+'</span></div>'+
+      '<svg viewBox="0 0 620 195" class="budget-flow-svg" role="group" aria-label="זרימת הכנסה להוצאות, חיסכון ויתרה פנויה" preserveAspectRatio="xMidYMid meet">'+
+      '<text x="550" y="17" text-anchor="middle" direction="rtl" font-size="12" fill="#6b5e50">הכנסה</text>'+
+      '<text x="120" y="17" text-anchor="middle" direction="rtl" font-size="12" fill="#6b5e50">חלוקה</text>'+
+      parts+'<rect x="507" y="21" width="16" height="'+Math.max(1,sourceY-21)+'" rx="3" fill="var(--accent)"/>'+
+      '</svg><div class="flow-legend">'+legend+'</div>'+
+      '<div class="bar-chart-guide">לחיצה על סעיף בתרשים או במקרא מעבירה לעריכת הערך</div></div>';
+  }
   function renderResults(){
     const s=states[active];
     if(active==='mortgage'){
@@ -1168,12 +1208,20 @@
       const housingShare=s.income?s.housing/s.income*100:0,saveShare=s.income?s.savings/s.income*100:0;
       show(left>=0?'יתרה פנויה בסוף החודש':'גירעון חודשי',money(left),'תקציב',left>=0?'הכסף שנותר אחרי הוצאות והפקדה לחיסכון.':'ההוצאות והחיסכון המתוכנן גבוהים מההכנסה.',[
         ['הוצאות חודשיות',money(expenses),'ללא החיסכון'],['חיסכון שנתי מתוכנן',money(s.savings*12),'אם ההפקדה קבועה'],['דיור מסך ההכנסה',pct(housingShare),'שכירות או החזר משכנתא'],['שיעור החיסכון',pct(saveShare),'מההכנסה נטו']
-      ],'לאן הולך הכסף?','חלוקת הוצאות חודשית',budgetBars([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[fieldLabels.budget[id]||label,s[id],id]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[])),`סה״כ הוצאות והפקדות מתוכננות: ${money(expenses+s.savings)} מתוך הכנסה של ${money(s.income)}.`,left<0?`גירעון של ${money(-left)} בחודש. כדאי לצמצם הוצאות או להתאים את החיסכון.`:`אם התקציב יישמר, העודף השנתי יהיה ${money(left*12)}.`,left<0?'warn':left/s.income<.05?'info':'good',left<0?'גירעון חודשי':left/s.income<.05?'מרווח תקציבי נמוך':'עודף תקציבי');
+      ],'לאן הולך הכסף?','חלוקת הוצאות חודשית',(budgetFlowMode?budgetFlowChart([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[fieldLabels.budget[id]||label,s[id],id]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[]),s.income):budgetBars([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[fieldLabels.budget[id]||label,s[id],id]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[]))),`סה״כ הוצאות והפקדות מתוכננות: ${money(expenses+s.savings)} מתוך הכנסה של ${money(s.income)}.`,left<0?`גירעון של ${money(-left)} בחודש. כדאי לצמצם הוצאות או להתאים את החיסכון.`:`אם התקציב יישמר, העודף השנתי יהיה ${money(left*12)}.`,left<0?'warn':left/s.income<.05?'info':'good',left<0?'גירעון חודשי':left/s.income<.05?'מרווח תקציבי נמוך':'עודף תקציבי');
     }
+    const budgetToggle=q('budgetChartToggle');budgetToggle.hidden=active!=='budget';
+    budgetToggle.setAttribute('aria-pressed',String(budgetFlowMode));
+    budgetToggle.textContent=budgetFlowMode?'הצג סרגלים':'הצג זרימת כסף';
   }
   q('chartModeToggle').addEventListener('click',()=>{
     if(active!=='savings'&&active!=='index')return;
     chartModes[active]=!chartModes[active];renderResults();saveState();
+  });
+
+  q('budgetChartToggle').addEventListener('click',()=>{
+    if(active!=='budget')return;
+    budgetFlowMode=!budgetFlowMode;renderResults();saveState();
   });
   // Future contribution planner; each calculator has an independent timeline.
   let plannerType='monthly',editingEventId=null,plannerFrom=null;

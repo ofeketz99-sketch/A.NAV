@@ -1,0 +1,14 @@
+{
+  "version": 11,
+  "stage": 6,
+  "branch": "dev",
+  "date": "2026-11-03",
+  "title": "Budget cash flow mode",
+  "changes": [
+    "Added switchable RTL cash flow visualization alongside editable category bars",
+    "Flow chart distinguishes spending, planned savings, surplus and budget deficit",
+    "Clickable flow ribbons and legend jump to the corresponding budget field",
+    "Chart mode persists in local backup snapshot"
+  ],
+  "backup": "backups/2026-11-03-stage-06-budget-flow/"
+}

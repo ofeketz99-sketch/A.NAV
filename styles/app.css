@@ -2428,3 +2428,21 @@ body{padding:8px}
 .compare-summary strong[data-tone=positive]{color:#52734a}
 .compare-actions{display:flex;gap:11px;align-items:center;flex-wrap:wrap}
 @media(max-width:600px){.compare-dual{grid-template-columns:1fr}.compare-workbench-head{display:block}.compare-summary strong{font-size:12px}.compare-pane{padding:9px}}
+
+/* Stage 6 — RTL Sankey-like cash flow with explicit savings / expense / surplus. */
+.chart-panel:has(.budget-flow){min-height:310px}
+.budget-flow{display:flex;flex-direction:column;gap:6px;width:100%;min-width:0;padding:2px}
+.budget-flow-head{display:flex;align-items:center;justify-content:space-between;gap:9px;color:#594b3d;font-size:11px}
+.budget-flow-head span{color:#8b6851;font-size:10px}
+.budget-flow-svg{display:block;width:100%;height:auto;max-height:168px;overflow:visible}
+.budget-flow-band{outline:0}
+.budget-flow-band[data-budget-field]{cursor:pointer}
+.budget-flow-band:hover path,.budget-flow-band:focus-visible path{opacity:1;filter:brightness(1.06)}
+.flow-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 11px}
+.flow-legend-item{display:flex;align-items:center;gap:6px;min-width:0;color:#66594a;font-size:10px}
+.flow-legend-item i{width:9px;height:9px;border-radius:2px;flex:none}
+.flow-legend-item span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flow-legend-item strong{margin-inline-start:auto;white-space:nowrap;font-size:10px;font-variant-numeric:tabular-nums}
+.flow-legend-item[data-budget-field]{cursor:pointer;padding:3px;border-radius:5px}
+.flow-legend-item[data-budget-field]:hover,.flow-legend-item[data-budget-field]:focus-visible{background:#efe6d9;outline:1px solid #cebca8}
+@media(max-width:540px){.flow-legend{grid-template-columns:1fr 1fr;gap:4px}.flow-legend-item{font-size:9px}.flow-legend-item strong{font-size:9px}.budget-flow-head{flex-wrap:wrap}}

@@ -30,6 +30,7 @@
     Object.assign(advanced.mortgage,{insurance:0,purchaseCosts:0,stressRise:0,income:0});
     Object.assign(advanced.index,{taxEnabled:false,taxRate:25});advanced.budget.annualItems=[];
     chartModes.savings=false;chartModes.index=false;
+    budgetFlowMode=saved.budgetFlowMode===true;
     for(const tab of ['savings','index']){goalPlans[tab]={locked:false,solve:'monthly'};goalFeedback[tab]=null;goalManuals[tab]=null;}
     for(const [tab,config] of Object.entries(configs)) {
       const inputs=saved.values[tab];

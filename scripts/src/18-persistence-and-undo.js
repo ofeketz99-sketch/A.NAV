@@ -15,7 +15,7 @@
     q('saveStatus').textContent='הנתונים נשמרים במעבר בין לשוניות בלבד';
     q('saveDot').style.background='#bd9569';
   }
-  function snapshot(){return {version:1,active,values:states,tabOrder,tabLabels,fieldLabels,fieldOrder,resetPoints,notes:notesText,notesMode,notesByTab,notesCollapsed,contributions,advanced,scenarios,compareIds,chartModes,goalPlans,goalManuals,goalPinned,tabColors};}
+  function snapshot(){return {version:1,active,values:states,tabOrder,tabLabels,fieldLabels,fieldOrder,resetPoints,notes:notesText,notesMode,notesByTab,notesCollapsed,contributions,advanced,scenarios,compareIds,chartModes,budgetFlowMode,goalPlans,goalManuals,goalPinned,tabColors};}
   const undoHistory=[];
   let undoGroup=0,lastRecordedGroup=-1,lastCommitted=JSON.stringify(snapshot()),restoring=false;
   const maxUndo=45;

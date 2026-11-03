@@ -30,6 +30,7 @@
   const scenarios=Object.fromEntries(defaultOrder.map(tab=>[tab,[]]));
   const compareIds=Object.fromEntries(defaultOrder.map(tab=>[tab,null]));
   const chartModes={savings:false,index:false};
+  let budgetFlowMode=false;
   const goalPlans={savings:{locked:false,solve:'monthly'},index:{locked:false,solve:'monthly'}};
   const goalFeedback={savings:null,index:null};
   const goalManuals={savings:null,index:null};

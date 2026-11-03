@@ -37,10 +37,18 @@
       const housingShare=s.income?s.housing/s.income*100:0,saveShare=s.income?s.savings/s.income*100:0;
       show(left>=0?'יתרה פנויה בסוף החודש':'גירעון חודשי',money(left),'תקציב',left>=0?'הכסף שנותר אחרי הוצאות והפקדה לחיסכון.':'ההוצאות והחיסכון המתוכנן גבוהים מההכנסה.',[
         ['הוצאות חודשיות',money(expenses),'ללא החיסכון'],['חיסכון שנתי מתוכנן',money(s.savings*12),'אם ההפקדה קבועה'],['דיור מסך ההכנסה',pct(housingShare),'שכירות או החזר משכנתא'],['שיעור החיסכון',pct(saveShare),'מההכנסה נטו']
-      ],'לאן הולך הכסף?','חלוקת הוצאות חודשית',budgetBars([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[fieldLabels.budget[id]||label,s[id],id]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[])),`סה״כ הוצאות והפקדות מתוכננות: ${money(expenses+s.savings)} מתוך הכנסה של ${money(s.income)}.`,left<0?`גירעון של ${money(-left)} בחודש. כדאי לצמצם הוצאות או להתאים את החיסכון.`:`אם התקציב יישמר, העודף השנתי יהיה ${money(left*12)}.`,left<0?'warn':left/s.income<.05?'info':'good',left<0?'גירעון חודשי':left/s.income<.05?'מרווח תקציבי נמוך':'עודף תקציבי');
+      ],'לאן הולך הכסף?','חלוקת הוצאות חודשית',(budgetFlowMode?budgetFlowChart([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[fieldLabels.budget[id]||label,s[id],id]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[]),s.income):budgetBars([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[fieldLabels.budget[id]||label,s[id],id]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[]))),`סה״כ הוצאות והפקדות מתוכננות: ${money(expenses+s.savings)} מתוך הכנסה של ${money(s.income)}.`,left<0?`גירעון של ${money(-left)} בחודש. כדאי לצמצם הוצאות או להתאים את החיסכון.`:`אם התקציב יישמר, העודף השנתי יהיה ${money(left*12)}.`,left<0?'warn':left/s.income<.05?'info':'good',left<0?'גירעון חודשי':left/s.income<.05?'מרווח תקציבי נמוך':'עודף תקציבי');
     }
+    const budgetToggle=q('budgetChartToggle');budgetToggle.hidden=active!=='budget';
+    budgetToggle.setAttribute('aria-pressed',String(budgetFlowMode));
+    budgetToggle.textContent=budgetFlowMode?'הצג סרגלים':'הצג זרימת כסף';
   }
   q('chartModeToggle').addEventListener('click',()=>{
     if(active!=='savings'&&active!=='index')return;
     chartModes[active]=!chartModes[active];renderResults();saveState();
+  });
+
+  q('budgetChartToggle').addEventListener('click',()=>{
+    if(active!=='budget')return;
+    budgetFlowMode=!budgetFlowMode;renderResults();saveState();
   });
