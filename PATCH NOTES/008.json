@@ -1,0 +1,13 @@
+{
+  "version": 8,
+  "branch": "dev",
+  "date": "2026-11-03",
+  "stage": 3,
+  "title": "Live calculated breakdowns for every metric card",
+  "changes": [
+    "Metric details now display model-derived financial amounts, not static prose",
+    "Dedicated breakdown for mortgage, savings, investment, loan, budget",
+    "Explains fees, inflation, mortgage interest, repayment term and budget cash allocations"
+  ],
+  "backup": "backups/2026-11-03-stage-03-metrics/"
+}
