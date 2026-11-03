@@ -1027,9 +1027,10 @@
     q('heroBaseline').setAttribute('aria-label','הפרש מתרחיש בסיס נבחר: '+(nearlyEqual?'ללא שינוי':money(difference)));
   }
 
+  let currentStats=[];
   function show(mainLabel,mainValue,tag,description,stats,chartTitle,chartCaption,chartContent,chartBottom,insight,tone='info',status='מידע'){
     q('heroLabel').textContent=mainLabel;q('heroNumber').textContent=mainValue;q('mobileLabel').textContent=mainLabel;q('mobileNumber').textContent=mainValue;q('heroTag').textContent=tag;q('heroDesc').textContent=description;
-    q('stats').innerHTML=stats.map(([label,value,mini])=>`<div class="stat"><div class="stat-label">${label}</div><div class="stat-number">${value}</div>${mini?`<div class="stat-mini">${mini}</div>`:''}</div>`).join('');
+    q('stats').innerHTML=stats.map(([label,value,mini],i)=>`<button type="button" class="stat" data-stat-index="${i}" aria-label="פרטים על ${escapeHtml(label)}"><div class="stat-label">${label}</div><div class="stat-number">${value}</div>${mini?`<div class="stat-mini">${mini}</div>`:''}</button>`).join('');currentStats=stats.map(x=>[...x]);
     q('chartTitle').textContent=chartTitle;q('chartCaption').textContent=chartCaption;q('chart').innerHTML=chartContent; if(typeof toolTip!=='undefined')toolTip.hidden=true;
     q('chartBottom').textContent=chartBottom+(goalIsActive()&&goalFeedback[active]&&!goalFeedback[active].reached?' · '+goalFeedback[active].message:'')+comparisonText();renderComposition();updateMeter();
     const heroStatus=q('heroStatus');
@@ -1110,7 +1111,7 @@
   function budgetBars(items){hoverChartModel=null;
     const max=Math.max(1,...items.map(i=>i[1]));
     const total=items.reduce((sum,item)=>sum+Math.max(0,item[1]),0);
-    return `<div class="bar-chart">${items.map(([title,v],i)=>`<div class="bar-row" data-tip="${escapeHtml(title)}: ${money(v)} · ${pct(total?100*v/total:0)} מסך ההוצאות וההפקדות" tabindex="0"><div class="bar-name" title="${escapeHtml(title)}">${escapeHtml(title)}</div><div class="bar-track"><div class="bar-fill" style="width:${100*v/max}%;opacity:${1-i*.12}"></div></div><div class="bar-amount">${money(v)}</div></div>`).join('')}</div>`;
+    return `<div class="bar-chart">${items.map(([title,v,id],i)=>`<div class="bar-row" ${id?`data-budget-field="${id}" role="button" aria-label="עריכת ${escapeHtml(title)}"`:""} data-tip="${escapeHtml(title)}: ${money(v)} · ${pct(total?100*v/total:0)} מסך ההוצאות וההפקדות" tabindex="0"><div class="bar-name" title="${escapeHtml(title)}">${escapeHtml(title)}</div><div class="bar-track"><div class="bar-fill" style="width:${100*v/max}%;opacity:${1-i*.12}"></div></div><div class="bar-amount">${money(v)}</div></div>`).join('')}</div>`;
   }
   function renderResults(){
     const s=states[active];
@@ -1151,7 +1152,7 @@
       const housingShare=s.income?s.housing/s.income*100:0,saveShare=s.income?s.savings/s.income*100:0;
       show(left>=0?'יתרה פנויה בסוף החודש':'גירעון חודשי',money(left),'תקציב',left>=0?'הכסף שנותר אחרי הוצאות והפקדה לחיסכון.':'ההוצאות והחיסכון המתוכנן גבוהים מההכנסה.',[
         ['הוצאות חודשיות',money(expenses),'ללא החיסכון'],['חיסכון שנתי מתוכנן',money(s.savings*12),'אם ההפקדה קבועה'],['דיור מסך ההכנסה',pct(housingShare),'שכירות או החזר משכנתא'],['שיעור החיסכון',pct(saveShare),'מההכנסה נטו']
-      ],'לאן הולך הכסף?','חלוקת הוצאות חודשית',budgetBars([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[fieldLabels.budget[id]||label,s[id]]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[])),`סה״כ הוצאות והפקדות מתוכננות: ${money(expenses+s.savings)} מתוך הכנסה של ${money(s.income)}.`,left<0?`גירעון של ${money(-left)} בחודש. כדאי לצמצם הוצאות או להתאים את החיסכון.`:`אם התקציב יישמר, העודף השנתי יהיה ${money(left*12)}.`,left<0?'warn':left/s.income<.05?'info':'good',left<0?'גירעון חודשי':left/s.income<.05?'מרווח תקציבי נמוך':'עודף תקציבי');
+      ],'לאן הולך הכסף?','חלוקת הוצאות חודשית',budgetBars([['housing','דיור'],['living','מחיה ותחבורה'],['bills','חשבונות'],['spending','בזבוזים'],['savings','חיסכון']].map(([id,label])=>[fieldLabels.budget[id]||label,s[id],id]).concat(annualMonthly?[['הוצאות שנתיות ÷ 12',annualMonthly]]:[])),`סה״כ הוצאות והפקדות מתוכננות: ${money(expenses+s.savings)} מתוך הכנסה של ${money(s.income)}.`,left<0?`גירעון של ${money(-left)} בחודש. כדאי לצמצם הוצאות או להתאים את החיסכון.`:`אם התקציב יישמר, העודף השנתי יהיה ${money(left*12)}.`,left<0?'warn':left/s.income<.05?'info':'good',left<0?'גירעון חודשי':left/s.income<.05?'מרווח תקציבי נמוך':'עודף תקציבי');
     }
   }
   q('chartModeToggle').addEventListener('click',()=>{
@@ -1809,6 +1810,39 @@
     calcDisplay.focus();
   });
   calcDisplay.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();calcEquals();}});
+
+  // Interactive result cards and budget chart direct editing.
+  const statExplanations={
+    mortgage:['מחיר הדירה פחות ההון העצמי.','סך הריבית לאורך תקופת המשכנתא.','יחס סכום המשכנתא למחיר הדירה.','משך ההחזר בפועל.'],
+    savings:['הסכום ההתחלתי וכל ההפקדות.','ההפרש בין שווי החיסכון לסך ההפקדות.','הרווח מתוך השווי הסופי של החיסכון.','הפער בין הצבירה העתידית ליעד.'],
+    index:['סך ההפקדות לתיק.','הרווח המשוער מעבר להפקדות.','שווי עתידי במונחי כוח קנייה של היום.','עלות דמי הניהול או השפעת המס בהגדרות.'],
+    loan:['סך הריבית שתשולם.','הקרן והריבית יחד.','מספר שנות ההחזר בפועל.','פער ריבית לעומת תרחיש ללא תשלום נוסף.'],
+    budget:['הוצאות חודשיות, כולל חלק יחסי של הוצאות שנתיות, ללא חיסכון.','ההפרשה החודשית כפול 12.','עלויות הדיור כאחוז מההכנסה.','החיסכון החודשי כאחוז מההכנסה.']
+  };
+  let statOpener=null;
+  function closeStatDetail(){q('statOverlay').hidden=true;document.body.classList.remove('schedule-open');statOpener?.focus?.();}
+  q('stats').addEventListener('click',e=>{
+    const btn=e.target.closest('[data-stat-index]');if(!btn)return;
+    const idx=Number(btn.dataset.statIndex),stat=currentStats[idx];if(!stat)return;
+    statOpener=btn;q('statDetailTitle').textContent=stat[0];q('statDetailValue').textContent=stat[1];
+    q('statDetailInfo').textContent=statExplanations[active]?.[idx]||stat[2]||'מדד מחושב.';
+    q('statDetailFooter').textContent=(stat[2]||'')+' · מחושב בזמן אמת מתוך נתוני המחשבון.';
+    q('statOverlay').hidden=false;document.body.classList.add('schedule-open');q('statClose').focus();
+  });
+  q('statClose').addEventListener('click',closeStatDetail);
+  q('statOverlay').addEventListener('pointerdown',e=>{if(e.target===q('statOverlay'))closeStatDetail();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!q('statOverlay').hidden){e.preventDefault();closeStatDetail();}});
+  function focusBudgetField(id){
+    if(active!=='budget'||!id)return;const input=q('number-'+id);if(!input)return;
+    const field=input.closest('.field');field.classList.remove('field-attention');void field.offsetWidth;field.classList.add('field-attention');
+    field.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'nearest'});
+    if(!input.readOnly&&!input.disabled)input.focus({preventScroll:true});
+    setTimeout(()=>field.classList.remove('field-attention'),1200);
+  }
+  q('chart').addEventListener('click',e=>{const bar=e.target.closest('[data-budget-field]');if(bar)focusBudgetField(bar.dataset.budgetField);});
+  q('chart').addEventListener('keydown',e=>{
+    const bar=e.target.closest('[data-budget-field]');if(bar&&(e.key==='Enter'||e.key===' ')){e.preventDefault();focusBudgetField(bar.dataset.budgetField);}
+  });
   // Double click a slider, including its surrounding track, restores its factory default.
   controlList.addEventListener('dblclick',e=>{
     if(e.target.closest('.range-control')){const field=e.target.closest('.field');if(field){e.preventDefault();const id=field.dataset.field;changeValue(id,getResetPoint(active,id),'reset');}}

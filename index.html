@@ -14,6 +14,10 @@
 </head>
 <body>
 <div class="shell" id="financeApp" data-theme="mortgage">
+  <header class="frame-chrome" aria-label="סביבת העבודה">
+    <div class="frame-identity"><span class="frame-monogram">מ</span><div><strong>מרווח</strong><small>סימולציות פיננסיות</small></div></div>
+    <div class="frame-state"><span class="frame-state-dot"></span><span>סביבת עבודה אישית · עדכון בזמן אמת</span></div>
+  </header>
   <div class="content-layout" id="contentLayout">
     <div class="main-column">
       <div class="tabs-bar">
@@ -170,6 +174,7 @@
 </div>
 
 
+<div id="statOverlay" class="tool-overlay" hidden><section class="tool-dialog" role="dialog" aria-modal="true" aria-labelledby="statDetailTitle"><header class="tool-head"><div><h2 id="statDetailTitle"></h2></div><button class="tool-close" type="button" id="statClose" aria-label="סגירה">×</button></header><div class="tool-content"><div class="stat-detail-value" id="statDetailValue"></div><p class="stat-detail-info" id="statDetailInfo"></p><div class="stat-detail-footer" id="statDetailFooter"></div></div></section></div>
 <script src="scripts/app.js" defer></script>
 </body>
 </html>

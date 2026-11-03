@@ -1,6 +1,7 @@
+  let currentStats=[];
   function show(mainLabel,mainValue,tag,description,stats,chartTitle,chartCaption,chartContent,chartBottom,insight,tone='info',status='מידע'){
     q('heroLabel').textContent=mainLabel;q('heroNumber').textContent=mainValue;q('mobileLabel').textContent=mainLabel;q('mobileNumber').textContent=mainValue;q('heroTag').textContent=tag;q('heroDesc').textContent=description;
-    q('stats').innerHTML=stats.map(([label,value,mini])=>`<div class="stat"><div class="stat-label">${label}</div><div class="stat-number">${value}</div>${mini?`<div class="stat-mini">${mini}</div>`:''}</div>`).join('');
+    q('stats').innerHTML=stats.map(([label,value,mini],i)=>`<button type="button" class="stat" data-stat-index="${i}" aria-label="פרטים על ${escapeHtml(label)}"><div class="stat-label">${label}</div><div class="stat-number">${value}</div>${mini?`<div class="stat-mini">${mini}</div>`:''}</button>`).join('');currentStats=stats.map(x=>[...x]);
     q('chartTitle').textContent=chartTitle;q('chartCaption').textContent=chartCaption;q('chart').innerHTML=chartContent; if(typeof toolTip!=='undefined')toolTip.hidden=true;
     q('chartBottom').textContent=chartBottom+(goalIsActive()&&goalFeedback[active]&&!goalFeedback[active].reached?' · '+goalFeedback[active].message:'')+comparisonText();renderComposition();updateMeter();
     const heroStatus=q('heroStatus');
