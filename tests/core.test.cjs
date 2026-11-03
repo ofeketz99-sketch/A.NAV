@@ -1,16 +1,25 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const root=path.resolve(__dirname,'..');
-const original=fs.readFileSync(path.join(root,'backups/2026-11-01-main/Index.html'),'utf8');
+const manifest=require('../tools/manifest.json');
 const css=fs.readFileSync(path.join(root,'styles/app.css'),'utf8'),js=fs.readFileSync(path.join(root,'scripts/app.js'),'utf8');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
-test('lossless refactor of deployed main CSS and JS',()=>{
- assert.equal(css,original.match(/<style>([\s\S]*?)<\/style>/)[1]);
- assert.equal(js,original.match(/<script>([\s\S]*?)<\/script>/)[1]);
+test('build outputs exactly match the ordered source modules',()=>{
+ const combine=(kind,folder,extension)=>manifest[kind].map(name=>fs.readFileSync(path.join(root,folder,'src',name+extension),'utf8')).join('');
+ assert.equal(css,combine('css','styles','.css'));
+ assert.equal(js,combine('javascript','scripts','.js'));
 });
-test('original app DOM is retained verbatim after externalizing assets',()=>{
- const expected=original.replace(/<style>[\s\S]*?<\/style>/,'<link rel="stylesheet" href="styles/app.css">').replace(/<script>[\s\S]*?<\/script>/,'<script src="scripts/app.js" defer></script>');
- assert.equal(html,expected);
+test('the live HTML entrypoint preserves linked assets and A.NAV branding',()=>{
+ assert.match(html,/^<!doctype html>/i);
+ assert.match(html,/<html lang="he" dir="rtl">/);
+ assert.match(html,/<link rel="stylesheet" href="styles\/app\.css">/);
+ assert.match(html,/<script src="scripts\/app\.js" defer><\/script>/);
+ assert.doesNotMatch(html,/<style>/);
+ assert.doesNotMatch(html,/<script>/);
+ assert.match(html,/<strong>A\.NAV<\/strong>/);
+ assert.match(html,/<title>A\.NAV[^<]*<\/title>/);
+ assert.match(html,/<meta name="application-name" content="A\.NAV">/);
+ assert.doesNotMatch(html,/<strong>מרווח<\/strong>/);
 });
 test('browser script parses and five tabs remain',()=>{
  new vm.Script(js);

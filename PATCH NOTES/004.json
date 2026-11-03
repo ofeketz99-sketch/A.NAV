@@ -1,0 +1,12 @@
+{
+  "version": 4,
+  "date": "2026-11-03",
+  "branch": "dev",
+  "summary": "Update integration tests for evolved dev UI and A.NAV branding",
+  "changes": [
+    "Replaced obsolete verbatim equality against original main with deterministic source-to-bundle checks",
+    "Added checks for entrypoint assets and A.NAV brand",
+    "Kept calculations, localStorage and backup schema tests intact"
+  ],
+  "backup": "backups/2026-11-03T21-12-00Z-current-tests/"
+}
