@@ -29,6 +29,7 @@
     "97-touch-context-menu",
     "98-pocket-calculator",
     "98-workbench",
+    "98-direct-charts",
     "99-startup"
   ],
   "css": [
@@ -60,6 +61,7 @@
     "97-pocket-calculator-redesign",
     "98-notebook-and-accents",
     "99-final-meter-tuning",
-    "99-workbench"
+    "99-workbench",
+    "99-direct-charts"
   ]
 }

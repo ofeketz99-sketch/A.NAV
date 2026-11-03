@@ -1,0 +1,10 @@
+
+/* Stage 4: direct chart manipulation with keyboard equivalents. */
+.line-chart .chart-edit-halo{cursor:ns-resize;touch-action:none;transition:stroke-width .14s ease,fill .14s ease;outline:0}
+.line-chart .chart-edit-halo:hover,.line-chart .chart-edit-halo:focus-visible{stroke-width:3;fill:#fffaf1;filter:drop-shadow(0 1px 7px #31261b38)}
+.bar-chart .bar-track{touch-action:pan-y;}
+.bar-chart [data-budget-field] .bar-track{cursor:ew-resize;touch-action:none;}
+.bar-chart [data-budget-field]:hover .bar-fill,.bar-chart [data-budget-field]:focus-visible .bar-fill{filter:brightness(1.16)}
+.bar-chart-guide{font-size:9.5px;color:#7c6d5c;padding:4px 1px;line-height:1.4}
+@media(max-width:540px){.bar-chart-guide{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.line-chart .chart-edit-halo{transition:none}}

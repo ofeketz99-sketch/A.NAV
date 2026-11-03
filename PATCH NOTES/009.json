@@ -1,0 +1,14 @@
+{
+  "version": 9,
+  "branch": "dev",
+  "stage": 4,
+  "date": "2026-11-03",
+  "title": "Direct chart editing",
+  "changes": [
+    "Drag budget bar segments to change monthly categories, using the same input calculation engine",
+    "Drag savings and investment chart endpoint to vary monthly contribution",
+    "Blocked draggable handle for locked or computed contribution and month-one overridden contributions",
+    "Keyboard arrows edit chart controls; original numerical input remains available"
+  ],
+  "backup": "backups/2026-11-03-stage-04-direct-edit/"
+}
