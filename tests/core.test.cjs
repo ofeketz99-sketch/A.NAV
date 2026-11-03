@@ -173,3 +173,14 @@ test('fixed viewport has selectable panes and paginated fields',()=>{
  assert.match(mod,/function applyViewportLayout\(\)/);
  assert.match(mod,/setScreenPanel\(button.dataset.screenPanel\)/);
 });
+
+test('non-scrolling dialogs offer explicit pages and tab access on narrow screens',()=>{
+ const css=fs.readFileSync(path.join(root,'styles/src/99-dialog-pages.css'),'utf8');
+ const js=fs.readFileSync(path.join(root,'scripts/src/98-dialog-pages.js'),'utf8');
+ assert.match(css,/overflow:hidden!important/);
+ assert.match(css,/grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+ assert.match(css,/@keyframes anav-running-rule/);
+ assert.match(js,/function ensureModalPager\(overlay\)/);
+ assert.match(js,/MutationObserver/);
+ assert.match(js,/data-modal-next/);
+});

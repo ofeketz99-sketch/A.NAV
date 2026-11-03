@@ -33,6 +33,7 @@
     "98-transfers",
     "98-risk-model",
     "98-fixed-screen",
+    "98-dialog-pages",
     "99-startup"
   ],
   "css": [
@@ -71,6 +72,7 @@
     "99-transfers",
     "99-risk-band",
     "99-visual-polish",
-    "99-no-scroll"
+    "99-no-scroll",
+    "99-dialog-pages"
   ]
 }

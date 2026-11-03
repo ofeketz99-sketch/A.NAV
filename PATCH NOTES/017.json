@@ -1,0 +1,13 @@
+{
+  "version": 17,
+  "date": "2026-11-03",
+  "branch": "dev",
+  "title": "Modal page navigation and tab fit",
+  "changes": [
+    "Scenario, settings, palette and deposit-plan dialogs show page controls rather than free scrolling when content exceeds the viewport",
+    "All five calculator tabs fit in a non-scrolling grid on narrow screens",
+    "Fixed animated header sweep direction for RTL",
+    "Respect reduced-motion preference"
+  ],
+  "backup": "backups/2026-11-03T23-20-00Z-dialog-pages/"
+}

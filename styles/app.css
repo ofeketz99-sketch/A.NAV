@@ -2724,3 +2724,51 @@ body{padding:0!important}
 @media (prefers-reduced-motion:reduce){
  .frame-chrome::after,.frame-monogram::after{animation:none!important}
 }
+
+/* A.NAV / modal page navigation, never a scrollbar. */
+#scenarioOverlay .tool-dialog,#advancedOverlay .tool-dialog,#paletteOverlay .tool-dialog{
+ height:min(680px,calc(100dvh - 20px));max-height:calc(100dvh - 20px);
+ overflow:hidden!important;
+}
+.schedule-dialog{height:min(760px,calc(100dvh - 20px));max-height:calc(100dvh - 20px);overflow:hidden!important}
+#scenarioOverlay .tool-content,#advancedOverlay .tool-content,
+#paletteOverlay .tool-content,.schedule-dialog .schedule-body{
+ flex:1 1 auto;min-height:0;position:relative;overflow:hidden!important;
+ scrollbar-width:none!important;overscroll-behavior:none!important;
+}
+.modal-page-inner{display:flow-root;position:relative;will-change:transform;transition:transform .22s ease-out}
+.modal-pager{
+ display:flex;align-items:center;justify-content:center;gap:16px;
+ min-height:39px;padding:5px 12px;border-top:1px solid #e7dccc;
+ background:#faf5ed;flex:0 0 auto;
+}
+.modal-pager[hidden]{display:none!important}
+.modal-pager button{
+ border:1px solid #d5c6b5;background:#fffdf9;padding:5px 11px;
+ border-radius:7px;color:#524638;font-size:11px;font-weight:700;
+}
+.modal-pager button:disabled{opacity:.28;cursor:default}
+.modal-page-count{color:#736453;font-size:11px;font-variant-numeric:tabular-nums}
+#scenarioOverlay .scenario-list,#advancedOverlay .advanced-grid,.schedule-list{
+ max-height:none!important;overflow:hidden!important;
+}
+.tabs-bar .tabs{min-width:0;overflow:hidden!important}
+@media(max-width:1050px){
+ .tabs-bar .tabs{
+  display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:2px!important;padding:2px!important;
+ }
+ .tabs-bar .tab-slot{min-width:0!important;max-width:100%;width:100%!important;flex:1 1 0!important}
+ .tabs-bar .tab-slot .tab{
+  display:block!important;min-width:0!important;max-width:100%!important;width:100%!important;
+  text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:6px 2px!important;
+ }
+}
+.frame-chrome::after{inset-inline-start:auto!important;left:auto;right:-22%}
+@keyframes anav-running-rule{
+ 0%{transform:translateX(0);opacity:.3}
+ 20%,85%{opacity:1}
+ 100%{transform:translateX(calc(-100vw - 280px));opacity:.3}
+}
+@media(prefers-reduced-motion:reduce){.modal-page-inner{transition:none!important}}
