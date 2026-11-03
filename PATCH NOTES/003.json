@@ -1,0 +1,13 @@
+{
+  "version": 3,
+  "date": "2026-11-03",
+  "branch": "dev",
+  "summary": "Rename site branding to A.NAV",
+  "changes": [
+    "Set A.NAV as visible frame brand and document title",
+    "Align decorative lettermark with new name",
+    "Set application-name metadata",
+    "Preserve the existing localStorage key and generic budget terminology"
+  ],
+  "backup": "backups/2026-11-03T21-01-00Z-anav-branding/"
+}
