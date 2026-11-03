@@ -1,0 +1,14 @@
+{
+  "version": 7,
+  "branch": "dev",
+  "date": "2026-11-03",
+  "stage": 2,
+  "title": "Responsive height and scroll containment",
+  "changes": [
+    "Separate scrolling for controls and analytical results on short desktop screens",
+    "Protect controls and charts from clipping under zoom or reduced viewport height",
+    "Adapt toolbars and metric cards on narrow screens",
+    "Preserve notebook and dashboard layout"
+  ],
+  "backup": "backups/2026-11-03-stage-02-layout/"
+}
