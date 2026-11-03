@@ -1,7 +1,7 @@
   function budgetBars(items){hoverChartModel=null;
     const max=Math.max(1,...items.map(i=>i[1]))*1.15;
     const total=items.reduce((sum,item)=>sum+Math.max(0,item[1]),0);
-    return `<div class="bar-chart">${items.map(([title,v,id],i)=>`<div class="bar-row" ${id?`data-budget-scale="${max}" data-budget-field="${id}" role="button" aria-label="עריכת ${escapeHtml(title)}"`:""} data-tip="${escapeHtml(title)}: ${money(v)} · ${pct(total?100*v/total:0)} מסך ההוצאות וההפקדות" tabindex="0"><div class="bar-name" title="${escapeHtml(title)}">${escapeHtml(title)}</div><div class="bar-track"><div class="bar-fill" style="width:${100*v/max}%;opacity:${1-i*.12}"></div></div><div class="bar-amount">${money(v)}</div></div>`).join('')}<div class="bar-chart-guide">אפשר לגרור את הסרגל כדי לשנות סעיף, או ללחוץ על השורה כדי לערוך מספר מדויק</div></div>`;
+    return `<div class="bar-chart">${items.map(([title,v,id],i)=>`<div class="bar-row" ${id?`data-budget-scale="${max}" data-budget-field="${id}" role="button" aria-label="עריכת ${escapeHtml(title)}"`:""} data-tip="${escapeHtml(title)}: ${money(v)} · ${pct(total?100*v/total:0)} מסך ההוצאות וההפקדות" tabindex="0"><div class="bar-name" title="${escapeHtml(title)}">${escapeHtml(title)}</div><div class="bar-track"><div class="bar-fill" style="width:${100*v/max}%;opacity:${1-i*.12}"></div></div><div class="bar-amount">${money(v)}</div></div>`).join('')}<div class="bar-chart-guide">גרירה לשינוי · לחיצה לעריכה</div></div>`;
   }
 
   // Stage 6: RTL cash-flow ribbon diagram; every band is derived from monthly budget fields.
@@ -39,5 +39,5 @@
       '<text x="120" y="17" text-anchor="middle" direction="rtl" font-size="12" fill="#6b5e50">חלוקה</text>'+
       parts+'<rect x="507" y="21" width="16" height="'+Math.max(1,sourceY-21)+'" rx="3" fill="var(--accent)"/>'+
       '</svg><div class="flow-legend">'+legend+'</div>'+
-      '<div class="bar-chart-guide">לחיצה על סעיף בתרשים או במקרא מעבירה לעריכת הערך</div></div>';
+      '<div class="bar-chart-guide">לחיצה לעריכה</div></div>';
   }

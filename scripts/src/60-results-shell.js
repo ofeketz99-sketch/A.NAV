@@ -13,14 +13,14 @@
     updateHeroSecondary();updateTransferActions();
     const toggle=q('riskToggle'),volControl=q('riskVolWrap'),riskLine=q('riskSummary');
     toggle.hidden=active!=='index';toggle.setAttribute('aria-pressed',String(riskSettings.enabled));
-    toggle.textContent=riskSettings.enabled?'הסתר טווח תרחישים':'הצג טווח תרחישים';
+    toggle.textContent=riskSettings.enabled?'הסתר טווח':'טווח תרחישים';
     volControl.hidden=active!=='index'||!riskSettings.enabled;
     q('riskVolatility').value=String(riskSettings.volatility);
     riskLine.hidden=!(active==='index'&&riskSettings.enabled&&riskLast);
-    if(!riskLine.hidden)riskLine.textContent='הדמיה בלבד · טווח 10%–90%: '+money(riskLast.low.at(-1))+'–'+money(riskLast.high.at(-1))+
-      ' · חציון: '+money(riskLast.median.at(-1))+' · '+riskLast.goalShare+'% מהמסלולים המדומים הגיעו ליעד. לא הסתברות אמיתית.';
+    if(!riskLine.hidden)riskLine.textContent='הדמיה · 10–90%: '+money(riskLast.low.at(-1))+'–'+money(riskLast.high.at(-1))+
+      ' · חציון '+money(riskLast.median.at(-1))+' · '+riskLast.goalShare+'% הגיעו ליעד · לא תחזית.';
     const chartToggle=q('chartModeToggle'),isInvest=active==='savings'||active==='index';
-    chartToggle.hidden=!isInvest;if(isInvest){chartToggle.setAttribute('aria-pressed',String(chartModes[active]));chartToggle.textContent=chartModes[active]?'הסתר הפקדות':'הצג הפקדות';}
+    chartToggle.hidden=!isInvest;if(isInvest){chartToggle.setAttribute('aria-pressed',String(chartModes[active]));chartToggle.textContent=chartModes[active]?'הסתר הפקדות':'הפקדות';}
   }
 
   function scenarioFor(tab){const rec=scenarios[tab].find(x=>x.id===compareIds[tab])||null;return rec&&compareDrafts[tab]?.id===rec.id?compareDrafts[tab]:rec;}
@@ -39,5 +39,5 @@
   }
   function currentScenarioValue(){return scenarioOutput(active,{values:states[active],events:contributions[active]||[],advanced:advanced[active]||{}});}
   function comparisonText(){const rec=scenarioFor(active),base=rec&&scenarioOutput(active,rec),current=currentScenarioValue();if(!base||!current)return '';
-    const delta=current.value-base.value;return ` · השוואה ל״${rec.name}״: ${money(base.value)} (פער ${delta>=0?'+':''}${money(delta)})`;
+    const delta=current.value-base.value;return ` · מול ״${rec.name}״: ${money(base.value)} (פער ${delta>=0?'+':''}${money(delta)})`;
   }

@@ -1,0 +1,13 @@
+{
+  "version": 16,
+  "date": "2026-11-03",
+  "branch": "dev",
+  "title": "Concise financial interface copy",
+  "changes": [
+    "Removed slogan and verbose marketing-style descriptions from header",
+    "Shortened tab names, control labels, result headings, chart notes and transfer prompts",
+    "Kept essential financial assumptions and disclosures",
+    "Shortened built-in labels while keeping user-defined names intact, including existing locally saved defaults"
+  ],
+  "backup": "backups/2026-11-03T23-05-00Z-text-shortening/"
+}

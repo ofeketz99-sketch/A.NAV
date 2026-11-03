@@ -1,12 +1,12 @@
 
   // Stage 7: explicit, one-time transfers. Never couple calculator values implicitly.
   function availableTransfers(tab){
-    if(tab==='mortgage')return [{id:'mortgage-budget',to:'budget',field:'housing',label:'העבר החזר לתקציב',hint:'שכירות / משכנתא'}];
+    if(tab==='mortgage')return [{id:'mortgage-budget',to:'budget',field:'housing',label:'החזר ← תקציב',hint:'שכירות / משכנתא'}];
     if(tab==='budget')return [
-      {id:'budget-savings',to:'savings',field:'monthly',label:'שלח חיסכון לתוכנית חיסכון',hint:'הפקדה חודשית'},
-      {id:'budget-index',to:'index',field:'monthly',label:'שלח חיסכון להשקעות',hint:'השקעה חודשית'}
+      {id:'budget-savings',to:'savings',field:'monthly',label:'חיסכון ← תוכנית',hint:'הפקדה חודשית'},
+      {id:'budget-index',to:'index',field:'monthly',label:'חיסכון ← השקעות',hint:'השקעה חודשית'}
     ];
-    if(tab==='savings')return [{id:'savings-index',to:'index',field:'monthly',label:'העבר הפקדה להשקעות',hint:'השקעה חודשית'}];
+    if(tab==='savings')return [{id:'savings-index',to:'index',field:'monthly',label:'הפקדה ← השקעות',hint:'השקעה חודשית'}];
     return [];
   }
   function transferValue(tab,route){
@@ -22,8 +22,8 @@
     const holder=q('transferActions'),routes=availableTransfers(active);
     holder.hidden=!routes.length;
     if(!routes.length){holder.innerHTML='';return;}
-    holder.innerHTML='<span class="transfer-prefix">העבר נתונים בין מחשבונים (בהסכמה בלבד):</span>'+
-      routes.map(route=>'<button type="button" class="transfer-button" data-transfer="'+route.id+'" title="העברת ערך חד־פעמית עם אישור">'+escapeHtml(route.label)+'</button>').join('');
+    holder.innerHTML='<span class="transfer-prefix">העברת נתונים:</span>'+
+      routes.map(route=>'<button type="button" class="transfer-button" data-transfer="'+route.id+'" title="העברה חד־פעמית">'+escapeHtml(route.label)+'</button>').join('');
   }
   q('transferActions').addEventListener('click',event=>{
     const button=event.target.closest('[data-transfer]');if(!button)return;
@@ -37,13 +37,13 @@
     }
     if(goalPinned[route.to]?.includes(route.field)||
       (goalPlans[route.to]?.locked&&goalPlans[route.to].solve===route.field)){
-      alert('המשתנה במחשבון המקבל נעול או מחושב אוטומטית. יש לשחרר את הנעילה לפני העברה.');
+      alert('המשתנה במחשבון המקבל נעול או מחושב אוטומטית. שחרר נעילה תחילה.');
       return;
     }
     const old=states[route.to][route.field],label=fieldLabels[route.to][route.field]||f[1];
     if(!confirm('להעביר '+money(value)+' מ־'+tabLabels[source]+' אל '+tabLabels[route.to]+'?'+
       '\nהשדה: '+label+'\nערך קודם: '+money(old)+
-      '\nהעברה זו חד־פעמית ולא תיצור סנכרון אוטומטי.'))return;
+      '\nהעברה חד־פעמית.'))return;
     states[route.to][route.field]=value;
     if(goalPlans[route.to]?.locked){
       if(!goalManuals[route.to])goalManuals[route.to]=Object.fromEntries(goalSolveChoices.map(([id])=>[id,states[route.to][id]]));
