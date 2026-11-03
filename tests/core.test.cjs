@@ -149,3 +149,15 @@ test('illustrative volatility fan is deterministic and percentile-ordered',()=>{
  const fixed=simulate(input,[],0,30);
  assert.ok(Math.abs(fixed.high.at(-1)-fixed.low.at(-1))<.01);
 });
+
+test('visual polish uses responsive plot bounds and a structured A.NAV masthead',()=>{
+ const css=fs.readFileSync(path.join(root,'styles/src/99-visual-polish.css'),'utf8');
+ const renderer=fs.readFileSync(path.join(root,'scripts/src/62-chart-rendering.js'),'utf8');
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+ assert.match(html,/<strong>A\.NAV<\/strong>/);
+ assert.match(html,/frame-chrome-center/);
+ assert.match(renderer,/getBoundingClientRect\(\)/);
+ assert.match(renderer,/const x0=34,x1=w-36,y0=h-38,y1=26/);
+ assert.match(css,/justify-content:space-evenly/);
+ assert.match(css,/grid-template-rows:minmax\(144px/);
+});

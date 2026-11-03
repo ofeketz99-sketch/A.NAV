@@ -1,0 +1,14 @@
+{
+  "version": 14,
+  "date": "2026-11-03",
+  "branch": "dev",
+  "title": "Premium A.NAV header and space-filling charts/controls",
+  "changes": [
+    "Redesigned dashboard header with clear brand, context and local save indicator",
+    "Line chart coordinates now derive from actual chart area dimensions instead of fixed viewport",
+    "Improved chart vertical allocation and removed empty grid row for hidden insight",
+    "Distributed sliders vertically through the available input pane while retaining scroll for many fields",
+    "Enhanced slider tracks, thumbs, visual hierarchy and responsive styles"
+  ],
+  "backup": "backups/2026-11-03T22-35-00Z-visual-polish/"
+}

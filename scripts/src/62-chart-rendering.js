@@ -3,11 +3,17 @@
     const values=data.length?data:[0];
     const compare=scenarioFor(active),other=scenarioOutput(active,compare);
     const horizon=Math.max(.01,years,other?.years||0);
-    const w=600,h=208,x0=28,x1=572,y0=170,y1=24;
+    // Match SVG coordinates to the actual chart region so the plot fills it.
+    const plot=q('chart').getBoundingClientRect();
+    const w=Math.max(360,Math.round(plot.width)||600);
+    const compact=window.matchMedia('(max-width:1050px)').matches;
+    const h=compact?Math.max(225,Math.min(320,Math.round(w*.6))):
+      Math.max(190,Math.min(345,Math.round(plot.height)||240));
+    const x0=34,x1=w-36,y0=h-38,y1=26;
     const risk=active==='index'&&riskSettings.enabled?riskEnvelope(states.index,events,riskSettings.volatility):null;
     riskLast=risk;
     const allValues=[...values,...(other?.series||[]),...(chartModes[active]&&principalSeries?principalSeries:[]),...(risk?.high||[])];
-    const max=Math.max(1,...allValues)*1.23;
+    const max=Math.max(1,...allValues)*1.14;
     const coords=(series,length)=>series.map((v,i)=>[x0+(x1-x0)*(length/horizon)*(i/Math.max(1,series.length-1)),y0-(Math.max(0,v)/max)*(y0-y1)]);
     const coord=coords(values,years);
     const linePath=points=>points.map((p,i)=>(i?'L':'M')+p[0].toFixed(2)+' '+p[1].toFixed(2)).join(' ');

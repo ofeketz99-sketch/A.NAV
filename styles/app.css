@@ -2463,3 +2463,82 @@ body{padding:8px}
 .chart-tools{flex-wrap:wrap;gap:5px}
 @media(min-width:1051px){.chart-panel:has(.risk-summary:not([hidden])){min-height:280px}}
 @media(max-width:540px){.risk-summary{font-size:9px}}
+
+/* A.NAV / visual polish — spacious, legible, intentional. */
+#financeApp.shell{background:linear-gradient(150deg,#fbf8f3,#f7f1e9 74%,#f9f5ee);border:1px solid #cbbca9;box-shadow:0 16px 44px #3022151e,inset 0 1px 0 #ffffffdc}
+.frame-chrome{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:22px;min-height:63px;padding:6px 8px 12px;margin:0 0 10px;border-bottom:1px solid #d9cbbb}
+.frame-identity{display:flex;gap:11px;align-items:center;min-width:0}
+.frame-monogram{width:40px;height:40px;flex:none;display:grid;place-items:center;background:linear-gradient(135deg,#32312e,#171815);color:#fff9ed;border-radius:12px;font-size:19px;font-weight:800;box-shadow:0 5px 14px #15120f25,inset 0 1px 0 #ffffff25}
+.frame-brand-copy strong{display:block;font-size:23px;font-weight:800;letter-spacing:-.6px;line-height:1.05;color:#241f19}
+.frame-brand-copy small{display:block;font-size:11px;font-weight:650;color:#74685c;margin-top:3px;white-space:nowrap}
+.frame-chrome-center{display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 18px;line-height:1.4;text-align:center}
+.frame-overline{font-size:10px;font-weight:720;letter-spacing:.07em;color:#9f8a73}
+.frame-chrome-center strong{font-size:12px;font-weight:700;color:#534a40;white-space:nowrap}
+.frame-state{justify-self:end;display:flex;align-items:center;gap:10px;text-align:right;padding:8px 12px;border:1px solid #e0d3c3;border-radius:11px;background:#fffdf9b8;box-shadow:0 2px 7px #44301e0a}
+.frame-state-dot{width:8px;height:8px;flex:none;border-radius:50%;background:#73866c;box-shadow:0 0 0 3px #e8eddf}
+.frame-state-copy strong{display:block;font-size:11px;font-weight:750;color:#544b3f;line-height:1.25}
+.frame-state-copy small{display:block;font-size:9px;color:#867869;margin-top:3px;white-space:nowrap}
+.tabs-bar{background:#f5efe7;border-color:#ded0c1;border-radius:13px;box-shadow:inset 0 1px 0 #fff9}
+.tabs-bar .tab[aria-selected=true]{background:#fffdf9;border-color:#c9bba9;box-shadow:0 2px 9px #35231714,inset 0 -2px 0 var(--accent)}
+.panel,.notes-panel,.stat{border-color:#dcd0c1}
+.stat{background:linear-gradient(155deg,color-mix(in srgb,var(--accent) 5%,#fffdf9),#fffdf9)}
+.stat-number{font-weight:780}
+.chart-panel{background:linear-gradient(160deg,#fffdfa,color-mix(in srgb,var(--accent) 2%,#fbf6ee))}
+.chart-panel .chart-top{padding-bottom:7px;border-bottom:1px solid color-mix(in srgb,var(--accent) 9%,#e6dbce)}
+.chart-title{font-weight:780;letter-spacing:-.25px}
+.line-chart{display:block;max-width:100%;width:100%;min-width:0}
+.chart-axis{color:#817464;line-height:1.3}
+.field-top label{color:#473e34;font-weight:690}
+.range-control input[type="range"]{height:7px;margin:12px 0 11px;border-radius:99px;box-shadow:inset 0 1px 2px #2d1f1008}
+.range-control input[type="range"]::-webkit-slider-thumb{width:20px;height:20px;border:3px solid #fffdf9;box-shadow:0 2px 7px #35271e52}
+.range-control input[type="range"]::-moz-range-thumb{width:14px;height:14px;border:3px solid #fffdf9;box-shadow:0 2px 7px #35271e52}
+.value-box{border-color:#e0d3c3;border-radius:9px;background:#f7f1e9}
+.limits{color:#928577}
+@media(hover:hover) and (pointer:fine){
+ #controlsBody .field:not(.goal-pinned):not(.goal-computed):not(.goal-locked):hover{background:color-mix(in srgb,var(--accent) 6%,#faf6ef);box-shadow:none;transform:none}
+}
+@media(min-width:1051px){
+ #financeApp.shell{padding:9px 15px 8px}
+ .frame-chrome{min-height:56px;padding:3px 8px 9px;margin-bottom:8px}
+ .workspace{grid-template-columns:minmax(335px,.8fr) minmax(0,1.2fr);gap:13px}
+ .controls{padding:15px 16px 12px}
+ .controls .panel-head{margin-bottom:9px}
+ .controls .panel-head h2{font-size:17px;font-weight:780}
+ #controlsBody{display:flex;flex:1;min-height:0;flex-direction:column;justify-content:space-evenly;gap:clamp(12px,1.7vh,19px);overflow-y:auto;overflow-x:hidden;padding:8px 9px 14px;scrollbar-gutter:stable}
+ #controlsBody .field{margin:0;flex:0 0 auto;padding:clamp(10px,1.1vh,15px) 12px 9px;border:1px solid transparent;border-radius:13px;background:color-mix(in srgb,var(--accent) 2%,#faf7f1)}
+ #controlsBody .select-field{flex:0 0 auto;margin-bottom:0}
+ #controlsBody .field-top{margin-bottom:9px}
+ #controlsBody .field-top label{font-size:12px}
+ #controlsBody .value-box{height:35px;padding:4px 9px}
+ #controlsBody .number-input{font-size:14px;max-width:98px;width:92px}
+ .results{display:grid;height:100%;min-height:0;overflow-y:auto;grid-template-rows:minmax(144px,.78fr) minmax(150px,.95fr) minmax(250px,1.75fr);align-content:stretch;gap:11px}
+ .results .hero-result{min-height:144px}
+ .results .stat-grid{min-height:150px}
+ .results .chart-panel{min-height:250px;height:100%;min-width:0;overflow:visible;padding:12px 16px}
+ .results .chart-panel #chart{min-height:185px;min-width:0;flex:1 1 auto;justify-content:center}
+ .results .chart-panel svg.line-chart{flex:1 1 auto;width:100%;height:100%;min-height:0;max-height:none}
+ .chart-title{font-size:13px}.chart-caption{font-size:10.5px}.chart-bottom{margin-top:5px;padding-top:7px;font-size:10px}
+}
+@media(min-width:1051px) and (max-height:760px){
+ #controlsBody{gap:10px;padding-block:4px 9px}
+ #controlsBody .field{padding-block:8px}
+ .results{grid-template-rows:minmax(124px,.75fr) minmax(140px,.9fr) minmax(215px,1.7fr)}
+ .results .hero-result{min-height:124px}.results .stat-grid{min-height:140px}
+ .results .chart-panel{min-height:215px}.results .chart-panel #chart{min-height:145px}
+}
+@media(max-width:1050px){
+ .frame-chrome{grid-template-columns:1fr auto;gap:12px;padding:5px 8px 11px}
+ .frame-chrome-center{display:none}.frame-state{justify-self:end}
+ .controls{padding:16px}#controlsBody{gap:13px}
+ .results .chart-panel{padding:14px 15px}
+ #chart{min-height:235px}.line-chart{width:100%;height:auto;min-height:220px;max-height:none}
+}
+@media(max-width:560px){
+ .frame-chrome{min-height:56px;gap:8px;padding:5px 3px 10px}
+ .frame-monogram{width:34px;height:34px;font-size:17px}
+ .frame-identity{gap:8px}.frame-brand-copy strong{font-size:19px}.frame-brand-copy small{font-size:9px}
+ .frame-state{border:0;background:transparent;box-shadow:none;padding:0;gap:7px}
+ .frame-state-copy strong{font-size:10px}.frame-state-copy small{font-size:8px;white-space:normal}
+ .chart-panel .chart-top{gap:7px;flex-wrap:wrap}#chart{min-height:225px}.line-chart{min-height:220px}
+}
+@media(prefers-reduced-motion:reduce){.stat,.field,.line-chart{transition:none!important}}
