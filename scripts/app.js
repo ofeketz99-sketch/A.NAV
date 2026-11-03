@@ -149,6 +149,20 @@
   // Entries of type monthly replace the recurring contribution from that month onward;
   // entries of type once add a contribution only at that month-end.
   const contributions={savings:[],index:[]};
+  // Optional scenario constraints are absent from earlier scenario records.
+  function normalizeScenarioLockState(tab,raw){
+    if((tab!=='savings'&&tab!=='index')||!raw||typeof raw!=='object'||Array.isArray(raw))return null;
+    const ids=new Set(configs[tab].fields.map(f=>f[0]).filter(id=>id!=='goal'));
+    const pinned=[...new Set(Array.isArray(raw.pinned)?raw.pinned:[])].filter(id=>ids.has(id));
+    const allowed=goalSolveChoices.map(([id])=>id).filter(id=>!pinned.includes(id));
+    const solve=allowed.includes(raw.solve)?raw.solve:(allowed[0]||'');
+    const manuals=raw.manuals&&typeof raw.manuals==='object'&&!Array.isArray(raw.manuals)
+      ?Object.fromEntries(goalSolveChoices.map(([id])=>{
+        const f=configs[tab].fields.find(x=>x[0]===id);
+        return [id,Number.isFinite(raw.manuals[id])?clamp(raw.manuals[id],f[2],f[3]):null];
+      })):null;
+    return {locked:raw.locked===true,solve,pinned,manuals};
+  }
   function restoreSnapshot(saved){
     if(!saved || saved.version!==1 || !saved.values || typeof saved.values!=='object' || Array.isArray(saved.values))throw new Error('פורמט גיבוי לא תקין');
     for(const tab of defaultOrder){
@@ -233,7 +247,7 @@
       for(const tab of defaultOrder){
         if(!Array.isArray(saved.scenarios[tab]))continue;
         scenarios[tab]=saved.scenarios[tab].slice(0,12).filter(x=>x&&typeof x.id==='string'&&typeof x.name==='string'&&x.values&&typeof x.values==='object').map(x=>({id:x.id.slice(0,45),name:x.name.slice(0,42),values:tab==='loan'&&Number.isFinite(x.values.years)&&!Number.isFinite(x.values.months)
-          ?{...x.values,months:Math.round(x.values.years*12)}:x.values,events:Array.isArray(x.events)?x.events.slice(0,80):[],advanced:x.advanced&&typeof x.advanced==='object'?x.advanced:{}}));
+          ?{...x.values,months:Math.round(x.values.years*12)}:x.values,events:Array.isArray(x.events)?x.events.slice(0,80):[],advanced:x.advanced&&typeof x.advanced==='object'?x.advanced:{},lockState:normalizeScenarioLockState(tab,x.lockState)}));
       }
     }
     if(saved.compareIds && typeof saved.compareIds==='object')for(const tab of defaultOrder){const id=saved.compareIds[tab];if(scenarios[tab].some(x=>x.id===id))compareIds[tab]=id;}
@@ -598,7 +612,8 @@
       if(!r||!n)return;
       const computed=locked&&!!plan.solve&&id===plan.solve;
       const pinned=goalPinned[active].includes(id);
-      r.disabled=n.disabled=computed||pinned;
+      const lockedTarget=locked&&id==='goal';
+      r.disabled=n.disabled=computed||pinned||lockedTarget;
       const row=r.closest('.field');row.classList.toggle('goal-computed',computed);row.classList.toggle('goal-pinned',pinned);
       const pin=row.querySelector('[data-pin-field]');
       if(pin){pin.setAttribute('aria-pressed',String(pinned));pin.setAttribute('aria-label',(pinned?'בטל נעילה':'נעל')+': '+(fieldLabels[active][id]||f[1]));
@@ -811,6 +826,7 @@
   function changeValue(id,value,origin){
     const c=configs[active],f=c.fields.find(x=>x[0]===id);if(!f)return;
     if((active==='savings'||active==='index')&&goalPinned[active].includes(id))return;
+    if(goalIsActive()&&id==='goal')return;
     if(goalIsActive()&&id===goalPlans[active].solve)return;
     const s=states[active],max=active==='mortgage'&&id==='equity'?s.price:f[3];
     s[id]=clamp(value,f[2],max);
@@ -1603,7 +1619,46 @@
     saveState();
     q('saveStatus').textContent='כל הנעילות בגיליון שוחררו';
   });
-  q('resetBtn').addEventListener('click',()=>{states[active]=Object.fromEntries(configs[active].fields.map(f=>[f[0],getResetPoint(active,f[0])]));if(active==='mortgage')states.mortgage.kind='first';if(active==='savings'||active==='index'){contributions[active]=[];goalPlans[active].locked=false;goalPinned[active]=[];goalFeedback[active]=null;goalManuals[active]=null;}activate(active);});
+  // Standard reset keeps locked values and scheduled deposits.
+  function resetCalculatorValues(tab,full=false){
+    const isSaving=tab==='savings'||tab==='index';
+    const pinned=!full&&isSaving?goalPinned[tab]:[];
+    const locked=!full&&isSaving&&goalPlans[tab].locked;
+    const computed=locked?goalPlans[tab].solve:null;
+    const values={...states[tab]};
+    for(const [id] of configs[tab].fields){
+      if(pinned.includes(id)||(locked&&(id==='goal'||id===computed)))continue;
+      values[id]=getResetPoint(tab,id);
+    }
+    if(tab==='mortgage'){values.kind='first';values.equity=Math.min(values.equity,values.price);}
+    states[tab]=values;
+    if(full){
+      compareIds[tab]=null;
+      if(tab==='mortgage')Object.assign(advanced.mortgage,{insurance:0,purchaseCosts:0,stressRise:0,income:0});
+      if(tab==='index')Object.assign(advanced.index,{taxEnabled:false,taxRate:25});
+      if(tab==='budget')advanced.budget.annualItems=[];
+      if(isSaving){
+        contributions[tab]=[];
+        goalPlans[tab]={locked:false,solve:'monthly'};
+        goalPinned[tab]=[];
+        goalFeedback[tab]=null;
+        goalManuals[tab]=null;
+      }
+    }else if(locked){
+      if(!goalManuals[tab])goalManuals[tab]=Object.fromEntries(goalSolveChoices.map(([id])=>[id,states[tab][id]]));
+      for(const [id] of goalSolveChoices)if(id!==computed&&!pinned.includes(id))goalManuals[tab][id]=states[tab][id];
+      goalSolver(tab);
+    }
+  }
+  q('resetBtn').addEventListener('click',()=>{
+    resetCalculatorValues(active,false);activate(active);
+    q('saveStatus').textContent='הערכים החופשיים אופסו; נעילות והפקדות נשמרו';
+  });
+  q('resetAllBtn').addEventListener('click',()=>{
+    if(!confirm('לאפס את כל הגיליון? נעילות, שינויי הפקדות והגדרות מתקדמות יימחקו. תרחישים שמורים ונקודות איפוס אישיות יישמרו.'))return;
+    resetCalculatorValues(active,true);activate(active);
+    q('saveStatus').textContent='הגיליון אופס במלואו; תרחישים שמורים נשמרו';
+  });
 
   // Details close when another tool opens; focus retained for keyboard users.
   let lastToolOpener=null;
@@ -1625,7 +1680,38 @@
   document.querySelectorAll('[data-close-tool]').forEach(b=>b.addEventListener('click',closeTool));
   toolOverlays.forEach(id=>q(id).addEventListener('pointerdown',e=>{if(e.target===q(id))closeTool();}));
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&toolOverlays.some(id=>!q(id).hidden)){e.preventDefault();closeTool();}});
-  function snapshotFor(tab){return {values:structuredClone(states[tab]),events:structuredClone(contributions[tab]||[]),advanced:structuredClone(advanced[tab]||{})};}
+  function snapshotFor(tab){
+    const lockState=normalizeScenarioLockState(tab,tab==='savings'||tab==='index'?{
+      locked:goalPlans[tab].locked,solve:goalPlans[tab].solve,
+      pinned:goalPinned[tab],manuals:goalManuals[tab]
+    }:null);
+    return {values:structuredClone(states[tab]),events:structuredClone(contributions[tab]||[]),
+      advanced:structuredClone(advanced[tab]||{}),...(lockState?{lockState}:{})};
+  }
+  // Legacy scenarios have no lockState; never keep unrelated currently active locks.
+  function loadScenarioRecord(tab,rec){
+    for(const [id,,min,max] of configs[tab].fields)
+      if(Number.isFinite(rec.values[id]))states[tab][id]=clamp(rec.values[id],min,max);
+    if(tab==='mortgage'){
+      if(allowedKinds.includes(rec.values.kind))states.mortgage.kind=rec.values.kind;
+      states.mortgage.equity=Math.min(states.mortgage.equity,states.mortgage.price);
+    }
+    if(tab==='savings'||tab==='index'){
+      contributions[tab]=Array.isArray(rec.events)?structuredClone(rec.events):[];
+      const locks=normalizeScenarioLockState(tab,rec.lockState);
+      goalPinned[tab]=locks?.pinned||[];
+      goalPlans[tab]={locked:locks?.locked||false,solve:locks?.solve||'monthly'};
+      goalManuals[tab]=locks?.manuals?Object.fromEntries(goalSolveChoices.map(([id])=>[
+        id,Number.isFinite(locks.manuals[id])?locks.manuals[id]:states[tab][id]
+      ])):null;
+      goalFeedback[tab]=null;
+    }
+    if(advanced[tab]&&rec.advanced)Object.assign(advanced[tab],structuredClone(rec.advanced));
+    if((tab==='savings'||tab==='index')&&goalPlans[tab].locked){
+      if(!goalManuals[tab])goalManuals[tab]=Object.fromEntries(goalSolveChoices.map(([id])=>[id,states[tab][id]]));
+      goalSolver(tab);
+    }
+  }
   function renderScenarioList(){
     const list=q('scenarioList');const listItems=scenarios[active];
     list.innerHTML=listItems.length?listItems.map(x=>`<div class="scenario-row"><div><strong>${escapeHtml(x.name)}</strong><small>${x.events?.length||0} אירועי הפקדה</small></div><div class="scenario-actions"><button type="button" data-scenario="${x.id}" data-action="load">טען</button><button type="button" data-scenario="${x.id}" data-action="compare" aria-pressed="${compareIds[active]===x.id}">${compareIds[active]===x.id?'בטל השוואה':'השווה'}</button><button type="button" data-scenario="${x.id}" data-action="delete">מחק</button></div></div>`).join(''):'<p class="tool-small">עדיין לא שמרת תרחישים למחשבון הזה.</p>';
@@ -1642,12 +1728,7 @@
     if(b.dataset.action==='compare'){compareIds[tab]=compareIds[tab]===rec.id?null:rec.id;renderScenarioList();renderResults();saveState();return;}
     if(b.dataset.action==='delete'){scenarios[tab]=scenarios[tab].filter(x=>x.id!==rec.id);if(compareIds[tab]===rec.id)compareIds[tab]=null;renderScenarioList();renderResults();saveState();return;}
     if(b.dataset.action==='load'){
-      const ids=configs[tab].fields;
-      for(const [id,,min,max] of ids)if(Number.isFinite(rec.values[id]))states[tab][id]=clamp(rec.values[id],min,max);
-      if(tab==='mortgage'){if(allowedKinds.includes(rec.values.kind))states.mortgage.kind=rec.values.kind;states.mortgage.equity=Math.min(states.mortgage.equity,states.mortgage.price);}
-      if((tab==='savings'||tab==='index')&&Array.isArray(rec.events))contributions[tab]=structuredClone(rec.events);
-      if(goalIsActive(tab))goalManuals[tab]=Object.fromEntries(['initial','monthly','years','rate'].map(id=>[id,states[tab][id]]));
-      if(advanced[tab]&&rec.advanced)Object.assign(advanced[tab],structuredClone(rec.advanced));
+      loadScenarioRecord(tab,rec);
       closeTool();activate(tab);saveState();
     }
   });

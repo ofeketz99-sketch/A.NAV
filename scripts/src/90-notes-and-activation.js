@@ -57,5 +57,44 @@
     saveState();
     q('saveStatus').textContent='כל הנעילות בגיליון שוחררו';
   });
-  q('resetBtn').addEventListener('click',()=>{states[active]=Object.fromEntries(configs[active].fields.map(f=>[f[0],getResetPoint(active,f[0])]));if(active==='mortgage')states.mortgage.kind='first';if(active==='savings'||active==='index'){contributions[active]=[];goalPlans[active].locked=false;goalPinned[active]=[];goalFeedback[active]=null;goalManuals[active]=null;}activate(active);});
+  // Standard reset keeps locked values and scheduled deposits.
+  function resetCalculatorValues(tab,full=false){
+    const isSaving=tab==='savings'||tab==='index';
+    const pinned=!full&&isSaving?goalPinned[tab]:[];
+    const locked=!full&&isSaving&&goalPlans[tab].locked;
+    const computed=locked?goalPlans[tab].solve:null;
+    const values={...states[tab]};
+    for(const [id] of configs[tab].fields){
+      if(pinned.includes(id)||(locked&&(id==='goal'||id===computed)))continue;
+      values[id]=getResetPoint(tab,id);
+    }
+    if(tab==='mortgage'){values.kind='first';values.equity=Math.min(values.equity,values.price);}
+    states[tab]=values;
+    if(full){
+      compareIds[tab]=null;
+      if(tab==='mortgage')Object.assign(advanced.mortgage,{insurance:0,purchaseCosts:0,stressRise:0,income:0});
+      if(tab==='index')Object.assign(advanced.index,{taxEnabled:false,taxRate:25});
+      if(tab==='budget')advanced.budget.annualItems=[];
+      if(isSaving){
+        contributions[tab]=[];
+        goalPlans[tab]={locked:false,solve:'monthly'};
+        goalPinned[tab]=[];
+        goalFeedback[tab]=null;
+        goalManuals[tab]=null;
+      }
+    }else if(locked){
+      if(!goalManuals[tab])goalManuals[tab]=Object.fromEntries(goalSolveChoices.map(([id])=>[id,states[tab][id]]));
+      for(const [id] of goalSolveChoices)if(id!==computed&&!pinned.includes(id))goalManuals[tab][id]=states[tab][id];
+      goalSolver(tab);
+    }
+  }
+  q('resetBtn').addEventListener('click',()=>{
+    resetCalculatorValues(active,false);activate(active);
+    q('saveStatus').textContent='הערכים החופשיים אופסו; נעילות והפקדות נשמרו';
+  });
+  q('resetAllBtn').addEventListener('click',()=>{
+    if(!confirm('לאפס את כל הגיליון? נעילות, שינויי הפקדות והגדרות מתקדמות יימחקו. תרחישים שמורים ונקודות איפוס אישיות יישמרו.'))return;
+    resetCalculatorValues(active,true);activate(active);
+    q('saveStatus').textContent='הגיליון אופס במלואו; תרחישים שמורים נשמרו';
+  });
 

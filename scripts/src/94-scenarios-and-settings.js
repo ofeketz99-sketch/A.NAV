@@ -1,4 +1,35 @@
-  function snapshotFor(tab){return {values:structuredClone(states[tab]),events:structuredClone(contributions[tab]||[]),advanced:structuredClone(advanced[tab]||{})};}
+  function snapshotFor(tab){
+    const lockState=normalizeScenarioLockState(tab,tab==='savings'||tab==='index'?{
+      locked:goalPlans[tab].locked,solve:goalPlans[tab].solve,
+      pinned:goalPinned[tab],manuals:goalManuals[tab]
+    }:null);
+    return {values:structuredClone(states[tab]),events:structuredClone(contributions[tab]||[]),
+      advanced:structuredClone(advanced[tab]||{}),...(lockState?{lockState}:{})};
+  }
+  // Legacy scenarios have no lockState; never keep unrelated currently active locks.
+  function loadScenarioRecord(tab,rec){
+    for(const [id,,min,max] of configs[tab].fields)
+      if(Number.isFinite(rec.values[id]))states[tab][id]=clamp(rec.values[id],min,max);
+    if(tab==='mortgage'){
+      if(allowedKinds.includes(rec.values.kind))states.mortgage.kind=rec.values.kind;
+      states.mortgage.equity=Math.min(states.mortgage.equity,states.mortgage.price);
+    }
+    if(tab==='savings'||tab==='index'){
+      contributions[tab]=Array.isArray(rec.events)?structuredClone(rec.events):[];
+      const locks=normalizeScenarioLockState(tab,rec.lockState);
+      goalPinned[tab]=locks?.pinned||[];
+      goalPlans[tab]={locked:locks?.locked||false,solve:locks?.solve||'monthly'};
+      goalManuals[tab]=locks?.manuals?Object.fromEntries(goalSolveChoices.map(([id])=>[
+        id,Number.isFinite(locks.manuals[id])?locks.manuals[id]:states[tab][id]
+      ])):null;
+      goalFeedback[tab]=null;
+    }
+    if(advanced[tab]&&rec.advanced)Object.assign(advanced[tab],structuredClone(rec.advanced));
+    if((tab==='savings'||tab==='index')&&goalPlans[tab].locked){
+      if(!goalManuals[tab])goalManuals[tab]=Object.fromEntries(goalSolveChoices.map(([id])=>[id,states[tab][id]]));
+      goalSolver(tab);
+    }
+  }
   function renderScenarioList(){
     const list=q('scenarioList');const listItems=scenarios[active];
     list.innerHTML=listItems.length?listItems.map(x=>`<div class="scenario-row"><div><strong>${escapeHtml(x.name)}</strong><small>${x.events?.length||0} אירועי הפקדה</small></div><div class="scenario-actions"><button type="button" data-scenario="${x.id}" data-action="load">טען</button><button type="button" data-scenario="${x.id}" data-action="compare" aria-pressed="${compareIds[active]===x.id}">${compareIds[active]===x.id?'בטל השוואה':'השווה'}</button><button type="button" data-scenario="${x.id}" data-action="delete">מחק</button></div></div>`).join(''):'<p class="tool-small">עדיין לא שמרת תרחישים למחשבון הזה.</p>';
@@ -15,12 +46,7 @@
     if(b.dataset.action==='compare'){compareIds[tab]=compareIds[tab]===rec.id?null:rec.id;renderScenarioList();renderResults();saveState();return;}
     if(b.dataset.action==='delete'){scenarios[tab]=scenarios[tab].filter(x=>x.id!==rec.id);if(compareIds[tab]===rec.id)compareIds[tab]=null;renderScenarioList();renderResults();saveState();return;}
     if(b.dataset.action==='load'){
-      const ids=configs[tab].fields;
-      for(const [id,,min,max] of ids)if(Number.isFinite(rec.values[id]))states[tab][id]=clamp(rec.values[id],min,max);
-      if(tab==='mortgage'){if(allowedKinds.includes(rec.values.kind))states.mortgage.kind=rec.values.kind;states.mortgage.equity=Math.min(states.mortgage.equity,states.mortgage.price);}
-      if((tab==='savings'||tab==='index')&&Array.isArray(rec.events))contributions[tab]=structuredClone(rec.events);
-      if(goalIsActive(tab))goalManuals[tab]=Object.fromEntries(['initial','monthly','years','rate'].map(id=>[id,states[tab][id]]));
-      if(advanced[tab]&&rec.advanced)Object.assign(advanced[tab],structuredClone(rec.advanced));
+      loadScenarioRecord(tab,rec);
       closeTool();activate(tab);saveState();
     }
   });

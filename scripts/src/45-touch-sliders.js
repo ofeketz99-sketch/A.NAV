@@ -100,6 +100,7 @@
   function changeValue(id,value,origin){
     const c=configs[active],f=c.fields.find(x=>x[0]===id);if(!f)return;
     if((active==='savings'||active==='index')&&goalPinned[active].includes(id))return;
+    if(goalIsActive()&&id==='goal')return;
     if(goalIsActive()&&id===goalPlans[active].solve)return;
     const s=states[active],max=active==='mortgage'&&id==='equity'?s.price:f[3];
     s[id]=clamp(value,f[2],max);

@@ -1,0 +1,14 @@
+{
+  "version": 5,
+  "date": "2026-11-03",
+  "branch": "dev",
+  "title": "Stage 1: safe reset, target locks and scenario constraints",
+  "changes": [
+    "Regular reset preserves locked inputs, locked goals and future contributions",
+    "Full reset confirms before clearing locks, contributions, advanced options and current comparison; custom reset points and saved scenarios stay",
+    "Locked goal blocks manual changes",
+    "Saved scenarios now include solver choice, pinned variables and lock state",
+    "Loading legacy scenarios clears any stale locks"
+  ],
+  "backup": "backups/2026-11-03-stage-01-locks-and-scenarios/"
+}

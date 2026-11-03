@@ -2,6 +2,20 @@
   // Entries of type monthly replace the recurring contribution from that month onward;
   // entries of type once add a contribution only at that month-end.
   const contributions={savings:[],index:[]};
+  // Optional scenario constraints are absent from earlier scenario records.
+  function normalizeScenarioLockState(tab,raw){
+    if((tab!=='savings'&&tab!=='index')||!raw||typeof raw!=='object'||Array.isArray(raw))return null;
+    const ids=new Set(configs[tab].fields.map(f=>f[0]).filter(id=>id!=='goal'));
+    const pinned=[...new Set(Array.isArray(raw.pinned)?raw.pinned:[])].filter(id=>ids.has(id));
+    const allowed=goalSolveChoices.map(([id])=>id).filter(id=>!pinned.includes(id));
+    const solve=allowed.includes(raw.solve)?raw.solve:(allowed[0]||'');
+    const manuals=raw.manuals&&typeof raw.manuals==='object'&&!Array.isArray(raw.manuals)
+      ?Object.fromEntries(goalSolveChoices.map(([id])=>{
+        const f=configs[tab].fields.find(x=>x[0]===id);
+        return [id,Number.isFinite(raw.manuals[id])?clamp(raw.manuals[id],f[2],f[3]):null];
+      })):null;
+    return {locked:raw.locked===true,solve,pinned,manuals};
+  }
   function restoreSnapshot(saved){
     if(!saved || saved.version!==1 || !saved.values || typeof saved.values!=='object' || Array.isArray(saved.values))throw new Error('פורמט גיבוי לא תקין');
     for(const tab of defaultOrder){
@@ -86,7 +100,7 @@
       for(const tab of defaultOrder){
         if(!Array.isArray(saved.scenarios[tab]))continue;
         scenarios[tab]=saved.scenarios[tab].slice(0,12).filter(x=>x&&typeof x.id==='string'&&typeof x.name==='string'&&x.values&&typeof x.values==='object').map(x=>({id:x.id.slice(0,45),name:x.name.slice(0,42),values:tab==='loan'&&Number.isFinite(x.values.years)&&!Number.isFinite(x.values.months)
-          ?{...x.values,months:Math.round(x.values.years*12)}:x.values,events:Array.isArray(x.events)?x.events.slice(0,80):[],advanced:x.advanced&&typeof x.advanced==='object'?x.advanced:{}}));
+          ?{...x.values,months:Math.round(x.values.years*12)}:x.values,events:Array.isArray(x.events)?x.events.slice(0,80):[],advanced:x.advanced&&typeof x.advanced==='object'?x.advanced:{},lockState:normalizeScenarioLockState(tab,x.lockState)}));
       }
     }
     if(saved.compareIds && typeof saved.compareIds==='object')for(const tab of defaultOrder){const id=saved.compareIds[tab];if(scenarios[tab].some(x=>x.id===id))compareIds[tab]=id;}

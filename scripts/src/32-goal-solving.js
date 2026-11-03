@@ -101,7 +101,8 @@
       if(!r||!n)return;
       const computed=locked&&!!plan.solve&&id===plan.solve;
       const pinned=goalPinned[active].includes(id);
-      r.disabled=n.disabled=computed||pinned;
+      const lockedTarget=locked&&id==='goal';
+      r.disabled=n.disabled=computed||pinned||lockedTarget;
       const row=r.closest('.field');row.classList.toggle('goal-computed',computed);row.classList.toggle('goal-pinned',pinned);
       const pin=row.querySelector('[data-pin-field]');
       if(pin){pin.setAttribute('aria-pressed',String(pinned));pin.setAttribute('aria-label',(pinned?'בטל נעילה':'נעל')+': '+(fieldLabels[active][id]||f[1]));
