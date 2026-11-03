@@ -16,10 +16,16 @@
 <body>
 <div class="shell" id="financeApp" data-theme="mortgage">
   <header class="frame-chrome" aria-label="כותרת A.NAV">
-    <div class="frame-identity"><span class="frame-monogram" aria-hidden="true">A</span><div class="frame-brand-copy"><strong>A.NAV</strong><small>מרחב תכנון פיננסי</small></div></div>
-    <div class="frame-chrome-center"><span class="frame-overline">פאנל פיננסים</span><strong>תכנון, השוואה וקבלת החלטות</strong></div>
-    <div class="frame-state"><span class="frame-state-dot" aria-hidden="true"></span><span class="frame-state-copy"><strong>סביבת עבודה אישית</strong><small>חישוב מיידי · שמירה מקומית</small></span></div>
+    <div class="frame-identity"><span class="frame-monogram" aria-hidden="true">A</span><div class="frame-brand-copy"><strong>A.NAV</strong><small>מחשבונים פיננסיים</small></div></div>
+    <div class="frame-chrome-center" aria-hidden="true"><span class="frame-overline">פאנל פיננסים</span><strong>כסף. במספרים.</strong></div>
+    <div class="frame-state"><span class="frame-state-dot" aria-hidden="true"></span><span class="frame-state-copy"><strong>שמירה מקומית</strong><small>מעודכן</small></span></div>
   </header>
+  <nav class="screen-views" id="screenViews" role="tablist" aria-label="תצוגה">
+    <button type="button" role="tab" data-screen-panel="inputs" aria-selected="true">נתונים</button>
+    <button type="button" role="tab" data-screen-panel="summary" aria-selected="false">תוצאות</button>
+    <button type="button" role="tab" data-screen-panel="chart" aria-selected="false">גרף</button>
+    <button type="button" role="tab" data-screen-panel="notes" aria-selected="false">פנקס</button>
+  </nav>
   <div class="content-layout" id="contentLayout">
     <div class="main-column">
       <div class="tabs-bar">
@@ -43,6 +49,11 @@
         <section class="panel controls" aria-label="שינוי נתונים">
           <div class="panel-head"><div class="panel-title-group"><div><h2 id="controlTitle">נתונים</h2><p id="controlSubtitle"></p></div><button class="subtle-tool unlock-all-goals" id="unlockAllGoals" type="button" hidden disabled title="שחרר את כל נעילות המשתנים ונעילת היעד בגיליון הנוכחי">שחרר נעילות <span class="unlock-count" id="unlockCount"></span></button></div><div class="panel-actions"><button class="schedule-toggle" id="scheduleToggle" type="button" hidden>שינויי הפקדות <span id="scheduleCount"></span></button><button class="subtle-tool" id="scenarioToggle" type="button" title="שמירת תרחישים והשוואה">תרחישים</button><button class="subtle-tool" id="advancedToggle" type="button" title="אפשרויות נוספות" hidden>הגדרות מתקדמות</button><button class="reset" id="resetBtn" type="button" title="איפוס ערכים חופשיים תוך שמירת נעילות והפקדות עתידיות">איפוס ערכים</button><button class="subtle-tool" id="resetAllBtn" type="button" title="איפוס כל הגיליון, הנעילות וההפקדות העתידיות">איפוס מלא</button></div></div>
           <div id="controlsBody"></div>
+          <nav class="field-pager" id="fieldPager" aria-label="עמודי שדות" hidden>
+            <button type="button" id="fieldPagePrev" aria-label="עמוד קודם">הקודם</button>
+            <span id="fieldPageLabel" aria-live="polite"></span>
+            <button type="button" id="fieldPageNext" aria-label="עמוד הבא">הבא</button>
+          </nav>
           <div class="controls-foot" id="controlFoot"></div>
         </section>
         <section class="results" aria-live="polite" aria-atomic="false">

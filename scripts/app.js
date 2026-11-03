@@ -662,6 +662,7 @@
       html+=`<div class="field ${secondaryFields[active]?.includes(id)?'is-secondary':''} ${isGoal?'goal-field':''}" data-field="${id}"><div class="field-top"><div class="field-heading"><button type="button" class="field-handle" aria-label="גרור לשינוי סדר של ${escapeHtml(label)}. במקלדת: חץ למעלה או למטה" title="גרור לסידור · חצים במקלדת">⠿</button><label for="range-${id}" title="${escapeHtml(label)}">${escapeHtml(label)}</label>${goalButton}${pinButton}${helpText[active]?.[id]?`<button type="button" class="field-help" aria-label="הסבר על ${escapeHtml(label)}">?<span class="help-pop">${escapeHtml(helpText[active][id])}</span></button>`:''}<button type="button" class="field-reset-point ${isCustom?'is-custom':''}" data-set-reset="${id}" aria-label="קבע את ${escapeHtml(formatField(val,unit))} כנקודת האיפוס של ${escapeHtml(label)}" title="קבע את הערך הנוכחי כנקודת איפוס · כעת: ${escapeHtml(resetLabel)}">◎</button><button type="button" class="field-reset-original" data-clear-reset="${id}" aria-label="החזר נקודת איפוס מקורית של ${escapeHtml(label)}" title="החזר נקודת איפוס מקורית" ${isCustom?'':'hidden'}>↶</button><button type="button" class="field-rename" data-rename-field="${id}" aria-label="שנה שם ${escapeHtml(label)}" title="עריכת שם">✎</button><button type="button" class="field-mobile-menu" data-field-menu="${id}" aria-label="אפשרויות עבור ${escapeHtml(label)}">⋯</button></div><div class="value-box"><input aria-label="ערך ${escapeHtml(label)}" class="number-input" id="number-${id}" type="number" inputmode="decimal" min="${min}" max="${upper}" step="any" value="${val}"><span>${unit}</span></div></div><div class="range-control"><input id="range-${id}" type="range" min="${min}" max="${upper}" step="any" data-slide-step="${step}" value="${val}" aria-label="${escapeHtml(label)}"><span class="default-tick" title="נקודת איפוס: ${escapeHtml(resetLabel)}" aria-hidden="true"></span><div class="range-touch-layer" aria-hidden="true"></div></div><div class="limits"><span>${formatField(min,unit)}</span><span>${formatField(upper,unit)}</span></div>${isGoal?`<div class="goal-options" id="goalOptions" ${goalIsActive()?'':'hidden'}><div class="goal-mode-line"><label for="goalSolve" title="המשתנה שהמערכת משנה אוטומטית כדי להגיע ליעד">מה לחשב?</label><select id="goalSolve" aria-label="בחר משתנה שיחושב אוטומטית">${goalSolveChoices.map(([key,title])=>`<option value="${key}" ${goalPlans[active].solve===key?'selected':''}>${title}</option>`).join('')}</select></div><div id="goalFeedback" class="goal-feedback" aria-live="polite"></div></div>`:''}</div>`;
     }
     q('controlsBody').innerHTML=html;
+    applyViewportLayout();
     if(active==='mortgage')q('propertyKind').value=s.kind;
     for(const [id,,,,,,] of c.fields){
       const slider=q('range-'+id),number=q('number-'+id);
@@ -2316,6 +2317,69 @@
     const v=Number(event.target.value);
     if(!Number.isFinite(v)||v<5||v>40)return;
     riskSettings.volatility=v;renderResults();saveState();
+  });
+
+  // Fixed-screen navigation: no wheel- or touch-scrolling required on any viewport.
+  let screenPanel='inputs';
+  let currentFieldPage=0;
+  let layoutTab=null;
+  const panels=['inputs','summary','chart','notes'];
+  function setScreenPanel(panel){
+    if(!panels.includes(panel))return;
+    screenPanel=panel;
+    document.body.dataset.screenPanel=panel;
+    q('screenViews').querySelectorAll('[data-screen-panel]').forEach(button=>{
+      const selected=button.dataset.screenPanel===panel;
+      button.setAttribute('aria-selected',String(selected));
+      button.tabIndex=selected?0:-1;
+    });
+    // A chart rendered while hidden has no measurable geometry.
+    if(panel==='chart'&&typeof renderResults==='function')renderResults();
+  }
+  function applyViewportLayout(){
+    const root=q('controlsBody');
+    if(!root)return;
+    const fields=[...root.children];
+    if(layoutTab!==active){layoutTab=active;currentFieldPage=0;}
+    root.dataset.count=String(fields.length);
+    const mobile=window.matchMedia('(max-width:1050px)').matches;
+    const available=window.innerHeight;
+    // Page through inputs on narrow displays. All inputs remain mounted.
+    const perPage=!mobile?fields.length:
+      available<=640?2:available<=820?3:4;
+    const pages=Math.max(1,Math.ceil(fields.length/Math.max(1,perPage)));
+    currentFieldPage=Math.min(Math.max(0,currentFieldPage),pages-1);
+    fields.forEach((element,index)=>{
+      element.hidden=mobile&&(index<currentFieldPage*perPage||index>=(currentFieldPage+1)*perPage);
+    });
+    root.style.setProperty('--visible-count',String(mobile?Math.min(perPage,fields.length-currentFieldPage*perPage):fields.length));
+    q('fieldPager').hidden=!mobile||pages===1;
+    q('fieldPageLabel').textContent=(currentFieldPage+1)+' / '+pages;
+    q('fieldPagePrev').disabled=currentFieldPage===0;
+    q('fieldPageNext').disabled=currentFieldPage===pages-1;
+    if(!mobile){
+      document.body.dataset.screenPanel='desktop';
+    }else{
+      document.body.dataset.screenPanel=screenPanel;
+    }
+  }
+  q('screenViews').addEventListener('click',event=>{
+    const button=event.target.closest('[data-screen-panel]');
+    if(button)setScreenPanel(button.dataset.screenPanel);
+  });
+  q('fieldPagePrev').addEventListener('click',()=>{
+    currentFieldPage=Math.max(0,currentFieldPage-1);applyViewportLayout();
+  });
+  q('fieldPageNext').addEventListener('click',()=>{
+    currentFieldPage++;applyViewportLayout();
+  });
+  let layoutFrame=null;
+  window.addEventListener('resize',()=>{
+    if(layoutFrame)cancelAnimationFrame(layoutFrame);
+    layoutFrame=requestAnimationFrame(()=>{
+      layoutFrame=null;applyViewportLayout();
+      if(!window.matchMedia('(max-width:1050px)').matches||screenPanel==='chart')renderResults();
+    });
   });
   // Double click a slider, including its surrounding track, restores its factory default.
   controlList.addEventListener('dblclick',e=>{

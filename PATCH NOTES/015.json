@@ -1,0 +1,14 @@
+{
+  "version": 15,
+  "date": "2026-11-03",
+  "branch": "dev",
+  "title": "Fixed viewport dashboard and animated header",
+  "changes": [
+    "Removed free scrolling from dashboard; controls use adaptive field grid",
+    "On narrow screens, switch between inputs, summary, chart and notebook instead of vertical scrolling",
+    "Added prev/next field pages for narrow screens",
+    "Animated thin header accent line and restrained monogram shine with reduced-motion support",
+    "Replaced generic marketing copy with short financial labels"
+  ],
+  "backup": "backups/2026-11-03T22-50-00Z-no-scroll-copy/"
+}

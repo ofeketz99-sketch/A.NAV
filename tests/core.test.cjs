@@ -161,3 +161,15 @@ test('visual polish uses responsive plot bounds and a structured A.NAV masthead'
  assert.match(css,/justify-content:space-evenly/);
  assert.match(css,/grid-template-rows:minmax\(144px/);
 });
+
+test('fixed viewport has selectable panes and paginated fields',()=>{
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+ const css=fs.readFileSync(path.join(root,'styles/src/99-no-scroll.css'),'utf8');
+ const mod=fs.readFileSync(path.join(root,'scripts/src/98-fixed-screen.js'),'utf8');
+ assert.match(html,/id="screenViews"/);
+ assert.match(html,/id="fieldPager"/);
+ assert.match(css,/overflow:hidden!important/);
+ assert.match(css,/grid-template-rows:repeat\(var\(--visible-count/);
+ assert.match(mod,/function applyViewportLayout\(\)/);
+ assert.match(mod,/setScreenPanel\(button.dataset.screenPanel\)/);
+});

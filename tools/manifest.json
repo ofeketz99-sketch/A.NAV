@@ -32,6 +32,7 @@
     "98-direct-charts",
     "98-transfers",
     "98-risk-model",
+    "98-fixed-screen",
     "99-startup"
   ],
   "css": [
@@ -69,6 +70,7 @@
     "99-budget-flow",
     "99-transfers",
     "99-risk-band",
-    "99-visual-polish"
+    "99-visual-polish",
+    "99-no-scroll"
   ]
 }
