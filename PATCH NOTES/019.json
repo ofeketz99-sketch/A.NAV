@@ -1,0 +1,14 @@
+{
+  "version": 19,
+  "date": "2026-11-04",
+  "branch": "dev",
+  "title": "Independent savings allocation modal",
+  "changes": [
+    "Added a separate allocation window accessible from the workspace toolbar",
+    "Custom savings channels with editable names, percentages and automatically calculated amounts",
+    "Percentage changes redistribute the remainder across other channels to retain 100%",
+    "Monthly or one-time amount, 4-channel pages and browser-local persistence",
+    "Existing financial calculator formulas, tabs and snapshot keys unchanged"
+  ],
+  "backup": "backups/2026-11-04T15-33-30Z-allocation-planner/"
+}
