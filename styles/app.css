@@ -2814,3 +2814,14 @@ body{padding:0!important}
  .allocation-content .tool-hint{font-size:9px}
 }
 @media(max-height:680px){.allocation-row{padding:6px;gap:4px}.allocation-content{gap:6px}}
+
+/* Optional one-way binding to the budget calculator savings field. */
+.allocation-content{gap:8px;padding-block:12px}
+.allocation-link{display:flex;align-items:center;gap:10px;min-width:0;border:1px solid #dcd0c2;background:#faf5ee;border-radius:10px;padding:8px 11px;cursor:pointer}
+.allocation-link input{accent-color:#397f7f;width:16px;height:16px;flex:none}
+.allocation-link span{display:flex;flex-direction:column;gap:3px;min-width:0}
+.allocation-link strong{font-size:12px;color:#3b332c}
+.allocation-link small{font-size:10px;line-height:1.4;color:#827463}
+.allocation-top input:disabled,.allocation-top select:disabled{opacity:.72;background:#efe7dc;color:#60554a;cursor:not-allowed}
+.allocation-row{padding:8px;gap:5px}
+@media(max-width:540px){.allocation-link{padding:6px 8px}.allocation-link strong{font-size:11px}.allocation-link small{font-size:9px}}
