@@ -41,6 +41,8 @@
       }
       lastCommitted=data;setUndoState();
     }
+    // Notify linked tools after any state change, even if browser storage is unavailable.
+    document.dispatchEvent(new Event('anav:finance-state-changed'));
     if(!storageAvailable)return;
     try{localStorage.setItem(STORAGE_KEY,data);}
     catch(err){storageAvailable=false;q('saveStatus').textContent='שמירה מקומית אינה זמינה';q('saveDot').style.background='#bd9569';}
