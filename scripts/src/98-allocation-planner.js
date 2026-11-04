@@ -3,17 +3,17 @@
   (() => {
     const STORAGE='anav.allocation.planner.v1', MAX=24, PAGE_SIZE=4;
     const colors=['#387d82','#a78e6e','#7289a5','#b57868','#7b8671','#9b7aa0','#c29c57'];
-    const defaults=()=>({amount:300,period:'monthly',items:[{id:1,name:'אפיק 1',pct:50},{id:2,name:'אפיק 2',pct:50}]});
+    const defaults=()=>({amount:300,period:'monthly',linkedToBudget:false,items:[{id:1,name:'אפיק 1',pct:50},{id:2,name:'אפיק 2',pct:50}]});
     function normalize(raw){
       const def=defaults();
       if(!raw||typeof raw!=='object')return def;
       const amount=Number(raw.amount);
       const items=Array.isArray(raw.items)?raw.items.slice(0,MAX).map((x,i)=>({id:i+1,name:typeof x.name==='string'?x.name.slice(0,60):'אפיק '+(i+1),pct:Math.max(0,Math.min(100,Number(x.pct)||0))})):[];
-      if(!items.length)return {...def,amount:Number.isFinite(amount)?Math.max(0,Math.min(100000000,amount)):300};
+      if(!items.length)return {...def,amount:Number.isFinite(amount)?Math.max(0,Math.min(100000000,amount)):300,period:raw.period==='once'?'once':'monthly',linkedToBudget:raw.linkedToBudget===true};
       let remaining=100;
       const sum=items.reduce((a,x)=>a+x.pct,0);
       items.forEach((item,i)=>{item.pct=i===items.length-1?remaining:Math.min(remaining,Math.round((sum?item.pct/sum:1/items.length)*1000)/10);remaining=Math.round((remaining-item.pct)*10)/10;});
-      return {amount:Number.isFinite(amount)?Math.max(0,Math.min(100000000,amount)):300,period:raw.period==='once'?'once':'monthly',items};
+      return {amount:Number.isFinite(amount)?Math.max(0,Math.min(100000000,amount)):300,period:raw.period==='once'?'once':'monthly',linkedToBudget:raw.linkedToBudget===true,items};
     }
     let allocation;
     try{allocation=normalize(JSON.parse(localStorage.getItem(STORAGE)||'null'));}catch(_){allocation=defaults();}
@@ -30,6 +30,7 @@
       <div class="allocation-content">
         <div class="allocation-top"><label class="allocation-amount">סכום לחלוקה (₪)<input id="allocationAmount" type="number" inputmode="decimal" min="0" max="100000000" step="50"></label>
         <label class="allocation-period">סוג סכום<select id="allocationPeriod"><option value="monthly">חודשי</option><option value="once">חד־פעמי</option></select></label></div>
+        <label class="allocation-link" for="allocationLinkBudget"><input type="checkbox" id="allocationLinkBudget"><span><strong>קשר לחיסכון החודשי בתקציב</strong><small id="allocationLinkNote" aria-live="polite">הסכום יישאב מלשונית תקציב חודשי</small></span></label>
         <div class="allocation-summary"><span>סה״כ מוקצה</span><strong id="allocationAssigned"></strong><span class="allocation-total" id="allocationTotal"></span></div>
         <div class="allocation-bar" id="allocationBar" role="img" aria-label="התפלגות החיסכון"></div>
         <div class="allocation-list-head"><strong>אפיקי החיסכון</strong><small id="allocationCount"></small></div>
@@ -42,6 +43,11 @@
     document.body.appendChild(overlay);
     const get=id=>document.getElementById(id);
     function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(allocation));}catch(_){}}
+    function effectiveAmount(){
+      const budgetSavings=Number(states.budget?.savings);
+      return allocation.linkedToBudget&&Number.isFinite(budgetSavings)
+        ? Math.max(0,Math.min(100000000,budgetSavings)) : allocation.amount;
+    }
     function setShare(index,value){
       const items=allocation.items;
       if(items.length===1){items[0].pct=100;return;}
@@ -53,7 +59,7 @@
       others.forEach((i,k)=>{const pct=k===others.length-1?remaining:Math.min(remaining,Math.round((other?items[i].pct/other:1/others.length)*(100-target)*10)/10);items[i].pct=pct;remaining=Math.round((remaining-pct)*10)/10;});
     }
     function amounts(){
-      const cents=Math.round(allocation.amount*100);
+      const cents=Math.round(effectiveAmount()*100);
       let left=cents;
       return allocation.items.map((item,i)=>{
         const part=i===allocation.items.length-1?left:Math.min(left,Math.round(cents*item.pct/100));
@@ -62,11 +68,16 @@
     }
     function render(){
       page=Math.max(0,Math.min(page,Math.ceil(allocation.items.length/PAGE_SIZE)-1));
-      get('allocationAmount').value=allocation.amount;
-      get('allocationPeriod').value=allocation.period;
+      const linked=allocation.linkedToBudget===true;
+      get('allocationLinkBudget').checked=linked;
+      get('allocationAmount').value=effectiveAmount();
+      get('allocationAmount').disabled=linked;
+      get('allocationPeriod').value=linked?'monthly':allocation.period;
+      get('allocationPeriod').disabled=linked;
+      get('allocationLinkNote').textContent=linked?'מתעדכן אוטומטית מהתקציב · שינוי התקציב יעדכן את כל האפיקים':'סכום עצמאי · ניתן לחזור לקישור בכל עת';
       const values=amounts();
       get('allocationAssigned').textContent=money.format(values.reduce((a,v)=>a+v,0));
-      get('allocationTotal').textContent=allocation.period==='monthly'?'בכל חודש':'בהפקדה חד־פעמית';
+      get('allocationTotal').textContent=linked?'בכל חודש · מקושר לתקציב':allocation.period==='monthly'?'בכל חודש':'בהפקדה חד־פעמית';
       get('allocationCount').textContent=allocation.items.length+' אפיקים · 100%';
       const bar=get('allocationBar');bar.replaceChildren();
       allocation.items.forEach((item,i)=>{
@@ -109,12 +120,20 @@
     get('allocationClose').addEventListener('click',close);
     overlay.addEventListener('pointerdown',e=>{if(e.target===overlay)close();});
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlay.hidden){e.preventDefault();e.stopImmediatePropagation();close();}},{capture:true});
+    get('allocationLinkBudget').addEventListener('change',e=>{
+      allocation.linkedToBudget=e.target.checked;
+      persist();render();
+    });
+    document.addEventListener('anav:finance-state-changed',()=>{
+      if(allocation.linkedToBudget&&!overlay.hidden)render();
+    });
     get('allocationAmount').addEventListener('change',e=>{
+      if(allocation.linkedToBudget)return;
       const n=Number(e.target.value);
       allocation.amount=Number.isFinite(n)?Math.max(0,Math.min(100000000,n)):0;
       persist();render();
     });
-    get('allocationPeriod').addEventListener('change',e=>{allocation.period=e.target.value==='once'?'once':'monthly';persist();render();});
+    get('allocationPeriod').addEventListener('change',e=>{if(allocation.linkedToBudget)return;allocation.period=e.target.value==='once'?'once':'monthly';persist();render();});
     get('allocationAdd').addEventListener('click',()=>{
       if(allocation.items.length>=MAX)return;
       const n=allocation.items.length;
