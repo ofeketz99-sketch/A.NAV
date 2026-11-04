@@ -92,7 +92,7 @@
         const slider=document.createElement('input');slider.type='range';slider.min='0';slider.max='100';slider.step='1';slider.value=item.pct;slider.disabled=allocation.items.length===1;slider.setAttribute('aria-label','אחוז '+(item.name||'אפיק '+(i+1)));
         const percentage=document.createElement('input');percentage.type='number';percentage.inputMode='decimal';percentage.min='0';percentage.max='100';percentage.step='0.1';percentage.value=item.pct;percentage.className='allocation-percent';percentage.setAttribute('aria-label','אחוז מוקצה לאפיק '+(i+1));percentage.disabled=allocation.items.length===1;
         const onChange=value=>{setShare(i,value);persist();render();};
-        slider.addEventListener('input',()=>onChange(slider.value));percentage.addEventListener('change',()=>onChange(percentage.value));
+        slider.addEventListener('change',()=>onChange(slider.value));percentage.addEventListener('change',()=>onChange(percentage.value));
         bottom.append(slider,percentage,document.createTextNode('%'));
         row.append(head,bottom);list.append(row);
       });
@@ -109,7 +109,7 @@
     get('allocationClose').addEventListener('click',close);
     overlay.addEventListener('pointerdown',e=>{if(e.target===overlay)close();});
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlay.hidden){e.preventDefault();e.stopImmediatePropagation();close();}},{capture:true});
-    get('allocationAmount').addEventListener('input',e=>{
+    get('allocationAmount').addEventListener('change',e=>{
       const n=Number(e.target.value);
       allocation.amount=Number.isFinite(n)?Math.max(0,Math.min(100000000,n)):0;
       persist();render();
