@@ -1,0 +1,15 @@
+{
+  "version": 20,
+  "date": "2026-11-04",
+  "branch": "dev",
+  "title": "Link allocation amount to monthly budget savings",
+  "changes": [
+    "Optional one-way link from budget.savings to the standalone savings allocation window",
+    "Linked allocations use the live monthly budget savings value and automatically recalculate currency amounts",
+    "Manual allocation amount and monthly/one-time mode are preserved while linked and restored when unlinked",
+    "Linked mode disables manual amount and period inputs, adds an explanatory status label, and persists preference in the existing allocation-only browser key",
+    "Budget save events trigger refresh on the open allocation dialog without modifying budget values or the financial calculators",
+    "Added regression tests for legacy allocations, link changes and zero savings"
+  ],
+  "backup": "backups/2026-11-04T15-50-00Z-budget-savings-link/"
+}
