@@ -1,0 +1,15 @@
+{
+  "version": 21,
+  "date": "2026-11-08",
+  "branch": "dev",
+  "title": "Editable monthly savings breakdown",
+  "changes": [
+    "Replaced the former percentage split tool with a popup from the budget savings field",
+    "Individual destinations have user-editable names, shekel amounts, sliders, add and delete controls",
+    "Destination amount changes update the primary monthly budget savings value, while manual changes to the primary value never alter destination amounts",
+    "Previous allocation settings migrate to amount-based version 2 without dropping names",
+    "Financial budget savings cap is respected and UI remains paginated without scrolling",
+    "Added regression tests"
+  ],
+  "backup": "backups/2026-11-08T20-09-00Z-monthly-savings-breakdown/"
+}
