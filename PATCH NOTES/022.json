@@ -1,0 +1,14 @@
+{
+  "version": 22,
+  "date": "2026-11-08",
+  "branch": "dev",
+  "title": "Adaptive numeric arrow increments",
+  "changes": [
+    "Arrow key increments are adaptive to the current value and use human-friendly 1/2/5 decades",
+    "Native number-input spinner step changes as the value changes without affecting free typing",
+    "Range slider arrows and chart keyboard arrows use the same adaptive increments without altering pointer drag behavior",
+    "Savings breakdown target arrows also follow adaptive steps while preserving allocation limits and budget linkage",
+    "Integer duration fields retain integer values and numeric input limits remain enforced"
+  ],
+  "backup": "backups/2026-11-08T21-15-00Z-adaptive-arrow-steps/"
+}

@@ -121,6 +121,8 @@
     // In particular, double-click reset must move the actual range thumb.
     slider.value=String(s[id]);
     number.value=String(s[id]);
+    // Keep native number-spinner arrows proportional after updates from every source.
+    number.step=String(adaptiveArrowStep(s[id],f[6],f[4]));
     updateResetControls(id);
     if(active==='savings'||active==='index')syncGoalPlanningUI();
     renderResults();

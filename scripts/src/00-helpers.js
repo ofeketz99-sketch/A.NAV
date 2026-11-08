@@ -16,5 +16,23 @@
   const pct=n=>(Number.isFinite(n)?n:0).toFixed(1)+'%';
   const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
   const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // A compact 1/2/5 scale, adapted to the number currently shown.
+  // Examples: 700 -> 50; 7.5% -> 0.5; 500,000 -> 50,000.
+  function adaptiveArrowStep(value,unit,zeroStep=1){
+    const magnitude=Math.abs(Number(value));
+    const whole=unit==='שנים'||unit==='חודשים';
+    const floor=whole?1:0.01;
+    if(!Number.isFinite(magnitude)||magnitude===0)return Math.max(floor,Number(zeroStep)||floor);
+    const scale=Math.pow(10,Math.floor(Math.log10(magnitude)));
+    const digit=magnitude/scale;
+    let step=(digit>=5?0.5:digit>=2?0.2:0.1)*scale;
+    step=whole?Math.max(1,Math.round(step)):Math.max(floor,step);
+    return Number(step.toPrecision(12));
+  }
+  function adaptiveArrowValue(value,direction,unit,min,max,zeroStep=1){
+    const current=Number.isFinite(Number(value))?Number(value):0;
+    const increment=adaptiveArrowStep(current,unit,zeroStep);
+    return clamp(Number((current+(direction>0?1:-1)*increment).toFixed(10)),min,max);
+  }
   const fields=(...xs)=>xs;
 

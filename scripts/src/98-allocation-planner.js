@@ -84,11 +84,34 @@
         head.append(dot,name,value,del);
         const bottom=document.createElement('div');bottom.className='allocation-row-bottom';
         const slider=document.createElement('input');slider.type='range';slider.min='0';slider.max=String(remaining(i));slider.step='any';slider.value=String(item.amount);slider.setAttribute('aria-label','סכום חודשי עבור '+item.name);
-        const amount=document.createElement('input');amount.type='number';amount.inputMode='decimal';amount.min='0';amount.max=String(remaining(i));amount.step='any';amount.value=String(item.amount);amount.className='allocation-amount-input';amount.setAttribute('aria-label','סכום בשקלים ליעד '+(i+1));
+        const amount=document.createElement('input');amount.type='number';amount.inputMode='decimal';amount.min='0';amount.max=String(remaining(i));amount.step=String(adaptiveArrowStep(item.amount,'₪',50));amount.value=String(item.amount);amount.className='allocation-amount-input';amount.setAttribute('aria-label','סכום בשקלים ליעד '+(i+1));
+        const applyArrow=(event,target)=>{
+          const isNumber=target===amount;
+          const keys=isNumber?['ArrowUp','ArrowDown']:['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
+          if(!keys.includes(event.key)||event.altKey||event.ctrlKey||event.metaKey)return false;
+          event.preventDefault();
+          const direction=event.key==='ArrowUp'||event.key==='ArrowRight'?1:-1;
+          const valueNow=Number(target.value);
+          const saved=setAmount(i,adaptiveArrowValue(valueNow,direction,'₪',0,remaining(i),50));
+          amount.value=String(saved);amount.step=String(adaptiveArrowStep(saved,'₪',50));
+          slider.value=String(saved);value.textContent=currency.format(saved);
+          // Keep other destinations' limits accurate without replacing the focused input.
+          list.querySelectorAll('.allocation-row').forEach((visible,j)=>{
+            const other=page*PAGE+j,maxValue=String(remaining(other));
+            visible.querySelector('.allocation-amount-input').max=maxValue;
+            visible.querySelector('input[type=range]').max=maxValue;
+          });
+          return true;
+        };
+        amount.addEventListener('input',()=>{amount.step=String(adaptiveArrowStep(Number(amount.value),'₪',50));});
+        slider.addEventListener('keydown',event=>applyArrow(event,slider));
         slider.addEventListener('input',()=>{const n=Math.round(Number(slider.value)/10)*10;const saved=setAmount(i,n);amount.value=String(saved);value.textContent=currency.format(saved);});
         slider.addEventListener('change',render);
         amount.addEventListener('change',()=>{setAmount(i,amount.value);render();});
-        amount.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();amount.blur();}});
+        amount.addEventListener('keydown',e=>{
+          if(applyArrow(e,amount))return;
+          if(e.key==='Enter'){e.preventDefault();amount.blur();}
+        });
         const unit=document.createElement('span');unit.textContent='₪';
         bottom.append(slider,amount,unit);row.append(head,bottom);list.append(row);
       });

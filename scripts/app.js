@@ -16,6 +16,24 @@
   const pct=n=>(Number.isFinite(n)?n:0).toFixed(1)+'%';
   const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
   const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // A compact 1/2/5 scale, adapted to the number currently shown.
+  // Examples: 700 -> 50; 7.5% -> 0.5; 500,000 -> 50,000.
+  function adaptiveArrowStep(value,unit,zeroStep=1){
+    const magnitude=Math.abs(Number(value));
+    const whole=unit==='שנים'||unit==='חודשים';
+    const floor=whole?1:0.01;
+    if(!Number.isFinite(magnitude)||magnitude===0)return Math.max(floor,Number(zeroStep)||floor);
+    const scale=Math.pow(10,Math.floor(Math.log10(magnitude)));
+    const digit=magnitude/scale;
+    let step=(digit>=5?0.5:digit>=2?0.2:0.1)*scale;
+    step=whole?Math.max(1,Math.round(step)):Math.max(floor,step);
+    return Number(step.toPrecision(12));
+  }
+  function adaptiveArrowValue(value,direction,unit,min,max,zeroStep=1){
+    const current=Number.isFinite(Number(value))?Number(value):0;
+    const increment=adaptiveArrowStep(current,unit,zeroStep);
+    return clamp(Number((current+(direction>0?1:-1)*increment).toFixed(10)),min,max);
+  }
   const fields=(...xs)=>xs;
 
   // Default text is shortened for display only; custom labels remain untouched.
@@ -688,6 +706,22 @@
     if(active==='mortgage')q('propertyKind').value=s.kind;
     for(const [id,,,,,,] of c.fields){
       const slider=q('range-'+id),number=q('number-'+id);
+      const spec=byId[id],unit=spec[6],zeroStep=spec[4];
+      // Native number spinners use the same changing increment as keyboard arrows.
+      // Updating step never rounds or overwrites a typed number.
+      const syncNumberStep=()=>{
+        const typed=number.value.trim()===''?states[active][id]:Number(number.value);
+        number.step=String(adaptiveArrowStep(typed,unit,zeroStep));
+      };
+      syncNumberStep();
+      number.addEventListener('focus',syncNumberStep);
+      number.addEventListener('input',syncNumberStep);
+      slider.addEventListener('keydown',event=>{
+        if(!['ArrowUp','ArrowDown','ArrowRight','ArrowLeft'].includes(event.key)||event.altKey||event.ctrlKey||event.metaKey)return;
+        event.preventDefault();
+        const direction=event.key==='ArrowUp'||event.key==='ArrowRight'?1:-1;
+        changeValue(id,adaptiveArrowValue(states[active][id],direction,unit,Number(slider.min),Number(slider.max),zeroStep),'range-arrow');
+      });
       slider.addEventListener('input',()=>{
         // Native range controls round an exact typed value to their step.
         // Keep step="any" for precise display, but retain the intended
@@ -713,6 +747,16 @@
       };
       number.addEventListener('change',commitTypedValue);
       number.addEventListener('keydown',event=>{
+        if((event.key==='ArrowUp'||event.key==='ArrowDown')&&!event.altKey&&!event.ctrlKey&&!event.metaKey){
+          event.preventDefault();
+          const raw=number.value.trim();
+          const current=raw===''?states[active][id]:Number(raw);
+          if(Number.isFinite(current)){
+            const direction=event.key==='ArrowUp'?1:-1;
+            changeValue(id,adaptiveArrowValue(current,direction,unit,Number(number.min),Number(number.max),zeroStep),'number-arrow');
+          }
+          return;
+        }
         if(event.key==='Enter'){event.preventDefault();number.blur();}
         if(event.key==='Escape'){
           event.preventDefault();
@@ -875,6 +919,8 @@
     // In particular, double-click reset must move the actual range thumb.
     slider.value=String(s[id]);
     number.value=String(s[id]);
+    // Keep native number-spinner arrows proportional after updates from every source.
+    number.step=String(adaptiveArrowStep(s[id],f[6],f[4]));
     updateResetControls(id);
     if(active==='savings'||active==='index')syncGoalPlanningUI();
     renderResults();
@@ -2216,7 +2262,7 @@
     if(!f||goalPinned[active]?.includes(id))return;
     const sign=event.key==='ArrowUp'||event.key==='ArrowRight'?1:-1;
     event.preventDefault();event.stopImmediatePropagation();
-    changeValue(id,states[active][id]+sign*f[4],'chart-keyboard');
+    changeValue(id,adaptiveArrowValue(states[active][id],sign,f[6],f[2],f[3],f[4]),'chart-keyboard');
     const target=chart.querySelector(handle?'[data-chart-drag]':'[data-budget-field="'+id+'"]');
     target?.focus();
   });
@@ -2564,11 +2610,34 @@
         head.append(dot,name,value,del);
         const bottom=document.createElement('div');bottom.className='allocation-row-bottom';
         const slider=document.createElement('input');slider.type='range';slider.min='0';slider.max=String(remaining(i));slider.step='any';slider.value=String(item.amount);slider.setAttribute('aria-label','סכום חודשי עבור '+item.name);
-        const amount=document.createElement('input');amount.type='number';amount.inputMode='decimal';amount.min='0';amount.max=String(remaining(i));amount.step='any';amount.value=String(item.amount);amount.className='allocation-amount-input';amount.setAttribute('aria-label','סכום בשקלים ליעד '+(i+1));
+        const amount=document.createElement('input');amount.type='number';amount.inputMode='decimal';amount.min='0';amount.max=String(remaining(i));amount.step=String(adaptiveArrowStep(item.amount,'₪',50));amount.value=String(item.amount);amount.className='allocation-amount-input';amount.setAttribute('aria-label','סכום בשקלים ליעד '+(i+1));
+        const applyArrow=(event,target)=>{
+          const isNumber=target===amount;
+          const keys=isNumber?['ArrowUp','ArrowDown']:['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
+          if(!keys.includes(event.key)||event.altKey||event.ctrlKey||event.metaKey)return false;
+          event.preventDefault();
+          const direction=event.key==='ArrowUp'||event.key==='ArrowRight'?1:-1;
+          const valueNow=Number(target.value);
+          const saved=setAmount(i,adaptiveArrowValue(valueNow,direction,'₪',0,remaining(i),50));
+          amount.value=String(saved);amount.step=String(adaptiveArrowStep(saved,'₪',50));
+          slider.value=String(saved);value.textContent=currency.format(saved);
+          // Keep other destinations' limits accurate without replacing the focused input.
+          list.querySelectorAll('.allocation-row').forEach((visible,j)=>{
+            const other=page*PAGE+j,maxValue=String(remaining(other));
+            visible.querySelector('.allocation-amount-input').max=maxValue;
+            visible.querySelector('input[type=range]').max=maxValue;
+          });
+          return true;
+        };
+        amount.addEventListener('input',()=>{amount.step=String(adaptiveArrowStep(Number(amount.value),'₪',50));});
+        slider.addEventListener('keydown',event=>applyArrow(event,slider));
         slider.addEventListener('input',()=>{const n=Math.round(Number(slider.value)/10)*10;const saved=setAmount(i,n);amount.value=String(saved);value.textContent=currency.format(saved);});
         slider.addEventListener('change',render);
         amount.addEventListener('change',()=>{setAmount(i,amount.value);render();});
-        amount.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();amount.blur();}});
+        amount.addEventListener('keydown',e=>{
+          if(applyArrow(e,amount))return;
+          if(e.key==='Enter'){e.preventDefault();amount.blur();}
+        });
         const unit=document.createElement('span');unit.textContent='₪';
         bottom.append(slider,amount,unit);row.append(head,bottom);list.append(row);
       });

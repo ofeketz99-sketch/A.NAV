@@ -31,6 +31,22 @@
     if(active==='mortgage')q('propertyKind').value=s.kind;
     for(const [id,,,,,,] of c.fields){
       const slider=q('range-'+id),number=q('number-'+id);
+      const spec=byId[id],unit=spec[6],zeroStep=spec[4];
+      // Native number spinners use the same changing increment as keyboard arrows.
+      // Updating step never rounds or overwrites a typed number.
+      const syncNumberStep=()=>{
+        const typed=number.value.trim()===''?states[active][id]:Number(number.value);
+        number.step=String(adaptiveArrowStep(typed,unit,zeroStep));
+      };
+      syncNumberStep();
+      number.addEventListener('focus',syncNumberStep);
+      number.addEventListener('input',syncNumberStep);
+      slider.addEventListener('keydown',event=>{
+        if(!['ArrowUp','ArrowDown','ArrowRight','ArrowLeft'].includes(event.key)||event.altKey||event.ctrlKey||event.metaKey)return;
+        event.preventDefault();
+        const direction=event.key==='ArrowUp'||event.key==='ArrowRight'?1:-1;
+        changeValue(id,adaptiveArrowValue(states[active][id],direction,unit,Number(slider.min),Number(slider.max),zeroStep),'range-arrow');
+      });
       slider.addEventListener('input',()=>{
         // Native range controls round an exact typed value to their step.
         // Keep step="any" for precise display, but retain the intended
@@ -56,6 +72,16 @@
       };
       number.addEventListener('change',commitTypedValue);
       number.addEventListener('keydown',event=>{
+        if((event.key==='ArrowUp'||event.key==='ArrowDown')&&!event.altKey&&!event.ctrlKey&&!event.metaKey){
+          event.preventDefault();
+          const raw=number.value.trim();
+          const current=raw===''?states[active][id]:Number(raw);
+          if(Number.isFinite(current)){
+            const direction=event.key==='ArrowUp'?1:-1;
+            changeValue(id,adaptiveArrowValue(current,direction,unit,Number(number.min),Number(number.max),zeroStep),'number-arrow');
+          }
+          return;
+        }
         if(event.key==='Enter'){event.preventDefault();number.blur();}
         if(event.key==='Escape'){
           event.preventDefault();

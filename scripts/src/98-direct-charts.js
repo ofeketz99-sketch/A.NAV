@@ -66,7 +66,7 @@
     if(!f||goalPinned[active]?.includes(id))return;
     const sign=event.key==='ArrowUp'||event.key==='ArrowRight'?1:-1;
     event.preventDefault();event.stopImmediatePropagation();
-    changeValue(id,states[active][id]+sign*f[4],'chart-keyboard');
+    changeValue(id,adaptiveArrowValue(states[active][id],sign,f[6],f[2],f[3],f[4]),'chart-keyboard');
     const target=chart.querySelector(handle?'[data-chart-drag]':'[data-budget-field="'+id+'"]');
     target?.focus();
   });
