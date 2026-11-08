@@ -2773,55 +2773,35 @@ body{padding:0!important}
 }
 @media(prefers-reduced-motion:reduce){.modal-page-inner{transition:none!important}}
 
-/* Independent A.NAV savings allocation dialog */
-.allocation-dialog{width:min(630px,100%);height:min(680px,calc(100dvh - 20px));max-height:calc(100dvh - 20px)}
-.allocation-content{flex:1;min-height:0;padding:16px 20px;display:flex;flex-direction:column;gap:11px;overflow:hidden}
-.allocation-top{display:grid;grid-template-columns:1.4fr 1fr;gap:10px}
-.allocation-top label{display:flex;flex-direction:column;gap:5px;color:#64584d;font-size:11px;font-weight:700}
-.allocation-top input,.allocation-top select,.allocation-name,.allocation-percent{min-width:0;border:1px solid #dacfc1;border-radius:8px;background:#fcf8f2;color:#342c25;padding:9px 10px;outline-color:#8c745d}
-.allocation-top input{direction:ltr;text-align:right;font-size:17px;font-weight:750}
+/* Monthly savings breakdown, opened from the main budget savings input. */
+.allocation-field-trigger{display:inline-flex;align-items:center;justify-content:center;flex:none;padding:3px 8px;border:1px solid #cbb9a1;border-radius:7px;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:750;cursor:pointer}
+.allocation-field-trigger:hover,.allocation-field-trigger:focus-visible{background:var(--accent);color:white;outline-offset:2px}
+.allocation-dialog{width:min(620px,100%);height:min(650px,calc(100dvh - 20px));max-height:calc(100dvh - 20px)}
+.allocation-content{flex:1;min-height:0;padding:15px 20px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
 .allocation-summary{display:flex;align-items:center;gap:9px;flex-wrap:wrap;color:#776c60;font-size:11px}
-.allocation-summary strong{font-size:24px;color:#332c24;font-variant-numeric:tabular-nums}
-.allocation-total{margin-inline-start:auto}
-.allocation-bar{height:13px;border-radius:10px;overflow:hidden;display:flex;background:#eae1d6}
+.allocation-summary strong{font-size:25px;color:#332c24;font-variant-numeric:tabular-nums}
+.allocation-summary small{margin-inline-start:auto;color:#817566}
+.allocation-bar{height:13px;min-height:13px;border-radius:10px;overflow:hidden;display:flex;background:#eae1d6}
 .allocation-bar span{height:100%;display:block;transition:width .17s}
 .allocation-list-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ece2d5;padding-bottom:7px;font-size:12px}
 .allocation-list-head small{color:#968675}
 .allocation-list{display:grid;gap:8px;min-height:0;align-content:start;flex:1}
-.allocation-row{border:1px solid #e7dccf;border-radius:11px;padding:10px;background:#fffdfa;display:flex;flex-direction:column;gap:9px}
+.allocation-empty{align-self:center;text-align:center;padding:26px 14px;font-size:12px;line-height:1.65;color:#756858}
+.allocation-row{border:1px solid #e7dccf;border-radius:11px;padding:11px;background:#fffdfa;display:flex;flex-direction:column;gap:8px}
 .allocation-row-head{display:flex;align-items:center;gap:8px;min-width:0}
 .allocation-dot{display:block;width:10px;height:10px;border-radius:4px;flex:none}
-.allocation-name{width:100%;flex:1;font-size:12px;padding:7px}
+.allocation-name,.allocation-amount-input{min-width:0;border:1px solid #dacfc1;border-radius:8px;background:#fcf8f2;color:#342c25;padding:7px 9px;outline-color:#8c745d}
+.allocation-name{width:100%;flex:1;font-size:12px}
 .allocation-value{font-size:13px;white-space:nowrap;color:#3b3227;font-variant-numeric:tabular-nums}
-.allocation-delete{background:transparent;border:1px solid #e0d4c5;color:#a16f60;font-size:18px;border-radius:7px;line-height:20px;min-width:27px}
-.allocation-delete:disabled{opacity:.3}
+.allocation-delete{background:transparent;border:1px solid #e0d4c5;color:#a16f60;font-size:18px;border-radius:7px;line-height:20px;min-width:27px;cursor:pointer}
 .allocation-row-bottom{display:flex;align-items:center;gap:7px;font-size:12px;color:#6a5847}
 .allocation-row-bottom input[type=range]{flex:1;min-width:0;accent-color:#6e877f}
-.allocation-percent{width:64px;text-align:center;direction:ltr;padding:6px}
+.allocation-amount-input{width:90px;text-align:center;direction:ltr;font-variant-numeric:tabular-nums}
 .allocation-pager,.allocation-actions{display:flex;gap:10px;align-items:center;justify-content:center}
 .allocation-pager[hidden]{display:none}
-.allocation-pager button,.allocation-reset{border:1px solid #ded1c0;background:#f7f1e9;color:#615244;padding:7px 12px;border-radius:8px;font-size:11px}
-.allocation-pager button:disabled{opacity:.3}
+.allocation-pager button,.allocation-reset{border:1px solid #ded1c0;background:#f7f1e9;color:#615244;padding:7px 12px;border-radius:8px;font-size:11px;cursor:pointer}
+.allocation-pager button:disabled,.allocation-actions button:disabled{opacity:.35;cursor:default}
 .allocation-actions{justify-content:space-between;border-top:1px solid #ece2d7;padding-top:11px}
-.allocation-content .tool-hint{margin:0}
-.allocation-trigger{font-weight:700}
-@media(max-width:540px){
- .allocation-content{padding:10px;gap:7px}
- .allocation-dialog .tool-head{padding:12px}
- .allocation-row{padding:7px;gap:5px}
- .allocation-top input,.allocation-top select{padding:7px}
- .allocation-summary strong{font-size:20px}
- .allocation-content .tool-hint{font-size:9px}
-}
-@media(max-height:680px){.allocation-row{padding:6px;gap:4px}.allocation-content{gap:6px}}
-
-/* Optional one-way binding to the budget calculator savings field. */
-.allocation-content{gap:8px;padding-block:12px}
-.allocation-link{display:flex;align-items:center;gap:10px;min-width:0;border:1px solid #dcd0c2;background:#faf5ee;border-radius:10px;padding:8px 11px;cursor:pointer}
-.allocation-link input{accent-color:#397f7f;width:16px;height:16px;flex:none}
-.allocation-link span{display:flex;flex-direction:column;gap:3px;min-width:0}
-.allocation-link strong{font-size:12px;color:#3b332c}
-.allocation-link small{font-size:10px;line-height:1.4;color:#827463}
-.allocation-top input:disabled,.allocation-top select:disabled{opacity:.72;background:#efe7dc;color:#60554a;cursor:not-allowed}
-.allocation-row{padding:8px;gap:5px}
-@media(max-width:540px){.allocation-link{padding:6px 8px}.allocation-link strong{font-size:11px}.allocation-link small{font-size:9px}}
+.allocation-content .tool-hint{margin:0;font-size:10px;line-height:1.5}
+@media(max-width:540px){.allocation-content{padding:10px;gap:8px}.allocation-dialog .tool-head{padding:12px}.allocation-row{padding:8px;gap:5px}.allocation-summary strong{font-size:20px}.allocation-summary small{width:100%;margin:0}.allocation-content .tool-hint{font-size:9px}.allocation-amount-input{width:76px}.allocation-field-trigger{font-size:10px;padding:3px 6px}}
+@media(max-height:680px){.allocation-row{padding:7px;gap:4px}.allocation-content{gap:7px}}
