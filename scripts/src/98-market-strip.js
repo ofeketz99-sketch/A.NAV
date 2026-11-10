@@ -62,8 +62,7 @@
       });
       const tip=pt(now,33);
       svg.appendChild(el('line',{x1:50,y1:50,x2:tip[0],y2:tip[1],stroke:'#3f372f','stroke-width':2.2,'stroke-linecap':'round'}));
-      svg.appendChild(el('circle',{cx:50,cy:50,r:3.6,fill:'#3f372f'}));
-      [[0,'0'],[100,'100']].forEach(([v,t])=>{const p=pt(v,41);const x=el('text',{x:v?96:4,y:52.5,'font-size':6.5,'text-anchor':v?'end':'start',fill:'#8a7f72'});x.textContent=t;svg.appendChild(x);});
+      svg.appendChild(el('circle',{cx:50,cy:50,r:3.2,fill:'#3f372f'}));
     }
     // points: oldest first, numbers 0-100
     function drawFng(points,label,source){

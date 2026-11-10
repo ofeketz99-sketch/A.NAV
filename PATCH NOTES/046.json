@@ -1,0 +1,11 @@
+{
+  "version": 46,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Market strip: equal tile widths and a gauge that fits inside its tile",
+  "changes": [
+    "The bottom of the Fear & Greed gauge was clipped by the tile; the 0 and 100 captions were removed and the dial is smaller and placed fully inside",
+    "All three tiles now have the same width"
+  ],
+  "backup": "backups/2026-11-10T18-55-00Z-gauge-fit/"
+}

@@ -3213,3 +3213,8 @@ html.splash-run .splash-word .splash-dot{
 .mk-fng{flex:1.4 1 250px;min-width:240px}
 .mk-fng .mk-rate{bottom:auto;top:23px;inset-inline-start:auto;inset-inline-end:11px}
 .mk-fng .mk-val{top:17px;font-size:20px}
+
+/* 046: equal tile widths, gauge fully inside the tile */
+.market-strip .mk,.market-strip .mk-px,.market-strip .mk-fng{flex:1 1 0;min-width:200px;max-width:none}
+.mk-fng .mk-dial{left:12px;top:3px;width:86px;height:44px}
+.mk-fng b,.mk-fng .mk-val{inset-inline-start:110px}
