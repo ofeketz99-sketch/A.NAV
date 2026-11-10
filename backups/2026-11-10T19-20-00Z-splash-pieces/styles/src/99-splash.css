@@ -1,0 +1,20 @@
+
+/* A/NAV 034 — entry splash: the site's beige with the logo centred, fading in and out. */
+.splash{
+  position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:var(--paper,#f3eee5);cursor:pointer;
+}
+.splash-logo{
+  display:grid;justify-items:center;gap:10px;opacity:0;color:#282521;
+  grid-template-columns:auto auto;align-items:center;column-gap:clamp(14px,2.2vw,26px);
+}
+.splash-mark{
+  display:grid;place-items:center;width:clamp(58px,8.5vw,104px);height:clamp(58px,8.5vw,104px);border-radius:26%;
+  background:#292923;color:#fffaf1;font-weight:800;font-size:clamp(32px,4.8vw,60px);line-height:1;
+}
+.splash-word{font-weight:800;font-size:clamp(44px,7.4vw,92px);letter-spacing:-.025em;line-height:1}
+.splash-logo small{grid-column:1/-1;margin-top:6px;font-size:clamp(12px,1.5vw,16px);letter-spacing:.14em;color:#857e73}
+html.splash-run .splash{animation:splash-life 2.5s ease-in-out both}
+html.splash-run .splash-logo{animation:splash-logo 1s cubic-bezier(.22,1,.36,1) .12s both}
+@keyframes splash-life{0%,72%{opacity:1}100%{opacity:0}}
+@keyframes splash-logo{from{opacity:0;transform:translateY(10px) scale(.94)}to{opacity:1;transform:none}}
+@media print{.splash{display:none!important}}
