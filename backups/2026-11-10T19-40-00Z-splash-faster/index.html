@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="application-name" content="A.NAV">
+  <meta name="theme-color" content="#f3eee5">
+  <title>A.NAV | פיננסים</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%0A%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23272725%22%2F%3E%0A%3Cpath%20fill%3D%22%23ffffff%22%20d%3D%22M30.5%209%20A23%2023%200%201%200%2055%2033.5%20H30.5%20Z%22%2F%3E%0A%3Cpath%20fill%3D%22%23ffffff%22%20d%3D%22M35%209%20A23%2023%200%200%201%2055%2029%20H35%20Z%22%2F%3E%0A%3C%2Fsvg%3E">
+  <!-- Optional webfont: falls back to installed Hebrew fonts when offline. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/app.css">
+</head>
+<body>
+<div class="splash" id="splash" aria-hidden="true"><div class="splash-logo"><div class="splash-word" dir="ltr"><span class="sp" style="--i:0;--dir:-1">A</span><i class="sp splash-dot" style="--i:1;--dir:1"></i><span class="sp" style="--i:2;--dir:-1">N</span><span class="sp" style="--i:3;--dir:1">A</span><span class="sp" style="--i:4;--dir:-1">V</span></div></div></div>
+<div class="shell" id="financeApp" data-theme="mortgage">
+  <header class="frame-chrome" aria-label="כותרת A.NAV">
+    <div class="frame-identity"><span class="frame-monogram" aria-hidden="true">A</span><div class="frame-brand-copy"><strong aria-label="A.NAV">A<span class="brand-dot" aria-hidden="true"></span>NAV</strong><small>כלים פיננסיים</small></div></div>
+    <div class="frame-chrome-center" aria-hidden="true"><span class="frame-overline">פאנל פיננסים</span><strong>חיסכון · אשראי · תקציב</strong></div>
+    <div class="frame-state"><span class="frame-state-dot" aria-hidden="true"></span><span class="frame-state-copy"><strong>נשמר בדפדפן</strong><small>ללא ענן</small></span></div>
+  </header>
+  <nav class="screen-views" id="screenViews" role="tablist" aria-label="תצוגה">
+    <button type="button" role="tab" data-screen-panel="inputs" aria-selected="true">נתונים</button>
+    <button type="button" role="tab" data-screen-panel="summary" aria-selected="false">תוצאות</button>
+    <button type="button" role="tab" data-screen-panel="chart" aria-selected="false">גרף</button>
+    <button type="button" role="tab" data-screen-panel="notes" aria-selected="false">פנקס</button>
+  </nav>
+  <div class="content-layout" id="contentLayout">
+    <div class="main-column">
+      <div class="tabs-bar">
+        <nav class="tabs" id="tabList" aria-label="בחירת מחשבון" role="tablist">
+          <button class="tab" data-tab="mortgage" role="tab" aria-selected="true">משכנתא</button>
+          <button class="tab" data-tab="savings" role="tab" aria-selected="false">חיסכון</button>
+          <button class="tab" data-tab="index" role="tab" aria-selected="false">S&amp;P 500</button>
+          <button class="tab" data-tab="loan" role="tab" aria-selected="false">הלוואה</button>
+          <button class="tab" data-tab="budget" role="tab" aria-selected="false">תקציב</button>
+        </nav>
+        <div class="workspace-tools" role="group" aria-label="ניהול נתונים">
+          <button type="button" class="mini-tool palette-trigger" id="paletteToggle" aria-label="בחירת צבע ללשונית" title="בחירת צבע ללשונית הנוכחית"><i id="paletteChip" aria-hidden="true"></i>צבע</button>
+          <button type="button" class="mini-tool" id="undoBtn" title="ביטול פעולה אחרונה (Ctrl+Z)" aria-label="בטל פעולה אחרונה" disabled>↶ <span>ביטול</span></button>
+          <div class="data-menu" id="dataMenu">
+            <button type="button" class="mini-tool" id="dataMenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="dataMenuList" title="ייצוא, גיבוי, שחזור והדפסה">ייצוא וגיבוי ▾</button>
+            <div class="data-menu-list" id="dataMenuList" role="menu" hidden>
+              <button type="button" role="menuitem" id="excelBtn" title="ייצוא כל המחשבונים והנתונים ל־Excel">ייצוא ל־Excel</button>
+              <button type="button" role="menuitem" id="backupBtn" title="ייצוא הנתונים לקובץ JSON">גיבוי לקובץ</button>
+              <button type="button" role="menuitem" id="restoreBtn" title="ייבוא גיבוי מקובץ JSON">שחזור מגיבוי</button>
+              <button type="button" role="menuitem" id="printBtn" title="הדפסה או שמירה כ־PDF של הלשונית הנוכחית">הדפסה / PDF</button>
+              <p class="data-menu-note">הנתונים נשמרים רק בדפדפן הזה. מומלץ לגבות מדי פעם.</p>
+            </div>
+          </div>
+          <input type="file" id="restoreFile" accept=".json,application/json" hidden aria-label="בחירת קובץ גיבוי">
+        </div>
+      </div>
+      <main class="workspace">
+        <section class="panel controls" aria-label="שינוי נתונים">
+          <div class="panel-head"><div class="panel-title-group"><div><h2 id="controlTitle">נתונים</h2><p id="controlSubtitle"></p></div><button class="subtle-tool unlock-all-goals" id="unlockAllGoals" type="button" hidden disabled title="שחרר את כל נעילות המשתנים ונעילת היעד בגיליון הנוכחי">שחרר נעילות <span class="unlock-count" id="unlockCount"></span></button></div><div class="panel-actions"><button class="schedule-toggle" id="scheduleToggle" type="button" hidden>הפקדות <span id="scheduleCount"></span></button><button class="subtle-tool" id="scenarioToggle" type="button" title="שמירת תרחישים והשוואה">תרחישים</button><button class="subtle-tool" id="advancedToggle" type="button" title="אפשרויות נוספות" hidden>מתקדם</button><button class="reset" id="resetBtn" type="button" title="איפוס ערכים חופשיים תוך שמירת נעילות והפקדות עתידיות">איפוס</button><button class="subtle-tool" id="resetAllBtn" type="button" title="איפוס כל הגיליון, הנעילות וההפקדות העתידיות">איפוס מלא</button></div></div>
+          <div id="controlsBody"></div>
+          <nav class="field-pager" id="fieldPager" aria-label="עמודי שדות" hidden>
+            <button type="button" id="fieldPagePrev" aria-label="עמוד קודם">הקודם</button>
+            <span id="fieldPageLabel" aria-live="polite"></span>
+            <button type="button" id="fieldPageNext" aria-label="עמוד הבא">הבא</button>
+          </nav>
+          <div class="controls-foot" id="controlFoot"></div>
+        </section>
+        <section class="results" aria-live="polite" aria-atomic="false">
+          <div class="hero-result">
+            <div class="hero-copy"><div class="hero-top"><div class="hero-title-wrap"><div class="hero-label" id="heroLabel"></div><div class="hero-tag" id="heroTag" hidden></div></div><span class="hero-status" id="heroStatus" data-tone="info" hidden>מידע</span></div><div class="hero-number" id="heroNumber"></div><div class="hero-description" id="heroDesc"></div></div>
+            <div class="hero-secondary" id="heroSecondary" aria-label="מדד נוסף והשוואה לנקודת איפוס">
+              <div class="hero-secondary-main">
+                <div class="hero-secondary-label" id="heroSecondaryLabel"></div>
+                <div class="hero-secondary-number" id="heroSecondaryNumber" dir="ltr"></div>
+                <div class="hero-secondary-description" id="heroSecondaryDesc"></div>
+              </div>
+              <div class="hero-baseline" id="heroBaseline">
+                <div class="hero-baseline-label">שינוי מהבסיס</div>
+                <div class="hero-baseline-delta" id="heroBaselineDelta" dir="ltr"></div>
+              </div>
+            </div>
+            <div class="hero-meter" id="heroMeter" role="img" aria-label="מדד יחסי מתעדכן" data-state="normal">
+              <svg class="meter-svg" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+                <circle class="meter-outer-hairline" cx="60" cy="60" r="58" fill="none"/>
+                <path class="meter-ticks-minor" d="M 65.59 6.79 L 65.82 4.61 M 71.12 7.67 L 71.58 5.52 M 76.53 9.12 L 77.21 7.03 M 81.76 11.13 L 82.66 9.12 M 91.45 16.72 L 92.74 14.94 M 95.80 20.24 L 97.27 18.61 M 99.76 24.20 L 101.39 22.73 M 103.28 28.55 L 105.06 27.26 M 108.87 38.24 L 110.88 37.34 M 110.88 43.47 L 112.97 42.79 M 112.33 48.88 L 114.48 48.42 M 113.21 54.41 L 115.39 54.18 M 113.21 65.59 L 115.39 65.82 M 112.33 71.12 L 114.48 71.58 M 110.88 76.53 L 112.97 77.21 M 108.87 81.76 L 110.88 82.66 M 103.28 91.45 L 105.06 92.74 M 99.76 95.80 L 101.39 97.27 M 95.80 99.76 L 97.27 101.39 M 91.45 103.28 L 92.74 105.06 M 81.76 108.87 L 82.66 110.88 M 76.53 110.88 L 77.21 112.97 M 71.12 112.33 L 71.58 114.48 M 65.59 113.21 L 65.82 115.39 M 54.41 113.21 L 54.18 115.39 M 48.88 112.33 L 48.42 114.48 M 43.47 110.88 L 42.79 112.97 M 38.24 108.87 L 37.34 110.88 M 28.55 103.28 L 27.26 105.06 M 24.20 99.76 L 22.73 101.39 M 20.24 95.80 L 18.61 97.27 M 16.72 91.45 L 14.94 92.74 M 11.13 81.76 L 9.12 82.66 M 9.12 76.53 L 7.03 77.21 M 7.67 71.12 L 5.52 71.58 M 6.79 65.59 L 4.61 65.82 M 6.79 54.41 L 4.61 54.18 M 7.67 48.88 L 5.52 48.42 M 9.12 43.47 L 7.03 42.79 M 11.13 38.24 L 9.12 37.34 M 16.72 28.55 L 14.94 27.26 M 20.24 24.20 L 18.61 22.73 M 24.20 20.24 L 22.73 18.61 M 28.55 16.72 L 27.26 14.94 M 38.24 11.13 L 37.34 9.12 M 43.47 9.12 L 42.79 7.03 M 48.88 7.67 L 48.42 5.52 M 54.41 6.79 L 54.18 4.61"/>
+                <path class="meter-ticks-major" d="M 60.00 8.40 L 60.00 3.30 M 85.80 15.31 L 88.35 10.90 M 104.69 34.20 L 109.10 31.65 M 111.60 60.00 L 116.70 60.00 M 104.69 85.80 L 109.10 88.35 M 85.80 104.69 L 88.35 109.10 M 60.00 111.60 L 60.00 116.70 M 34.20 104.69 L 31.65 109.10 M 15.31 85.80 L 10.90 88.35 M 8.40 60.00 L 3.30 60.00 M 15.31 34.20 L 10.90 31.65 M 34.20 15.31 L 31.65 10.90"/>
+                <circle class="meter-dial-face" cx="60" cy="60" r="36"/>
+                <circle class="meter-inner-hairline" cx="60" cy="60" r="33.8" fill="none"/>
+                <circle class="meter-track-base" cx="60" cy="60" r="31" fill="none" stroke-width="8.4"/>
+                <circle class="meter-track" cx="60" cy="60" r="31" fill="none" stroke-width="5.9"/>
+                <circle class="meter-progress" id="meterProgress" cx="60" cy="60" r="31" fill="none" stroke-width="5.9" stroke-dasharray="194.778745" stroke-dashoffset="194.778745" transform="rotate(-90 60 60)"/>
+                <circle class="meter-track meter-track-secondary" id="meterTrackSecondary" cx="60" cy="60" r="39" fill="none" stroke-width="5.6" stroke-dasharray="245.044227" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+                <circle class="meter-progress meter-progress-secondary" id="meterProgressSecondary" cx="60" cy="60" r="39" fill="none" stroke-width="5.6" stroke-dasharray="245.044227" stroke-dashoffset="245.044227" transform="rotate(-90 60 60)"/>
+                <circle class="meter-track meter-track-tertiary" id="meterTrackTertiary" cx="60" cy="60" r="47" fill="none" stroke-width="5.2" stroke-dasharray="295.309709" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+                <circle class="meter-progress meter-progress-tertiary" id="meterProgressTertiary" cx="60" cy="60" r="47" fill="none" stroke-width="5.2" stroke-dasharray="295.309709" stroke-dashoffset="295.309709" transform="rotate(-90 60 60)"/>
+              </svg>
+              <div class="meter-center" aria-hidden="true"><strong id="meterNumber" dir="ltr">0%</strong><span class="meter-divider"></span><small id="meterLabel">שיעור מימון</small></div>
+            </div>
+          </div>
+          <div class="stat-grid" id="stats"></div>
+          <div class="panel chart-panel"><div class="chart-top"><div class="chart-title" id="chartTitle"></div><div class="chart-tools"><div class="chart-caption" id="chartCaption"></div><button id="chartModeToggle" class="chart-mode" type="button" hidden aria-pressed="false">הפקדות</button><button id="budgetChartToggle" class="chart-mode" type="button" hidden aria-pressed="false">תזרים</button><button id="riskToggle" class="chart-mode" type="button" hidden aria-pressed="false">תרחישים</button><label class="risk-vol-control" id="riskVolWrap" hidden>תנודתיות <select id="riskVolatility" aria-label="תנודתיות תשואה שנתית לצורך הדמיה"><option value="10">10%</option><option value="18" selected>18%</option><option value="25">25%</option><option value="35">35%</option></select></label></div></div><div id="chart"></div><div class="composition" id="composition" aria-label="חלוקת סכומים"></div><div class="chart-bottom" id="chartBottom"></div><div class="risk-summary" id="riskSummary" hidden aria-live="polite"></div><div class="transfer-actions" id="transferActions" role="group" aria-label="העברת נתונים" hidden></div></div>
+        </section>
+      </main>
+    </div>
+    <aside class="side-rail" aria-label="פנקס ומחשבון כיס">
+    <section class="notes-panel" aria-label="פנקס">
+      <div class="notes-top">
+        <div class="notes-title">פנקס</div>
+        <button class="notes-toggle" id="notesToggle" type="button" aria-expanded="true" aria-controls="notesBody">הסתר</button>
+      </div>
+      <div class="notes-body" id="notesBody">
+        <div class="notes-mode" role="group" aria-label="אופן שמירת הפנקס">
+          <button type="button" id="notesModeShared" data-notes-mode="shared" aria-pressed="true">משותף</button>
+          <button type="button" id="notesModeSeparate" data-notes-mode="separate" aria-pressed="false">לפי לשונית</button>
+        </div>
+        <textarea class="notes-input" id="notesInput" maxlength="6000" spellcheck="true" aria-label="פנקס משותף" placeholder="הערות..."></textarea>
+        <div class="notes-footer"><span class="notes-saved" id="notesSaveStatus">נשמר</span><span id="notesCounter">0 תווים</span></div>
+      </div>
+    </section>
+      <section class="calc-dock" id="calcDock" aria-label="מחשבון כיס מתקפל">
+        <button id="quickCalcToggle" type="button" class="quick-calc-trigger" aria-controls="quickCalc" aria-label="מחשבון כיס" aria-expanded="false">
+          <span class="calc-toggle-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+              <rect x="4.5" y="3.5" width="15" height="17" rx="3"></rect>
+              <line x1="7.5" y1="8.2" x2="16.5" y2="8.2"></line>
+              <circle cx="8.3" cy="12.2" r=".9"></circle><circle cx="12" cy="12.2" r=".9"></circle><circle cx="15.7" cy="12.2" r=".9"></circle>
+              <circle cx="8.3" cy="15.7" r=".9"></circle><circle cx="12" cy="15.7" r=".9"></circle><circle cx="15.7" cy="15.7" r=".9"></circle>
+            </svg>
+          </span>
+          <span class="calc-toggle-copy"><span class="calc-toggle-label">מחשבון</span></span>
+          <span class="calc-chevron" aria-hidden="true"><i></i></span>
+        </button>
+        <div class="calc-clip">
+          <div class="quick-calc" id="quickCalc" role="region" aria-label="מחשבון כיס" inert aria-hidden="true">
+  <input id="calcDisplay" type="text" dir="ltr" aria-label="תרגיל חשבוני" inputmode="decimal" autocomplete="off" placeholder="0">
+  <div id="calcError" class="calc-error" aria-live="polite"></div>
+  <div class="calc-keys" id="calcKeys">
+    <button data-calc="C" class="calc-clear">C</button><button data-calc="(">(</button><button data-calc=")">)</button><button data-calc="/">÷</button>
+    <button data-calc="7">7</button><button data-calc="8">8</button><button data-calc="9">9</button><button data-calc="*">×</button>
+    <button data-calc="4">4</button><button data-calc="5">5</button><button data-calc="6">6</button><button data-calc="-">−</button>
+    <button data-calc="1">1</button><button data-calc="2">2</button><button data-calc="3">3</button><button data-calc="+">+</button>
+    <button data-calc="0">0</button><button data-calc=".">.</button><button data-calc="back">⌫</button><button data-calc="=" class="calc-equals">=</button>
+  </div>
+</div>
+        </div>
+      </section>
+    </aside>
+  </div>
+  <div class="mobile-summary" aria-live="off"><span id="mobileLabel"></span><strong id="mobileNumber"></strong></div>
+  <footer><span class="topnote"><span class="status-dot" id="saveDot"></span><span id="saveStatus">הנתונים נשמרים בדפדפן</span></span><span>סימולציה בלבד · לא ייעוץ</span></footer>
+</div>
+<div class="schedule-overlay" id="scheduleOverlay" hidden>
+  <div class="schedule-dialog" role="dialog" aria-modal="true" aria-labelledby="scheduleTitle">
+    <div class="schedule-head"><div><h2 id="scheduleTitle">שינויים עתידיים בהפקדות</h2><p>הגדירו הפקדה חודשית חדשה או סכום חד־פעמי במועד עתידי.</p></div><button type="button" id="scheduleClose" class="schedule-close" aria-label="סגירת חלון">×</button></div>
+    <div class="schedule-body">
+      <div class="schedule-type" role="group" aria-label="סוג השינוי">
+        <button type="button" class="schedule-type-btn" data-kind="monthly" aria-pressed="true">שינוי הפקדה חודשית</button>
+        <button type="button" class="schedule-type-btn" data-kind="once" aria-pressed="false">הפקדה חד־פעמית</button>
+      </div>
+      <div class="schedule-fields">
+        <div><label for="scheduleYear">שנת חיסכון</label><select id="scheduleYear"></select></div>
+        <div><label for="scheduleMonth">חודש בשנה</label><select id="scheduleMonth"></select></div>
+        <div class="schedule-sum"><label id="scheduleAmountLabel" for="scheduleAmount">הפקדה חודשית חדשה (₪)</label><input id="scheduleAmount" type="number" inputmode="decimal" min="0" max="10000000" step="250" value="3000"></div>
+      </div>
+      <div class="schedule-range-wrap range-control"><input id="scheduleRange" type="range" min="0" max="50000" step="250" value="3000" aria-label="סכום ההפקדה"><div class="range-touch-layer" aria-hidden="true"></div></div>
+      <div class="schedule-help" id="scheduleHelp">השינוי יחול מסוף החודש שנבחר והלאה, ויחליף את ההפקדה החודשית הקודמת.</div>
+      <p class="schedule-error" id="scheduleError" role="alert" hidden></p>
+      <div class="schedule-form-actions"><button type="button" class="schedule-add" id="scheduleSubmit">הוסף שינוי</button><button type="button" class="schedule-cancel" id="scheduleCancel" hidden>ביטול עריכה</button></div>
+      <div class="schedule-existing"><div class="schedule-existing-head"><strong>שינויים שהוגדרו</strong><span id="scheduleExistingCount">0 שינויים</span></div><div id="scheduleList" class="schedule-list"></div></div>
+      <div class="schedule-policy">השינויים מחושבים לפי חודשים מסוף החודש, אחרי צבירת התשואה. אירועים מעבר למשך החיסכון נשמרים אך אינם נכללים בתוצאה.</div>
+    </div>
+  </div>
+</div>
+
+<div class="tool-overlay" id="scenarioOverlay" hidden>
+  <section class="tool-dialog" role="dialog" aria-modal="true" aria-labelledby="scenarioTitle">
+    <header class="tool-head"><div><h2 id="scenarioTitle">תרחישים</h2><p>שמור את הנתונים, טען אותן או השווה על אותו הגרף.</p></div><button type="button" class="tool-close" data-close-tool="scenarioOverlay" aria-label="סגור">×</button></header>
+    <div class="tool-content">
+      <div class="tool-save"><input id="scenarioName" type="text" maxlength="42" placeholder="שם התרחיש, למשל: 25 שנה" aria-label="שם התרחיש"><button id="scenarioSave" type="button" class="tool-primary">שמור תרחיש</button></div>
+      <p id="scenarioMessage" class="tool-small" aria-live="polite"></p><div id="scenarioList" class="scenario-list"></div><section id="compareWorkbench" class="compare-workbench" hidden aria-label="השוואת תרחישים חיה"></section>
+      <div class="tool-hint">בגרפים לאורך זמן ההשוואה בקו מקווקו. בתקציב מוצג פער מספרי. טעינת תרחיש מחליפה את הנתונים.</div>
+    </div>
+  </section>
+</div>
+<div class="tool-overlay" id="paletteOverlay" hidden>
+  <section class="tool-dialog palette-dialog" role="dialog" aria-modal="true" aria-labelledby="paletteTitle">
+    <header class="tool-head"><div><h2 id="paletteTitle">בחירת צבע ללשונית</h2><p id="paletteSubtitle">15 גוונים בסדר כרומטי · צבע תפוס שמור ללשונית אחרת</p></div><button type="button" class="tool-close" data-close-tool="paletteOverlay" aria-label="סגור">×</button></header>
+    <div class="tool-content"><div class="palette-current" id="paletteCurrent"></div><div class="palette-grid" id="paletteGrid" role="group" aria-label="בנק צבעי הלשוניות"></div><p class="tool-hint">בחירת צבע תעדכן את צבעי ההדגשה של הלשונית בלבד. הבחירה נשמרת יחד עם יתר הנתונים והגיבוי.</p></div>
+  </section>
+</div>
+<div class="tool-overlay" id="advancedOverlay" hidden>
+  <section class="tool-dialog" role="dialog" aria-modal="true" aria-labelledby="advancedTitle">
+    <header class="tool-head"><div><h2 id="advancedTitle">הגדרות מתקדמות</h2><p id="advancedSubtitle">הנחות נוספות, ללא עומס על המחשבון הראשי.</p></div><button type="button" class="tool-close" data-close-tool="advancedOverlay" aria-label="סגור">×</button></header>
+    <div class="tool-content" id="advancedBody"></div>
+  </section>
+</div>
+
+
+<div id="statOverlay" class="tool-overlay" hidden><section class="tool-dialog" role="dialog" aria-modal="true" aria-labelledby="statDetailTitle"><header class="tool-head"><div><h2 id="statDetailTitle"></h2></div><button class="tool-close" type="button" id="statClose" aria-label="סגירה">×</button></header><div class="tool-content"><div class="stat-detail-value" id="statDetailValue"></div><p class="stat-detail-info" id="statDetailInfo"></p><div class="stat-detail-breakdown" id="statDetailBreakdown" aria-label="פירוט חישוב"></div><div class="stat-detail-footer" id="statDetailFooter"></div></div></section></div>
+<script src="scripts/app.js" defer></script>
+</body>
+</html>
