@@ -180,3 +180,8 @@
 ## בורר פנקס ומסגרת מחשבון — 2026-11-10 (v039)
 - `99-ambient-motion.css`: `.notes-mode button` (כולל `aria-pressed=true` ו-hover) עם `border-color:transparent!important`; הידית `.notes-mode::before` נושאת את המסגרת. בלי זה המסגרת של הכפתור הנבחר נשארה במקום הישן בזמן ההחלקה.
 - `#calcDisplay:focus` בלי outline, צל או צבע מסגרת מודגשים.
+
+## פס מדדי שוק בכותרת — 2026-11-10 (v040)
+- `.frame-chrome-center` הפך ל-`#marketStrip` עם שלוש אריחים: `SP:SPX` ו-`BITSTAMP:BTCUSD` כווידג'טי `mini-symbol-overview` של TradingView במצב `chartOnly` (חודש, בלי מחיר), ואריח `F&G` שמצויר ב-SVG עצמי.
+- `scripts/src/98-market-strip.js`: נטען רק אחרי `load` ובזמן סרק, רק כשהפס נראה (במסך צר הוא מוסתר ב-`99-visual-polish.css`) ולא ב-`saveData`. נתוני הפחד והחמדנות מ-`api.alternative.me/fng` (מדד הקריפטו), עם מטמון שעה ב-`anav.fng.v1`. כשמקור לא זמין האריח מציג מקף (`mk-offline`).
+- `styles/src/99-market-strip.css`; הפס מוסתר בהדפסה. שני אריחי TradingView נטענים מצד שלישי בכל טעינה; לא אומתו חיים בסביבת הפיתוח.

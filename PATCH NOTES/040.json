@@ -1,0 +1,12 @@
+{
+  "version": 40,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Header market strip: SPX and BTC charts plus a Fear & Greed sparkline",
+  "changes": [
+    "The centre of the top banner now holds three small tiles: TradingView chart-only mini charts for SPX and BTCUSD (one month) and a self-drawn sparkline of the Fear & Greed index with its current value",
+    "Fear & Greed data comes from api.alternative.me (crypto index), cached for one hour in localStorage key anav.fng.v1; tiles show a quiet dash when a source is unreachable",
+    "The strip loads only after the page is idle, only on wide layouts, not with save-data, and is hidden in print"
+  ],
+  "backup": "backups/2026-11-10T21-00-00Z-market-strip/"
+}
