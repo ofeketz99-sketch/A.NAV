@@ -1,0 +1,24 @@
+
+/* A.NAV 044 — header market strip: three uniform tiles (S&P 500, Bitcoin, Fear & Greed). */
+.market-strip{flex:1 1 auto;width:min(100%,660px);max-width:660px;flex-direction:row!important;align-items:center;justify-content:center;gap:10px;padding:0;min-width:0}
+.mk{
+  position:relative;flex:1 1 200px;min-width:170px;height:50px;border-radius:12px;overflow:hidden;direction:ltr;text-align:left;
+  background:rgba(255,255,255,.58);border:1px solid rgba(60,45,30,.09);box-shadow:0 1px 3px rgba(60,45,30,.07);
+  transition:background .4s,border-color .4s;
+}
+.mk b{position:absolute;top:7px;inset-inline-start:11px;font-size:9.5px;font-weight:700;letter-spacing:.09em;color:#6d6358;pointer-events:none;white-space:nowrap}
+.mk-chg{position:absolute;top:6px;inset-inline-end:11px;font-size:11px;font-weight:800;letter-spacing:.03em;font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none;color:#6d6358}
+.mk-val{position:absolute;top:19px;inset-inline-start:11px;font-size:19px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums;color:#4a4238;pointer-events:none}
+.mk-bar{position:absolute;left:11px;right:11px;bottom:6px;height:3px;border-radius:3px;background:rgba(60,45,30,.12)}
+.mk-gauge{background:linear-gradient(90deg,hsl(0 62% 45%),hsl(30 70% 50%),hsl(55 65% 52%),hsl(90 50% 45%),hsl(125 50% 38%))}
+.mk-gauge u{position:absolute;top:-3px;width:3px;height:9px;margin-inline-start:-1.5px;border-radius:2px;background:#2d2822;box-shadow:0 0 0 1.5px rgba(255,255,255,.85);text-decoration:none}
+.mk.mk-up{background:rgba(60,160,95,.13);border-color:rgba(60,160,95,.30)}
+.mk.mk-down{background:rgba(205,70,60,.12);border-color:rgba(205,70,60,.30)}
+.mk.mk-up .mk-val,.mk.mk-up .mk-chg{color:hsl(145 58% 27%)}
+.mk.mk-down .mk-val,.mk.mk-down .mk-chg{color:hsl(2 62% 40%)}
+.mk.mk-up .mk-bar{background:hsl(145 50% 40%)}
+.mk.mk-down .mk-bar{background:hsl(2 62% 50%)}
+.mk.mk-offline .mk-val,.mk.mk-offline .mk-chg,.mk.mk-offline .mk-gauge u{display:none}
+.mk.mk-offline::after{content:"–";position:absolute;top:17px;inset-inline-start:11px;color:#b3a896;font-size:19px;line-height:1}
+.mk-fng.mk-crypto b::after{content:" · CRYPTO"}
+@media print{.market-strip{display:none!important}}
