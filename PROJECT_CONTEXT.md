@@ -130,3 +130,8 @@
 ## דחיפת צבע בין לשוניות — 2026-11-10 (v026)
 - `#financeApp.shell::before` הוא הצבע הנוכחי ו-`::after` הצבע הקודם; שניהם רחבים ב-24% מהמסגרת כדי שהקפיצה בסיום לא תחשוף רווח. במעבר לשונית `::before` נכנס מצד הלשונית הנבחרת ו-`::after` נדחף החוצה לצד הנגדי (`--nav-x`, `data-sweep` a/b).
 - הצבעים נלקחים מ-`--ambient` ו-`--ambient-prev` (ללא מעבר צבע), ש-`applyTabAccent` ו-`playNavMotion` מציבים. דריפט הרקע (`--ax`,`--ay`) רץ ברציפות על שתי השכבות.
+
+## מעבר לשוניות חד וחלק — 2026-11-10 (v027)
+- `activate()` ב-`90-notes-and-activation.js` עוטף את ההחלפה ב-`document.startViewTransition` כשיש כיוון ניווט ותנועה מותרת; `--nav-x` נקבע על `documentElement` ו-`html.nav-vt` קיים רק בזמן המעבר, ורק אז `#controlsBody` ו-`.results` מקבלים `view-transition-name` (`vt-controls`, `vt-results`).
+- `99-ambient-motion.css`: הפאנל הישן נעלם ב-0.16s והחדש נכנס אחריו (fade-through) עם הזזה קצרה; דחיפת הצבע התקצרה ל-1.15s עם שוליים מטושטשים במסכה. בלי View Transitions או עם reduced-motion יש נסיגה לאנימציה במקום או ללא אנימציה.
+- הסיבה לריצוד שדווח: חיתוך של פריים אחד ואחריו הופעה מ-opacity 0 (מסך ריק) וקצה אנכי חד של הצבע.

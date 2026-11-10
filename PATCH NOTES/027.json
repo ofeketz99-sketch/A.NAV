@@ -1,0 +1,14 @@
+{
+  "version": 27,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Crisp tab transition: no hard cut, no blank flash, fade-through panels",
+  "changes": [
+    "Tab switching no longer hard-cuts: the panels (controls and results) are captured with the View Transitions API and cross-moved instead of being re-rendered and faded in from an empty screen",
+    "The old panel leaves quickly and the new one arrives right after it, so two texts are never visible on top of each other",
+    "Panels slide a short distance (22px out, 36px in) with a gentle settle instead of a large bounce",
+    "The colour push is shorter (1.15s) with a softer overshoot, and its edge is feathered so it no longer shows as a sharp vertical line",
+    "Browsers without View Transitions, and reduced-motion users, fall back to the previous in-place animation or no animation"
+  ],
+  "backup": "backups/2026-11-10T13-00-00Z-smooth-transition/"
+}

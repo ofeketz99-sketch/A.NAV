@@ -1746,7 +1746,20 @@
     if(prevColor)app.style.setProperty('--ambient-prev',prevColor);
     app.dataset.sweep=app.dataset.sweep==='a'?'b':'a';
   }
-  function activate(tab){const navDir=navDirection(active,tab),prevColor=app.style.getPropertyValue('--ambient');active=tab;app.dataset.theme=tab;applyTabAccent();document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab?'true':'false'));if(goalIsActive()){if(!goalManuals[tab])goalManuals[tab]=Object.fromEntries(['initial','monthly','years','rate'].map(id=>[id,states[tab][id]]));goalSolver(tab);}playNavMotion(navDir,prevColor);renderControls();renderResults();renderNotes();if(motionAllowed()){for(const el of [q('controlsBody'),document.querySelector('.results')]){el.classList.remove('animate-in');void el.offsetWidth;el.classList.add('animate-in');}}saveState();}
+  // Tab change: with the View Transitions API the outgoing panels leave while the incoming ones arrive, so there is never an empty frame.
+  let navTransition=null;
+  function activate(tab){
+    const navDir=navDirection(active,tab),prevColor=app.style.getPropertyValue('--ambient');
+    const apply=inPlace=>{active=tab;app.dataset.theme=tab;applyTabAccent();document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab?'true':'false'));if(goalIsActive()){if(!goalManuals[tab])goalManuals[tab]=Object.fromEntries(['initial','monthly','years','rate'].map(id=>[id,states[tab][id]]));goalSolver(tab);}playNavMotion(navDir,prevColor);renderControls();renderResults();renderNotes();if(inPlace&&motionAllowed()){for(const el of [q('controlsBody'),document.querySelector('.results')]){el.classList.remove('animate-in');void el.offsetWidth;el.classList.add('animate-in');}}saveState();};
+    if(navTransition){try{navTransition.skipTransition();}catch(e){}navTransition=null;}
+    if(navDir&&motionAllowed()&&typeof document.startViewTransition==='function'){
+      const root=document.documentElement;
+      root.style.setProperty('--nav-x',String(navDir));
+      root.classList.add('nav-vt');
+      const transition=navTransition=document.startViewTransition(()=>apply(false));
+      transition.finished.catch(()=>{}).then(()=>{if(navTransition===transition){navTransition=null;root.classList.remove('nav-vt');}});
+    }else apply(true);
+  }
   document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>activate(b.dataset.tab)));
   const notesInput=q('notesInput');
   function renderNotes(){
