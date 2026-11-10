@@ -22,14 +22,14 @@
     return a&&b?Math.sign(b.getBoundingClientRect().left-a.getBoundingClientRect().left):0;
   }
   // Content and the ambient glow flow in from the side of the chosen tab.
-  function playNavMotion(dir){
+  // The new tab's colour enters from its own side and pushes the previous colour out the other way.
+  function playNavMotion(dir,prevColor){
     app.style.setProperty('--nav-x',String(dir||0));
     if(!dir||!motionAllowed())return;
-    app.style.setProperty('--sx-from',dir<0?'-20%':'120%');
-    app.style.setProperty('--sx-to',dir<0?'120%':'-20%');
+    if(prevColor)app.style.setProperty('--ambient-prev',prevColor);
     app.dataset.sweep=app.dataset.sweep==='a'?'b':'a';
   }
-  function activate(tab){const navDir=navDirection(active,tab);active=tab;app.dataset.theme=tab;applyTabAccent();document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab?'true':'false'));if(goalIsActive()){if(!goalManuals[tab])goalManuals[tab]=Object.fromEntries(['initial','monthly','years','rate'].map(id=>[id,states[tab][id]]));goalSolver(tab);}playNavMotion(navDir);renderControls();renderResults();renderNotes();if(motionAllowed()){for(const el of [q('controlsBody'),document.querySelector('.results')]){el.classList.remove('animate-in');void el.offsetWidth;el.classList.add('animate-in');}}saveState();}
+  function activate(tab){const navDir=navDirection(active,tab),prevColor=app.style.getPropertyValue('--ambient');active=tab;app.dataset.theme=tab;applyTabAccent();document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab?'true':'false'));if(goalIsActive()){if(!goalManuals[tab])goalManuals[tab]=Object.fromEntries(['initial','monthly','years','rate'].map(id=>[id,states[tab][id]]));goalSolver(tab);}playNavMotion(navDir,prevColor);renderControls();renderResults();renderNotes();if(motionAllowed()){for(const el of [q('controlsBody'),document.querySelector('.results')]){el.classList.remove('animate-in');void el.offsetWidth;el.classList.add('animate-in');}}saveState();}
   document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>activate(b.dataset.tab)));
   const notesInput=q('notesInput');
   function renderNotes(){

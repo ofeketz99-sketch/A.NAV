@@ -2967,46 +2967,60 @@ html:not([dir="rtl"]) .notes-mode{--thumb-dir:1}
 }
 .notes-mode button:not([aria-pressed="true"]):hover{color:var(--surface-ink,#3b332b)}
 
-/* 2 · Ambient background: the frame's rim carries the tab colour, the centre stays calm. */
+/* 2 · Ambient background: the frame's rim carries the tab colour, the centre stays calmer. */
 @property --ax{syntax:'<percentage>';inherits:false;initial-value:10%}
 @property --ay{syntax:'<percentage>';inherits:false;initial-value:20%}
-@property --sx{syntax:'<percentage>';inherits:false;initial-value:-30%}
-@property --sa{syntax:'<number>';inherits:false;initial-value:0}
-#financeApp.shell{isolation:isolate;--edge:color-mix(in srgb,var(--accent) 80%,#1b140e)}
-#financeApp.shell::before{
-  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;
-  background:
-    radial-gradient(52% 42% at var(--ax) 0%,color-mix(in srgb,var(--edge) 34%,transparent),transparent 100%),
-    radial-gradient(52% 42% at calc(100% - var(--ax)) 100%,color-mix(in srgb,var(--edge) 34%,transparent),transparent 100%),
-    radial-gradient(36% 52% at 0% var(--ay),color-mix(in srgb,var(--edge) 30%,transparent),transparent 100%),
-    radial-gradient(36% 52% at 100% calc(100% - var(--ay)),color-mix(in srgb,var(--edge) 30%,transparent),transparent 100%),
-    radial-gradient(ellipse 80% 78% at 50% 50%,transparent 50%,color-mix(in srgb,var(--edge) 17%,transparent) 100%);
+#financeApp.shell{
+  isolation:isolate;overflow-x:clip;
+  --edge:color-mix(in srgb,var(--ambient,var(--accent)) 88%,#1b140e);
+  --edge-prev:color-mix(in srgb,var(--ambient-prev,var(--ambient,var(--accent))) 88%,#1b140e);
+}
+/* Two layers share one drawing: ::before is the current tab colour, ::after the colour being pushed out. */
+#financeApp.shell::before,#financeApp.shell::after{
+  content:"";display:block;position:absolute;inset:0 -12%;border:0;border-radius:0;pointer-events:none;z-index:-1;
   animation:ambient-drift 24s ease-in-out infinite alternate;
 }
-@keyframes ambient-drift{
-  from{--ax:6%;--ay:12%}
-  to{--ax:94%;--ay:88%}
+#financeApp.shell::before{
+  background:
+    radial-gradient(60% 50% at var(--ax) 0%,color-mix(in srgb,var(--edge) 56%,transparent),transparent 100%),
+    radial-gradient(60% 50% at calc(100% - var(--ax)) 100%,color-mix(in srgb,var(--edge) 56%,transparent),transparent 100%),
+    radial-gradient(44% 62% at 9.7% var(--ay),color-mix(in srgb,var(--edge) 50%,transparent),transparent 100%),
+    radial-gradient(44% 62% at 90.3% calc(100% - var(--ay)),color-mix(in srgb,var(--edge) 50%,transparent),transparent 100%),
+    radial-gradient(ellipse 78% 74% at 50% 50%,color-mix(in srgb,var(--edge) 6%,transparent) 30%,color-mix(in srgb,var(--edge) 30%,transparent) 100%);
 }
-
-/* 3 · Tab navigation: a band of colour travels from the chosen tab's side across the frame. */
 #financeApp.shell::after{
-  display:block;content:"";position:absolute;inset:0;border:0;border-radius:inherit;pointer-events:none;z-index:-1;
-  background:linear-gradient(90deg,
-    transparent calc(var(--sx) - 30%),
-    color-mix(in srgb,var(--edge) calc(var(--sa) * 30%),transparent) var(--sx),
-    transparent calc(var(--sx) + 30%));
+  opacity:0;
+  background:
+    radial-gradient(60% 50% at var(--ax) 0%,color-mix(in srgb,var(--edge-prev) 56%,transparent),transparent 100%),
+    radial-gradient(60% 50% at calc(100% - var(--ax)) 100%,color-mix(in srgb,var(--edge-prev) 56%,transparent),transparent 100%),
+    radial-gradient(44% 62% at 9.7% var(--ay),color-mix(in srgb,var(--edge-prev) 50%,transparent),transparent 100%),
+    radial-gradient(44% 62% at 90.3% calc(100% - var(--ay)),color-mix(in srgb,var(--edge-prev) 50%,transparent),transparent 100%),
+    radial-gradient(ellipse 78% 74% at 50% 50%,color-mix(in srgb,var(--edge-prev) 6%,transparent) 30%,color-mix(in srgb,var(--edge-prev) 30%,transparent) 100%);
 }
-#financeApp.shell[data-sweep="a"]::after{animation:nav-sweep-a .95s cubic-bezier(.22,1,.36,1) both}
-#financeApp.shell[data-sweep="b"]::after{animation:nav-sweep-b .95s cubic-bezier(.22,1,.36,1) both}
-@keyframes nav-sweep-a{0%{--sx:var(--sx-from);--sa:0}35%{--sa:1}100%{--sx:var(--sx-to);--sa:0}}
-@keyframes nav-sweep-b{0%{--sx:var(--sx-from);--sa:0}35%{--sa:1}100%{--sx:var(--sx-to);--sa:0}}
+@keyframes ambient-drift{
+  from{--ax:8%;--ay:12%}
+  to{--ax:92%;--ay:88%}
+}
 
-/* Panels slide in from the side of the chosen tab (visual direction, RTL-safe). */
-#controlsBody.animate-in,.results.animate-in{animation:nav-slide .5s cubic-bezier(.22,1,.36,1) both}
-@keyframes nav-slide{
-  from{opacity:0;transform:translateX(calc(var(--nav-x,0) * 36px))}
-  to{opacity:1;transform:translateX(0)}
+/* 3 · Tab navigation: the new colour slides in from the chosen tab's side and pushes the old one out, with a small settle at the end. */
+#financeApp.shell[data-sweep="a"]::before{animation:ambient-drift 24s ease-in-out infinite alternate,push-in-a 1.5s cubic-bezier(.3,1.3,.45,1) both}
+#financeApp.shell[data-sweep="b"]::before{animation:ambient-drift 24s ease-in-out infinite alternate,push-in-b 1.5s cubic-bezier(.3,1.3,.45,1) both}
+#financeApp.shell[data-sweep="a"]::after{animation:ambient-drift 24s ease-in-out infinite alternate,push-out-a 1.5s cubic-bezier(.3,1.3,.45,1) both}
+#financeApp.shell[data-sweep="b"]::after{animation:ambient-drift 24s ease-in-out infinite alternate,push-out-b 1.5s cubic-bezier(.3,1.3,.45,1) both}
+@keyframes push-in-a{from{transform:translateX(calc(var(--nav-x,0) * 100%))}to{transform:translateX(0)}}
+@keyframes push-in-b{from{transform:translateX(calc(var(--nav-x,0) * 100%))}to{transform:translateX(0)}}
+@keyframes push-out-a{from{opacity:1;transform:translateX(0)}to{opacity:1;transform:translateX(calc(var(--nav-x,0) * -100%))}}
+@keyframes push-out-b{from{opacity:1;transform:translateX(0)}to{opacity:1;transform:translateX(calc(var(--nav-x,0) * -100%))}}
+
+/* Panels follow the same direction, slower, with a small bounce as they land. */
+#controlsBody.animate-in,.results.animate-in{
+  animation:nav-slide .9s cubic-bezier(.3,1.4,.5,1) both,nav-fade .4s ease both;
 }
+@keyframes nav-slide{
+  from{transform:translateX(calc(var(--nav-x,0) * 64px))}
+  to{transform:translateX(0)}
+}
+@keyframes nav-fade{from{opacity:0}to{opacity:1}}
 
 @media (prefers-reduced-motion:reduce){
   #financeApp.shell::before,#financeApp.shell::after{animation:none!important}

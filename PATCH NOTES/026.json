@@ -1,0 +1,14 @@
+{
+  "version": 26,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Tab colour push, slower motion with a soft bounce, fuller ambient colour",
+  "changes": [
+    "Switching tabs now pushes colour: the new tab's colour enters from the side of the chosen tab and pushes the previous tab's colour out the opposite way",
+    "Motion is slower (1.5s colour push, 0.9s panels) and finishes with a small overshoot bounce",
+    "Ambient colour is fuller: stronger and wider edge glows, a lightly tinted centre, and a less darkened tab colour",
+    "Ambient layers use the exact tab colour from the first frame (no colour fade) and are oversized so the bounce never exposes a gap; the drift animation keeps running across switches",
+    "Panels slide in from the same side as the colour push"
+  ],
+  "backup": "backups/2026-11-10T12-30-00Z-ambient-push/"
+}

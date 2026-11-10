@@ -25,6 +25,7 @@
     const tone=accentBank.find(x=>x.id===tabColors[active])||accentBank[0];
     app.style.setProperty('--accent',tone.dark);
     app.style.setProperty('--accent-soft',tone.soft);
+    app.style.setProperty('--ambient',tone.dark);
     document.querySelectorAll('.tab').forEach(b=>{
       const t=accentBank.find(x=>x.id===tabColors[b.dataset.tab]);
       if(t){b.style.setProperty('--tab-accent',t.dark);b.style.setProperty('--tab-accent-soft',t.soft);}

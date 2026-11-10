@@ -126,3 +126,7 @@
 ## תנועה ורקע אקסנט — 2026-11-10 (v025)
 - `styles/src/99-ambient-motion.css`: בורר הפנקס הוא ידית אחת שמחליקה (`.notes-mode::before` + `:has(#notesModeSeparate[aria-pressed=true])`); רקע המסגרת נבנה מ-`#financeApp.shell::before` (זוהרים בקצוות שנעים לאט, מרכז רגוע) ומ-`::after` (פס צבע שחוצה את המסגרת במעבר לשונית). `.shell` הוא `isolation:isolate` כדי שהשכבות יהיו מעל רקע המסגרת ומתחת לתוכן.
 - `scripts/src/90-notes-and-activation.js`: `navDirection` מחשב כיוון חזותי (-1 שמאל / 1 ימין) לפי מיקום הלשוניות על המסך, ו-`playNavMotion` קובע `--nav-x`, `--sx-from/--sx-to` ומחליף `data-sweep` בין a ל-b כדי להפעיל מחדש את האנימציה.
+
+## דחיפת צבע בין לשוניות — 2026-11-10 (v026)
+- `#financeApp.shell::before` הוא הצבע הנוכחי ו-`::after` הצבע הקודם; שניהם רחבים ב-24% מהמסגרת כדי שהקפיצה בסיום לא תחשוף רווח. במעבר לשונית `::before` נכנס מצד הלשונית הנבחרת ו-`::after` נדחף החוצה לצד הנגדי (`--nav-x`, `data-sweep` a/b).
+- הצבעים נלקחים מ-`--ambient` ו-`--ambient-prev` (ללא מעבר צבע), ש-`applyTabAccent` ו-`playNavMotion` מציבים. דריפט הרקע (`--ax`,`--ay`) רץ ברציפות על שתי השכבות.
