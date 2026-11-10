@@ -1,0 +1,10 @@
+{
+  "version": 35,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Frame can no longer be scrolled sideways",
+  "changes": [
+    "The frame used overflow:hidden, which still allows programmatic scrolling; the wide background colour layers made it possible to shift the whole page sideways (for example when a click scrolled an element into view while the splash was closing). The frame now uses overflow:clip, which cannot scroll"
+  ],
+  "backup": "backups/2026-11-10T19-00-00Z-shell-clip/"
+}

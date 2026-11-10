@@ -162,3 +162,6 @@
 - שם המותג המוצג הוא A/NAV (כותרת, `<title>`, `aria-label`); שם המאגר והמסמכים נשארו A.NAV. הבדיקות ב-`tests/core.test.cjs` עודכנו.
 - `#splash` ב-`index.html`, `scripts/src/00-splash.js` (המודול הראשון ב-manifest) ו-`styles/src/99-splash.css`. הוא מוצג כשעברו יותר מ-5 דקות מהביקור האחרון, כשהאתר התעדכן (`document.lastModified` שונה; מתעלמים ממנו אם הוא קרוב ל"עכשיו") או ברענון ידני. מצב נשמר במפתח נפרד `anav.splash.v1`.
 - ברירת המחדל של השכבה גלויה וללוגו opacity 0 עד שה-JS מוסיף `html.splash-run`, כך שאין הבהוב לוגו כשלא צריך; כשלא צריך היא מוסרת מיד.
+
+## מסגרת בלי גלילה צדית — 2026-11-10 (v035)
+- `#financeApp.shell` מקבל `overflow:clip` (מסכים רחבים) ו-`overflow-x:clip` (תמיד) ב-`99-ambient-motion.css`, עם `!important` כי כלל קודם גובר עליו. שכבות הצבע הרחבות (124%) גרמו לכך ש-`overflow:hidden` אפשר גלילה תוכנית, והמסגרת נדחפה הצידה ב-179px.

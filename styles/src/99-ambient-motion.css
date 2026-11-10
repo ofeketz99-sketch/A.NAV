@@ -117,3 +117,7 @@ html.nav-vt .results{view-transition-name:vt-results}
   .tabs-bar .tab-slot{height:calc(100% - 2px)!important;align-self:center}
   .tabs-bar .tab-slot .tab{height:100%!important;min-height:0!important;padding-block:0!important;display:inline-flex;align-items:center;justify-content:center}
 }
+
+/* The wide colour layers must never make the frame scrollable (scrollIntoView/focus used to shift it sideways). */
+#financeApp.shell{overflow-x:clip!important}
+@media (min-width:1051px) and (min-height:731px){#financeApp.shell{overflow:clip!important}}
