@@ -3179,9 +3179,9 @@ html.splash-run .splash-word .splash-dot{
 .hero-meter,.hero-meter[data-rings="2"],.hero-meter[data-rings="3"]{max-width:calc(18.4vh - 37px)}
 
 /* A.NAV 040 — header market strip: SPX and BTC mini charts plus a Fear & Greed sparkline. */
-.market-strip{flex-direction:row!important;align-items:center;justify-content:center;gap:10px;padding:0 12px;min-width:0}
+.market-strip{flex:1 1 auto;max-width:700px;flex-direction:row!important;align-items:center;justify-content:center;gap:10px;padding:0 12px;min-width:0}
 .mk{
-  position:relative;flex:1 1 0;min-width:96px;max-width:168px;height:38px;border-radius:10px;overflow:hidden;
+  position:relative;flex:1 1 0;min-width:96px;max-width:176px;height:46px;border-radius:10px;overflow:hidden;
   background:rgba(255,255,255,.55);border:1px solid rgba(40,30,20,.08);
 }
 .mk b{position:absolute;z-index:2;top:3px;inset-inline-start:7px;font-size:10px;font-weight:700;letter-spacing:.07em;color:#6d6358;pointer-events:none}
@@ -3192,3 +3192,15 @@ html.splash-run .splash-word .splash-dot{
 .mk.mk-offline::after{content:"–";position:absolute;inset:0;display:grid;place-items:center;color:#b3a896;font-size:16px}
 .mk.mk-offline .mk-chart,.mk.mk-offline svg,.mk.mk-offline .mk-val{display:none}
 @media print{.market-strip{display:none!important}}
+
+/* 041: Fear & Greed tile (CNN scale) */
+.mk-fng{flex:2 1 0;max-width:290px;min-width:236px;direction:ltr}
+.mk-fng b{inset-inline-start:8px;top:4px}
+.mk-fng .mk-val{inset-inline-end:auto;inset-inline-start:8px;top:15px;font-size:22px;line-height:1}
+.mk-fng .mk-lbl{position:absolute;z-index:2;top:17px;inset-inline-start:46px;font-size:10px;font-weight:800;letter-spacing:.05em;white-space:nowrap;pointer-events:none}
+.mk-fng svg{inset:6px 8px 12px 138px;width:calc(100% - 146px);height:calc(100% - 18px);opacity:.55}
+.mk-gauge{position:absolute;z-index:2;left:8px;right:8px;bottom:5px;height:3px;border-radius:3px;background:linear-gradient(90deg,hsl(0 62% 45%),hsl(30 70% 50%),hsl(55 65% 52%),hsl(90 50% 45%),hsl(125 50% 38%))}
+.mk-gauge u{position:absolute;top:-3px;width:3px;height:9px;margin-inline-start:-1.5px;border-radius:2px;background:#2d2822;box-shadow:0 0 0 1.5px rgba(255,255,255,.85);text-decoration:none}
+.mk-fng.mk-offline .mk-gauge,.mk-fng.mk-offline .mk-lbl{display:none}
+.mk-fng.mk-crypto b::after{content:" · CRYPTO"}
+.mk:not(.mk-fng) b{background:rgba(255,255,255,.7);padding:0 4px;border-radius:4px;top:4px}

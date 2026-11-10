@@ -17,27 +17,57 @@
       box.appendChild(script);
       setTimeout(()=>{if(!box.querySelector('iframe'))tile.classList.add('mk-offline');},9000);
     }
-    const fngColor=v=>`hsl(${Math.round(Math.max(0,Math.min(100,v))*1.2)} 55% 36%)`;
-    function drawFng(list){
-      const tile=q('mkFng'),line=q('mkFngLine'),val=q('mkFngVal');
-      const values=list.map(item=>Number(item.value)).filter(Number.isFinite).reverse();
-      if(values.length<2){tile.classList.add('mk-offline');return;}
-      const now=values[values.length-1];
-      line.setAttribute('points',values.map((v,i)=>(i/(values.length-1)*100).toFixed(1)+','+(28-v/100*26).toFixed(1)).join(' '));
-      line.style.stroke=fngColor(now);
-      val.textContent=String(Math.round(now));val.style.color=fngColor(now);
-      tile.title='מדד פחד וחמדנות: '+Math.round(now)+(list[0].value_classification?' · '+list[0].value_classification:'')+' · 30 הימים האחרונים';
+    const fngColor=v=>`hsl(${Math.round(Math.max(0,Math.min(100,v))*1.2)} 62% 38%)`;
+    const rate=v=>v<25?'EXTREME FEAR':v<45?'FEAR':v<55?'NEUTRAL':v<75?'GREED':'EXTREME GREED';
+    // points: oldest first, numbers 0-100
+    function drawFng(points,label,source){
+      const tile=q('mkFng'),line=q('mkFngLine'),val=q('mkFngVal'),lbl=q('mkFngLbl'),pin=q('mkFngPin');
+      const values=points.filter(Number.isFinite);
+      if(!values.length){tile.classList.add('mk-offline');return;}
+      const now=Math.max(0,Math.min(100,values[values.length-1]));
+      if(values.length>1)line.setAttribute('points',values.map((v,i)=>(i/(values.length-1)*100).toFixed(1)+','+(28-v/100*26).toFixed(1)).join(' '));
+      const col=fngColor(now);
+      line.style.stroke=col;val.textContent=String(Math.round(now));val.style.color=col;
+      lbl.textContent=label||rate(now);lbl.style.color=col;
+      pin.style.insetInlineStart=now+'%';
+      tile.title='Fear & Greed '+Math.round(now)+' · '+lbl.textContent+(source==='crypto'?' · crypto index':' · CNN');
+      tile.classList.toggle('mk-crypto',source==='crypto');
       tile.classList.remove('mk-offline');
     }
-    function loadFng(){
-      const KEY='anav.fng.v1';let cached=null;
+    const CNN='https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
+    const ROUTES=[CNN,'https://corsproxy.io/?'+encodeURIComponent(CNN),'https://api.allorigins.win/raw?url='+encodeURIComponent(CNN)];
+    async function fromCnn(){
+      for(const url of ROUTES){
+        try{
+          const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),7000);
+          const r=await fetch(url,{signal:ctl.signal});clearTimeout(t);
+          const j=await r.json();
+          const score=Number(j&&j.fear_and_greed&&j.fear_and_greed.score);
+          const hist=((j&&j.fear_and_greed_historical&&j.fear_and_greed_historical.data)||[]).slice(-30).map(d=>Number(d.y));
+          if(Number.isFinite(score)){
+            if(hist.length)hist[hist.length-1]=score;else hist.push(score);
+            const rating=String(j.fear_and_greed.rating||'').replace(/_/g,' ').toUpperCase();
+            return {points:hist,label:rating&&rating!=='UNDEFINED'?rating:rate(score),source:'cnn'};
+          }
+        }catch(e){}
+      }
+      throw new Error('cnn unavailable');
+    }
+    async function fromCrypto(){
+      const r=await fetch('https://api.alternative.me/fng/?limit=30&format=json');
+      const j=await r.json();
+      const pts=j.data.map(d=>Number(d.value)).reverse();
+      return {points:pts,label:rate(pts[pts.length-1]),source:'crypto'};
+    }
+    async function loadFng(){
+      const KEY='anav.fng.v2';let cached=null;
       try{cached=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
-      if(cached&&cached.data&&Date.now()-cached.t<3600000){drawFng(cached.data);return;}
-      fetch('https://api.alternative.me/fng/?limit=30&format=json').then(r=>r.json()).then(json=>{
-        if(!json||!Array.isArray(json.data))throw new Error('bad payload');
-        drawFng(json.data);
-        try{localStorage.setItem(KEY,JSON.stringify({t:Date.now(),data:json.data}));}catch(e){}
-      }).catch(()=>{if(cached&&cached.data)drawFng(cached.data);else q('mkFng').classList.add('mk-offline');});
+      if(cached&&cached.res&&Date.now()-cached.t<1800000){drawFng(cached.res.points,cached.res.label,cached.res.source);return;}
+      let res=null;
+      try{res=await fromCnn();}catch(e){try{res=await fromCrypto();}catch(e2){}}
+      if(res){drawFng(res.points,res.label,res.source);try{localStorage.setItem(KEY,JSON.stringify({t:Date.now(),res}));}catch(e){}}
+      else if(cached&&cached.res)drawFng(cached.res.points,cached.res.label,cached.res.source);
+      else q('mkFng').classList.add('mk-offline');
     }
     function start(){
       if(!strip.getClientRects().length)return; // hidden in narrow layouts: do not load anything

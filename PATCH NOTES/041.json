@@ -1,0 +1,13 @@
+{
+  "version": 41,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Market strip: CNN Fear & Greed with score, label and scale; SPX symbol fixed",
+  "changes": [
+    "The Fear & Greed tile now reads the CNN index directly, then through two public CORS proxies; only if all fail it falls back to the crypto index, marked CRYPTO",
+    "The tile shows the number, the CNN rating such as EXTREME FEAR, a colour scale from 0 to 100 with a pin, and a 30 day sparkline",
+    "SPX tile uses FOREXCOM:SPXUSD because SP:SPX showed a symbol not available message; tiles are taller (46px)",
+    "Cache key moved to anav.fng.v2 (30 minutes)"
+  ],
+  "backup": "backups/2026-11-10T17-45-00Z-fng-cnn/"
+}

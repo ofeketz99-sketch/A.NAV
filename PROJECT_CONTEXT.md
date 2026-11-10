@@ -185,3 +185,7 @@
 - `.frame-chrome-center` הפך ל-`#marketStrip` עם שלוש אריחים: `SP:SPX` ו-`BITSTAMP:BTCUSD` כווידג'טי `mini-symbol-overview` של TradingView במצב `chartOnly` (חודש, בלי מחיר), ואריח `F&G` שמצויר ב-SVG עצמי.
 - `scripts/src/98-market-strip.js`: נטען רק אחרי `load` ובזמן סרק, רק כשהפס נראה (במסך צר הוא מוסתר ב-`99-visual-polish.css`) ולא ב-`saveData`. נתוני הפחד והחמדנות מ-`api.alternative.me/fng` (מדד הקריפטו), עם מטמון שעה ב-`anav.fng.v1`. כשמקור לא זמין האריח מציג מקף (`mk-offline`).
 - `styles/src/99-market-strip.css`; הפס מוסתר בהדפסה. שני אריחי TradingView נטענים מצד שלישי בכל טעינה; לא אומתו חיים בסביבת הפיתוח.
+
+## מדד פחד וחמדנות של CNN — 2026-11-10 (v041)
+- `98-market-strip.js`: המקור הראשי `production.dataviz.cnn.io/index/fearandgreed/graphdata` (ישירות, ואז דרך `corsproxy.io` ו-`allorigins`); רק אם כולם נכשלים נעשה שימוש במדד הקריפטו של `alternative.me` והאריח מסומן CRYPTO. מטמון `anav.fng.v2` לחצי שעה. האריח מציג מספר, דירוג (EXTREME FEAR וכו'), סקאלה צבעונית עם סמן וגרף 30 יום.
+- סימול S&P 500 הוחלף ל-`FOREXCOM:SPXUSD`. נגישות CNN מהדפדפן ושני הפרוקסי לא אומתו חיים בסביבת הפיתוח.
