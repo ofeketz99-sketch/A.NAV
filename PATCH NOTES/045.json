@@ -1,0 +1,11 @@
+{
+  "version": 45,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Fear & Greed as a neutral CNN style half-circle gauge; S&P 500 stale-cache fix",
+  "changes": [
+    "The Fear & Greed tile shows a half-circle gauge in one neutral tone: five bands in CNN proportions, the active band dark, a needle at the exact value, and the number with the rating beside it",
+    "S&P 500 stayed empty because the cached Fear & Greed answer from the previous version had no S&P data; the cache key is now anav.fng.v3 and an entry without S&P data is ignored"
+  ],
+  "backup": "backups/2026-11-10T18-40-00Z-fng-gauge/"
+}

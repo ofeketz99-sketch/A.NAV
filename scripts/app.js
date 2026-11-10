@@ -2804,18 +2804,34 @@
         }catch(e2){if(!q('mkBtc').classList.contains('mk-up')&&!q('mkBtc').classList.contains('mk-down'))q('mkBtc').classList.add('mk-offline');}
       }
     }
-    const fngColor=v=>`hsl(${Math.round(Math.max(0,Math.min(100,v))*1.2)} 62% 38%)`;
     const rate=v=>v<25?'EXTREME FEAR':v<45?'FEAR':v<55?'NEUTRAL':v<75?'GREED':'EXTREME GREED';
+    const BANDS=[0,25,45,55,75,100];
+    const NS='http://www.w3.org/2000/svg';
+    function pt(v,r){const a=Math.PI*(1-v/100);return [(50+r*Math.cos(a)).toFixed(2),(50-r*Math.sin(a)).toFixed(2)];}
+    function arc(v0,v1,r){const p0=pt(v0,r),p1=pt(v1,r);return 'M'+p0.join(' ')+' A'+r+' '+r+' 0 0 1 '+p1.join(' ');}
+    function el(name,attrs){const e=document.createElementNS(NS,name);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+    // CNN style half-circle gauge in one neutral tone: the active band is dark, the needle shows the exact value.
+    function drawDial(now){
+      const svg=q('mkDial');svg.textContent='';
+      const gap=1.2;
+      BANDS.slice(0,-1).forEach((lo,i)=>{
+        const hi=BANDS[i+1],active=now>=lo&&(now<hi||(i===BANDS.length-2&&now<=hi));
+        svg.appendChild(el('path',{d:arc(lo+gap,hi-gap,41),fill:'none','stroke-width':active?8:6,'stroke-linecap':'butt',stroke:active?'#3f372f':'rgba(60,45,30,.20)'}));
+      });
+      const tip=pt(now,33);
+      svg.appendChild(el('line',{x1:50,y1:50,x2:tip[0],y2:tip[1],stroke:'#3f372f','stroke-width':2.2,'stroke-linecap':'round'}));
+      svg.appendChild(el('circle',{cx:50,cy:50,r:3.6,fill:'#3f372f'}));
+      [[0,'0'],[100,'100']].forEach(([v,t])=>{const p=pt(v,41);const x=el('text',{x:v?96:4,y:52.5,'font-size':6.5,'text-anchor':v?'end':'start',fill:'#8a7f72'});x.textContent=t;svg.appendChild(x);});
+    }
     // points: oldest first, numbers 0-100
     function drawFng(points,label,source){
-      const tile=q('mkFng'),val=q('mkFngVal'),lbl=q('mkFngLbl'),pin=q('mkFngPin');
+      const tile=q('mkFng'),val=q('mkFngVal'),lbl=q('mkFngLbl');
       const values=points.filter(Number.isFinite);
       if(!values.length){tile.classList.add('mk-offline');return;}
       const now=Math.max(0,Math.min(100,values[values.length-1]));
-      const col=fngColor(now);
-      val.textContent=String(Math.round(now));val.style.color=col;
-      lbl.textContent=label||rate(now);lbl.style.color=col;
-      pin.style.insetInlineStart=now+'%';
+      val.textContent=String(Math.round(now));
+      lbl.textContent=label||rate(now);
+      drawDial(now);
       tile.title='Fear & Greed '+Math.round(now)+' · '+lbl.textContent+(source==='crypto'?' · crypto index':' · CNN');
       tile.classList.toggle('mk-crypto',source==='crypto');
       tile.classList.remove('mk-offline');
@@ -2849,9 +2865,9 @@
       return {points:pts,label:rate(pts[pts.length-1]),source:'crypto'};
     }
     async function loadFng(){
-      const KEY='anav.fng.v2';let cached=null;
+      const KEY='anav.fng.v3';let cached=null;
       try{cached=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
-      if(cached&&cached.res&&Date.now()-cached.t<1800000){lastSpx=cached.res.spx||null;drawFng(cached.res.points,cached.res.label,cached.res.source);return;}
+      if(cached&&cached.res&&(cached.res.spx||cached.res.source==='crypto')&&Date.now()-cached.t<1800000){lastSpx=cached.res.spx||null;drawFng(cached.res.points,cached.res.label,cached.res.source);return;}
       let res=null;
       try{res=await fromCnn();}catch(e){try{res=await fromCrypto();}catch(e2){}}
       if(res){drawFng(res.points,res.label,res.source);try{localStorage.setItem(KEY,JSON.stringify({t:Date.now(),res}));}catch(e){}}
@@ -2862,7 +2878,7 @@
       if(!strip.getClientRects().length)return; // hidden in narrow layouts: do not load anything
       loadBtc();loadFng().then(loadSpx);
       setInterval(()=>{if(!document.hidden)loadBtc();},120000);
-      setInterval(()=>{if(!document.hidden){try{localStorage.removeItem('anav.fng.v2');}catch(e){}loadFng().then(loadSpx);}},600000);
+      setInterval(()=>{if(!document.hidden){try{localStorage.removeItem('anav.fng.v3');}catch(e){}loadFng().then(loadSpx);}},600000);
     }
     const later=()=>('requestIdleCallback' in window?requestIdleCallback(start,{timeout:4000}):setTimeout(start,1500));
     if(document.readyState==='complete')later();else window.addEventListener('load',later,{once:true});
