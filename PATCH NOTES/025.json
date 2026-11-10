@@ -1,0 +1,14 @@
+{
+  "version": 25,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Sliding notes switch, ambient accent background, direction-aware tab motion",
+  "changes": [
+    "Notes mode switch (shared / per tab) is now a segmented control with a single thumb that glides between the two options",
+    "Frame background carries the tab accent: richer and darker along the rim, calm in the centre, with soft edge glows that drift slowly",
+    "Switching tabs plays a band of accent colour from the chosen tab's side across the frame, and the input and result panels slide in from that side",
+    "Direction is derived from the on-screen position of the old and new tab, so it follows tab order, reordering and RTL",
+    "All motion is disabled under prefers-reduced-motion"
+  ],
+  "backup": "backups/2026-11-10T12-00-00Z-ambient-motion/"
+}
