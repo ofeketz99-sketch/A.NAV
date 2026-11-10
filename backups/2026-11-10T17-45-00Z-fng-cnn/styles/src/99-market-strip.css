@@ -1,0 +1,15 @@
+
+/* A.NAV 040 — header market strip: SPX and BTC mini charts plus a Fear & Greed sparkline. */
+.market-strip{flex-direction:row!important;align-items:center;justify-content:center;gap:10px;padding:0 12px;min-width:0}
+.mk{
+  position:relative;flex:1 1 0;min-width:96px;max-width:168px;height:38px;border-radius:10px;overflow:hidden;
+  background:rgba(255,255,255,.55);border:1px solid rgba(40,30,20,.08);
+}
+.mk b{position:absolute;z-index:2;top:3px;inset-inline-start:7px;font-size:10px;font-weight:700;letter-spacing:.07em;color:#6d6358;pointer-events:none}
+.mk-chart,.mk-chart .tradingview-widget-container__widget,.mk-chart iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;pointer-events:none;border:0}
+.mk-fng svg{position:absolute;inset:15px 8px 4px 8px;width:calc(100% - 16px);height:calc(100% - 19px);overflow:visible}
+.mk-fng polyline{stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.mk-val{position:absolute;z-index:2;top:2px;inset-inline-end:8px;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;color:#534a40;pointer-events:none}
+.mk.mk-offline::after{content:"–";position:absolute;inset:0;display:grid;place-items:center;color:#b3a896;font-size:16px}
+.mk.mk-offline .mk-chart,.mk.mk-offline svg,.mk.mk-offline .mk-val{display:none}
+@media print{.market-strip{display:none!important}}
