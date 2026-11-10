@@ -1,0 +1,12 @@
+{
+  "version": 42,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Market strip: softer charts and logo, brown trend line, stronger Fear & Greed sparkline",
+  "changes": [
+    "TradingView charts use a warm brown line instead of black and are rendered at reduced opacity so the TradingView logo is no longer a heavy black mark",
+    "Chart tiles have a fixed comfortable width and a soft shadow",
+    "The Fear & Greed sparkline is stronger and thicker"
+  ],
+  "backup": "backups/2026-11-10T17-55-00Z-market-strip-polish/"
+}

@@ -25,3 +25,10 @@
 .mk-fng.mk-offline .mk-gauge,.mk-fng.mk-offline .mk-lbl{display:none}
 .mk-fng.mk-crypto b::after{content:" · CRYPTO"}
 .mk:not(.mk-fng) b{background:rgba(255,255,255,.7);padding:0 4px;border-radius:4px;top:4px}
+
+/* 042: calmer tiles — soft chart and logo, stronger Fear & Greed sparkline */
+.mk-chart iframe{opacity:.55;filter:saturate(.7)}
+.mk:not(.mk-fng){flex:0 1 132px}
+.mk-fng svg{opacity:.95}
+.mk-fng polyline{stroke-width:2}
+.mk{box-shadow:0 1px 3px rgba(60,45,30,.07)}

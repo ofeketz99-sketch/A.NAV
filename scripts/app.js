@@ -2771,7 +2771,7 @@
       box.appendChild(widget);tile.appendChild(box);
       const script=document.createElement('script');
       script.src=TV;script.async=true;
-      script.textContent=JSON.stringify({symbol:tile.dataset.symbol,width:'100%',height:'100%',locale:'en',dateRange:'1M',colorTheme:'light',isTransparent:true,autosize:true,largeChartUrl:'',chartOnly:true,noTimeScale:true,trendLineColor:'rgba(40, 37, 33, 1)',underLineColor:'rgba(40, 37, 33, 0.10)',underLineBottomColor:'rgba(40, 37, 33, 0)'});
+      script.textContent=JSON.stringify({symbol:tile.dataset.symbol,width:'100%',height:'100%',locale:'en',dateRange:'1M',colorTheme:'light',isTransparent:true,autosize:true,largeChartUrl:'',chartOnly:true,noTimeScale:true,trendLineColor:'rgba(120, 96, 76, 1)',underLineColor:'rgba(120, 96, 76, 0.14)',underLineBottomColor:'rgba(120, 96, 76, 0)'});
       box.appendChild(script);
       setTimeout(()=>{if(!box.querySelector('iframe'))tile.classList.add('mk-offline');},9000);
     }
