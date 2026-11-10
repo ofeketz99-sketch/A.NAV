@@ -108,7 +108,7 @@
       if(pin){pin.setAttribute('aria-pressed',String(pinned));pin.setAttribute('aria-label',(pinned?'בטל נעילה':'נעל')+': '+(fieldLabels[active][id]||f[1]));
         pin.title=pinned?'שחרר ערך נעול לעריכה':'נעל את הערך כך שלא ישתנה בחישוב היעד';
         const path=pin.querySelector('path');if(path)path.setAttribute('d',pinned?'M8 10V7a4 4 0 0 1 8 0v3':'M8 10V7a4 4 0 0 1 8 0');}
-      r.value=n.value=String(states[active][id]);
+      r.value=String(states[active][id]);n.value=inputText(states[active][id]);
       if(id==='years')r.dataset.slideStep=locked&&plan.solve==='years'?String(1/12):String(f[4]);
       paintSlider(r);
       if(computed){r.title='ערך מחושב לפי יעד נעול · בחר משתנה אחר כדי לשנות אותו';n.title=r.title;}

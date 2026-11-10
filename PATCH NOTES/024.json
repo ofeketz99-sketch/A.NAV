@@ -1,0 +1,15 @@
+{
+  "version": 24,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Text clarity: no spill-over, crisper rendering, readable sizes",
+  "changes": [
+    "KPI cards and hero scale their content with the screen height, so sub-labels and the baseline value no longer cross the card edge (previously 2-18px at 1366x768, 1440x900 and 1914x912)",
+    "A locked goal field now spans two grid rows, so the solver select and its feedback no longer overlap the next field",
+    "Removed permanent will-change layers and fractional hover scales/filters from text containers to avoid blurry text",
+    "Light text on the accent hero is more opaque and the hero gradient is subtler, improving contrast",
+    "Minimum text size raised from 9-10px to 10.5-11px for limits, chart captions, legends, tool buttons and status lines",
+    "Computed number inputs show at most two decimals (30.42 instead of 30.4166666)"
+  ],
+  "backup": "backups/2026-11-10T11-30-00Z-text-clarity/"
+}

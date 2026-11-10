@@ -4,6 +4,8 @@
   const app=document.getElementById('financeApp');
   const q=id=>document.getElementById(id);
   const num=new Intl.NumberFormat('he-IL',{maximumFractionDigits:0});
+  // Text shown inside number inputs: at most two decimals, so values like 30.4166666 stay readable.
+  const inputText=v=>{const n=Number(v);return Number.isFinite(n)?String(Number(n.toFixed(2))):String(v);};
   const money=n=>(n<0?'−':'')+'₪'+num.format(Math.round(Math.abs(Number.isFinite(n)?n:0)));
   const compactMoney=n=>{
     const val=Math.abs(Number.isFinite(n)?n:0),sign=n<0?'−':'';
