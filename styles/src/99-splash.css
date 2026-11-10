@@ -24,15 +24,23 @@ html.splash-run .splash-logo{opacity:1}
 .splash-word span.sp{color:transparent;-webkit-background-clip:text;background-clip:text}
 .splash-dot{width:.2em;height:.2em;border-radius:50%;margin:0 .06em}
 
-html.splash-run .splash{animation:splash-life 3.5s ease-in-out both}
-html.splash-run .splash-word{animation:splash-shine .85s cubic-bezier(.45,0,.55,1) 1.4s both}
+html.splash-run .splash{animation:splash-life 2.8s ease-in-out both}
+html.splash-run .splash-word{animation:splash-shine .68s cubic-bezier(.45,0,.55,1) 1.12s both}
 html.splash-run .splash-word .sp{
   animation:
-    sp-in .9s cubic-bezier(.16,1,.3,1) calc(var(--i) * 70ms) backwards,
-    sp-out .7s cubic-bezier(.55,0,.85,.35) calc(2.35s + var(--i) * 55ms) forwards;
+    sp-in .72s cubic-bezier(.16,1,.3,1) calc(var(--i) * 56ms) backwards,
+    sp-out .56s cubic-bezier(.55,0,.85,.35) calc(1.88s + var(--i) * 44ms) forwards;
+}
+/* The dot appears out of nowhere: it grows in place once the letters have landed, and shrinks away at the end. */
+html.splash-run .splash-word .splash-dot{
+  animation:
+    dot-in .46s cubic-bezier(.34,1.56,.64,1) .46s backwards,
+    dot-out .34s ease-in 1.88s forwards;
 }
 @keyframes splash-life{0%,78%{opacity:1}100%{opacity:0}}
 @keyframes splash-shine{from{--sx:var(--s0)}to{--sx:var(--s1)}}
-@keyframes sp-in{from{opacity:0;transform:translateX(calc(var(--dir) * 58vw))}to{opacity:1;transform:none}}
-@keyframes sp-out{from{opacity:1;transform:none}to{opacity:0;transform:translateX(calc(var(--dir) * -58vw))}}
+@keyframes sp-in{from{opacity:0;transform:translate(calc(var(--dx) * 58vw),calc(var(--dy) * 62vh))}to{opacity:1;transform:none}}
+@keyframes sp-out{from{opacity:1;transform:none}to{opacity:0;transform:translate(calc(var(--dx) * -58vw),calc(var(--dy) * -62vh))}}
+@keyframes dot-in{from{opacity:0;transform:scale(0)}to{opacity:1;transform:none}}
+@keyframes dot-out{from{opacity:1;transform:none}to{opacity:0;transform:scale(0)}}
 @media print{.splash{display:none!important}}

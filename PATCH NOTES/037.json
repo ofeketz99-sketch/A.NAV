@@ -1,0 +1,12 @@
+{
+  "version": 37,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Faster splash; letters arrive from four directions, the dot appears in place",
+  "changes": [
+    "The splash is about 20% faster (3.5s to 2.8s)",
+    "The four letters arrive from the left, top, bottom and right, and leave towards the opposite directions",
+    "The dot does not travel: it grows in place once the letters have landed and shrinks away at the end"
+  ],
+  "backup": "backups/2026-11-10T19-40-00Z-splash-faster/"
+}
