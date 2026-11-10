@@ -125,3 +125,6 @@
     q('saveStatus').textContent='הגיליון אופס במלואו; תרחישים שמורים נשמרו';
   });
 
+
+  // Soft sea-wave layers behind the frame content (decorative, pointer-transparent).
+  if(!app.querySelector(':scope > .sea')){const sea=document.createElement('div');sea.className='sea';sea.setAttribute('aria-hidden','true');sea.innerHTML='<i></i><i></i><i></i>';app.insertBefore(sea,app.firstChild);}

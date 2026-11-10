@@ -1,0 +1,12 @@
+{
+  "version": 30,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Sea-wave background, no white flash on navigation, no hover flash on panels",
+  "changes": [
+    "The grain texture is replaced by three slow, soft wave bands drifting behind the frame (transform-only animation)",
+    "Tab navigation cross-dissolves panels without ever making them half-transparent, which removes the white flash; panels no longer slide",
+    "The large panels (data, chart, notes) no longer darken or lift on hover"
+  ],
+  "backup": "backups/2026-11-10T15-00-00Z-sea-waves/"
+}

@@ -34,8 +34,8 @@ html:not([dir="rtl"]) .notes-mode{--thumb-dir:1}
 #financeApp.shell::before,#financeApp.shell::after{
   content:"";display:block;position:absolute;inset:0 -12%;border:0;border-radius:0;pointer-events:none;z-index:-1;
 }
-#financeApp.shell::before{background-color:var(--edge);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .27 0 0 0 0 .22 0 0 0 .9 -.28'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:240px 240px}
-#financeApp.shell::after{background-color:var(--edge-prev);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .27 0 0 0 0 .22 0 0 0 .9 -.28'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:240px 240px;opacity:0}
+#financeApp.shell::before{background-color:var(--edge);}
+#financeApp.shell::after{background-color:var(--edge-prev);;opacity:0}
 
 /* 3 · Tab navigation: the new colour slides in from the chosen tab's side and pushes the old one out, with a small settle at the end. */
 #financeApp.shell[data-sweep="a"]::before{animation:push-in-a .8s cubic-bezier(.22,.9,.3,1) both}
@@ -56,26 +56,20 @@ html.nav-vt .results{view-transition-name:vt-results}
 /* No size/position morph: the old snapshot used to stretch from a corner towards the new panel size. */
 ::view-transition-group(vt-controls),::view-transition-group(vt-results){animation:none}
 ::view-transition-image-pair(vt-controls),::view-transition-image-pair(vt-results){isolation:auto}
-/* Fade-through: the old panel leaves quickly, the new one arrives right after, so two texts are never visible on top of each other. */
-::view-transition-old(vt-controls),::view-transition-old(vt-results){
-  mix-blend-mode:normal;animation:vt-out .14s ease-in both;
-}
-::view-transition-new(vt-controls),::view-transition-new(vt-results){
-  mix-blend-mode:normal;
-  animation:vt-in .5s cubic-bezier(.22,1,.36,1) .08s both,vt-fade .3s ease-out .08s both;
-}
-@keyframes vt-out{to{opacity:0;transform:translateX(calc(var(--nav-x,0) * -10px))}}
-@keyframes vt-in{from{transform:translateX(calc(var(--nav-x,0) * 14px))}to{transform:translateX(0)}}
+/* Cross-dissolve without a dip: the old panel stays fully opaque underneath while the new one fades in on top,
+   so the frame colour never shows through a half-transparent panel (that was the white flash). */
+::view-transition-old(vt-controls),::view-transition-old(vt-results){mix-blend-mode:normal;animation:none}
+::view-transition-new(vt-controls),::view-transition-new(vt-results){mix-blend-mode:normal;animation:vt-fade .26s ease-out both}
 @keyframes vt-fade{from{opacity:0}to{opacity:1}}
 
 #controlsBody.animate-in,.results.animate-in{
-  animation:nav-slide .5s cubic-bezier(.22,1,.36,1) both,nav-fade .3s ease-out both;
+  animation:nav-fade .26s ease-out both;
 }
 @keyframes nav-slide{
   from{transform:translateX(calc(var(--nav-x,0) * 14px))}
   to{transform:translateX(0)}
 }
-@keyframes nav-fade{from{opacity:.25}to{opacity:1}}
+@keyframes nav-fade{from{opacity:.6}to{opacity:1}}
 
 @media (prefers-reduced-motion:reduce){
   #financeApp.shell::before,#financeApp.shell::after{animation:none!important}
@@ -86,3 +80,33 @@ html.nav-vt .results{view-transition-name:vt-results}
 
 /* Calmer chrome: the running header line and the logo sheen are switched off. */
 .frame-chrome::after,.frame-monogram::after{display:none!important}
+
+/* Sea: three slow, soft wave bands drifting sideways (transform only, so they cost no repaints). */
+.sea{position:absolute;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.sea i{
+  position:absolute;left:0;bottom:0;width:200%;display:block;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 100' preserveAspectRatio='none'%3E%3Cpath d='M0 50C200 20 400 20 600 50S1000 80 1200 50V100H0Z'/%3E%3C/svg%3E") 0 0/50% 100% repeat-x;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 100' preserveAspectRatio='none'%3E%3Cpath d='M0 50C200 20 400 20 600 50S1000 80 1200 50V100H0Z'/%3E%3C/svg%3E") 0 0/50% 100% repeat-x;
+}
+.sea i:nth-child(1){height:62%;background:rgba(255,255,255,.34);animation:sea-a 70s linear infinite}
+.sea i:nth-child(2){height:46%;background:color-mix(in srgb,var(--ambient,var(--accent)) 24%,rgba(255,255,255,.22));animation:sea-b 96s linear infinite}
+.sea i:nth-child(3){height:30%;background:rgba(255,255,255,.26);animation:sea-a 54s linear infinite}
+@keyframes sea-a{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
+@keyframes sea-b{from{transform:translate3d(-50%,0,0)}to{transform:translate3d(0,0,0)}}
+@media (prefers-reduced-motion:reduce){.sea i{animation:none!important}}
+
+/* Large panels do not react to hover (the data panel used to flash darker and lift when the cursor crossed it). */
+@media (hover:hover) and (pointer:fine){
+  .controls:hover,.panel:hover{
+    transform:none!important;border-color:#dcd0c1!important;box-shadow:0 3px 15px rgba(91,75,53,.025)!important;
+    background:linear-gradient(165deg,color-mix(in srgb,var(--accent) 5.5%,#fffdf9) 0%,#fffdf9 64%)!important;
+  }
+  .chart-panel:hover{
+    transform:none!important;border-color:#dcd0c1!important;box-shadow:0 3px 15px rgba(91,75,53,.025)!important;
+    background:linear-gradient(160deg,#fffdfa,color-mix(in srgb,var(--accent) 2%,#fbf6ee))!important;
+  }
+  .notes-panel:hover{
+    transform:none!important;border-color:#dcd0c1!important;box-shadow:none!important;
+    background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 6%,#fffdf9),color-mix(in srgb,var(--accent) 2%,#fffdf9))!important;
+  }
+}
