@@ -1,0 +1,10 @@
+{
+  "version": 32,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Tab strip really centred: remove the 5px downward shift",
+  "changes": [
+    "A leftover rule shifted the whole tab strip 5px down (translateY), so the selected tab sat 10px from the bar's top and 1px from its bottom; the shift is cancelled and the gap is now 5px on both sides"
+  ],
+  "backup": "backups/2026-11-10T15-45-00Z-tab-centre/"
+}

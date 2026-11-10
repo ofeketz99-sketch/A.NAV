@@ -113,7 +113,7 @@ html.nav-vt .results{view-transition-name:vt-results}
 
 /* Tab strip: tabs sit centred in the bar with an even gap, so the selected tab's shadow and accent underline are no longer clipped at the bar's bottom edge. */
 @media (min-width:1051px) and (min-height:731px){
-  .tabs-bar .tabs{height:100%!important;padding:0 2px!important;margin:0!important;align-items:center!important;box-sizing:border-box}
+  .tabs-bar .tabs{height:100%!important;padding:0 2px!important;margin:0!important;transform:none!important;align-items:center!important;box-sizing:border-box}
   .tabs-bar .tab-slot{height:calc(100% - 2px)!important;align-self:center}
   .tabs-bar .tab-slot .tab{height:100%!important;min-height:0!important;padding-block:0!important;display:inline-flex;align-items:center;justify-content:center}
 }
