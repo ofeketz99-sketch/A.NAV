@@ -176,3 +176,7 @@
 ## סידור וידג'ט הטבעת — 2026-11-10 (v038)
 - `index.html`: `#meterLabel` הוצא מ-`.meter-center` והפך ל-`small.meter-label` שהוא ילד ישיר של `.hero-meter` (המזהה נשמר, ה-JS ב-`55-meters.js` לא שונה).
 - `styles/src/99-meter-layout.css`: התווית ממוקמת מתחת לטבעת (`top:calc(100% + 5px)`), המפריד מוסתר, ו-`max-width:calc(18.4vh - 37px)` מגביל את הטבעת (כולל גרסאות 2 ו-3 טבעות) כך שהטבעת והתווית נכנסות בכרטיס. המספר מותאם לפתח הטבעת הפנימית על ידי `fitMeterNumber` הקיים.
+
+## בורר פנקס ומסגרת מחשבון — 2026-11-10 (v039)
+- `99-ambient-motion.css`: `.notes-mode button` (כולל `aria-pressed=true` ו-hover) עם `border-color:transparent!important`; הידית `.notes-mode::before` נושאת את המסגרת. בלי זה המסגרת של הכפתור הנבחר נשארה במקום הישן בזמן ההחלקה.
+- `#calcDisplay:focus` בלי outline, צל או צבע מסגרת מודגשים.

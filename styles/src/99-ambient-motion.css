@@ -5,7 +5,7 @@
 .notes-mode{position:relative;isolation:isolate}
 .notes-mode::before{
   content:"";position:absolute;z-index:-1;top:3px;bottom:3px;inset-inline-start:3px;
-  width:calc((100% - 9px)/2);border-radius:7px;
+  width:calc((100% - 9px)/2);border-radius:7px;border:1px solid color-mix(in srgb,var(--accent) 14%,#d6c7b5);box-sizing:border-box;
   background:color-mix(in srgb,var(--accent-soft) 45%,#fffaf3);
   box-shadow:0 1px 3px rgba(40,30,20,.16),inset 0 -2px 0 color-mix(in srgb,var(--accent) 55%,transparent);
   transition:transform .42s cubic-bezier(.34,1.32,.5,1),background-color .4s ease,box-shadow .4s ease;
@@ -16,7 +16,7 @@ html:not([dir="rtl"]) .notes-mode{--thumb-dir:1}
   transform:translateX(calc(var(--thumb-dir) * (100% + 3px)));
 }
 .notes-mode button,.notes-mode button[aria-pressed="true"],.notes-mode button:hover{
-  background:transparent!important;box-shadow:none!important;position:relative;
+  background:transparent!important;box-shadow:none!important;border-color:transparent!important;position:relative;
   transition:color .3s ease,transform .15s ease;
 }
 .notes-mode button:not([aria-pressed="true"]):hover{color:var(--surface-ink,#3b332b)}
@@ -121,3 +121,9 @@ html.nav-vt .results{view-transition-name:vt-results}
 /* The wide colour layers must never make the frame scrollable (scrollIntoView/focus used to shift it sideways). */
 #financeApp.shell{overflow-x:clip!important}
 @media (min-width:1051px) and (min-height:731px){#financeApp.shell{overflow:clip!important}}
+
+/* Pocket calculator: no frame around the display while typing (the caret is enough). */
+.calc-dock #calcDisplay:focus,.calc-dock #calcDisplay:focus-visible,#calcDisplay:focus,#calcDisplay:focus-visible{
+  outline:none!important;box-shadow:none!important;border-color:#d9cab7!important;
+}
+.calc-dock button:focus:not(:focus-visible){outline:none}

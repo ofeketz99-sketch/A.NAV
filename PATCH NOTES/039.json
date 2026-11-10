@@ -1,0 +1,11 @@
+{
+  "version": 39,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Notes switch border no longer shows during the slide; no frame around the calculator display",
+  "changes": [
+    "The selected button of the notes switch kept its own border, which stayed visible at the old position while the thumb slid; the buttons are now fully borderless and the thumb carries the border",
+    "The pocket calculator display no longer shows a coloured frame when it is focused while typing"
+  ],
+  "backup": "backups/2026-11-10T20-30-00Z-notes-switch-focus/"
+}
