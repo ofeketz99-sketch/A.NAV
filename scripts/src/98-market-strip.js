@@ -1,21 +1,49 @@
 
-  // Header market strip: two TradingView mini charts (chart only) and a self-drawn Fear & Greed sparkline.
+  // Header market strip: live S&P 500 and BTC quotes with daily change colour, and the CNN Fear & Greed gauge.
   // Everything is decorative and loaded after the page; failures leave a quiet placeholder.
   (function(){
     const strip=q('marketStrip');
     if(!strip)return;
     const conn=navigator.connection;
     if(conn&&conn.saveData)return;
-    const TV='https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
-    function mountChart(tile){
-      const box=document.createElement('div');box.className='tradingview-widget-container mk-chart';
-      const widget=document.createElement('div');widget.className='tradingview-widget-container__widget';
-      box.appendChild(widget);tile.appendChild(box);
-      const script=document.createElement('script');
-      script.src=TV;script.async=true;
-      script.textContent=JSON.stringify({symbol:tile.dataset.symbol,width:'100%',height:'100%',locale:'en',dateRange:'1M',colorTheme:'light',isTransparent:true,autosize:true,largeChartUrl:'',chartOnly:true,noTimeScale:true,trendLineColor:'rgba(120, 96, 76, 1)',underLineColor:'rgba(120, 96, 76, 0.14)',underLineBottomColor:'rgba(120, 96, 76, 0)'});
-      box.appendChild(script);
-      setTimeout(()=>{if(!box.querySelector('iframe'))tile.classList.add('mk-offline');},9000);
+    // Live quotes: price plus daily change, coloured by direction. Direct request first, then public CORS proxies.
+    function viaProxies(url){return [url,'https://corsproxy.io/?'+encodeURIComponent(url),'https://api.allorigins.win/raw?url='+encodeURIComponent(url)];}
+    async function getJson(urls){
+      for(const url of urls){
+        try{
+          const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),7000);
+          const r=await fetch(url,{signal:ctl.signal});clearTimeout(t);
+          if(r.ok)return await r.json();
+        }catch(e){}
+      }
+      throw new Error('unreachable');
+    }
+    function setQuote(id,price,pct,digits,prefix){
+      const tile=q(id);
+      if(!Number.isFinite(price)||!Number.isFinite(pct)){tile.classList.add('mk-offline');return;}
+      tile.querySelector('.mk-val').textContent=prefix+price.toLocaleString('en-US',{minimumFractionDigits:digits,maximumFractionDigits:digits});
+      tile.querySelector('.mk-chg').textContent=(pct>=0?'▲ ':'▼ ')+Math.abs(pct).toFixed(2)+'%';
+      tile.classList.remove('mk-offline','mk-up','mk-down');
+      tile.classList.add(pct>=0?'mk-up':'mk-down');
+    }
+    async function loadSpx(){
+      try{
+        const j=await getJson(viaProxies('https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=1d&interval=1d'));
+        const m=j.chart.result[0].meta;
+        setQuote('mkSpx',m.regularMarketPrice,(m.regularMarketPrice/(m.chartPreviousClose||m.previousClose)-1)*100,2,'');
+      }catch(e){if(!q('mkSpx').classList.contains('mk-up')&&!q('mkSpx').classList.contains('mk-down'))q('mkSpx').classList.add('mk-offline');}
+    }
+    async function loadBtc(){
+      try{
+        const j=await getJson(['https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT']);
+        setQuote('mkBtc',Number(j.lastPrice),Number(j.priceChangePercent),0,'$');
+      }catch(e){
+        try{
+          const j=await getJson(['https://api.exchange.coinbase.com/products/BTC-USD/stats']);
+          const last=Number(j.last),open=Number(j.open);
+          setQuote('mkBtc',last,(last/open-1)*100,0,'$');
+        }catch(e2){if(!q('mkBtc').classList.contains('mk-up')&&!q('mkBtc').classList.contains('mk-down'))q('mkBtc').classList.add('mk-offline');}
+      }
     }
     const fngColor=v=>`hsl(${Math.round(Math.max(0,Math.min(100,v))*1.2)} 62% 38%)`;
     const rate=v=>v<25?'EXTREME FEAR':v<45?'FEAR':v<55?'NEUTRAL':v<75?'GREED':'EXTREME GREED';
@@ -71,8 +99,8 @@
     }
     function start(){
       if(!strip.getClientRects().length)return; // hidden in narrow layouts: do not load anything
-      strip.querySelectorAll('.mk[data-symbol]').forEach(mountChart);
-      loadFng();
+      loadSpx();loadBtc();loadFng();
+      setInterval(()=>{if(!document.hidden){loadSpx();loadBtc();}},120000);
     }
     const later=()=>('requestIdleCallback' in window?requestIdleCallback(start,{timeout:4000}):setTimeout(start,1500));
     if(document.readyState==='complete')later();else window.addEventListener('load',later,{once:true});

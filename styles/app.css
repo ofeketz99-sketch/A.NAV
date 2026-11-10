@@ -3211,3 +3211,20 @@ html.splash-run .splash-word .splash-dot{
 .mk-fng svg{opacity:.95}
 .mk-fng polyline{stroke-width:2}
 .mk{box-shadow:0 1px 3px rgba(60,45,30,.07)}
+
+/* 043: quote tiles with direction colour (replace the TradingView charts) */
+.mk-px{flex:0 1 128px;direction:ltr;text-align:left;transition:background .4s,border-color .4s}
+.mk-px b{inset-inline-start:9px;top:5px;background:none;padding:0}
+.mk-px .mk-val{inset-inline-end:auto;inset-inline-start:9px;top:17px;font-size:17px;line-height:1.1;font-weight:800}
+.mk-px .mk-chg{position:absolute;z-index:2;top:6px;inset-inline-end:9px;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;pointer-events:none}
+.mk-px.mk-up{background:rgba(60,160,95,.13);border-color:rgba(60,160,95,.28)}
+.mk-px.mk-down{background:rgba(205,70,60,.12);border-color:rgba(205,70,60,.28)}
+.mk-px.mk-up .mk-val,.mk-px.mk-up .mk-chg{color:hsl(145 58% 27%)}
+.mk-px.mk-down .mk-val,.mk-px.mk-down .mk-chg{color:hsl(2 62% 40%)}
+.mk-px.mk-offline .mk-val,.mk-px.mk-offline .mk-chg{display:none}
+.mk-px.mk-offline::after{display:grid}
+.mk.mk-px b{background:none;padding:0;font-size:9.5px}
+.mk-px{flex:0 1 150px}
+.mk-px .mk-chg{font-size:10.5px}
+.mk-px{flex:0 0 150px;min-width:150px}
+.mk-fng{flex:0 0 250px}

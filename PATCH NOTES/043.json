@@ -1,0 +1,12 @@
+{
+  "version": 43,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Market strip: live quote tiles with direction colour instead of crowded charts",
+  "changes": [
+    "The TradingView charts were removed; SPX and BTC are now tiles with the current value and the daily change, green with an up arrow or red with a down arrow",
+    "S&P 500 comes from Yahoo Finance (direct, then public CORS proxies); BTC from Binance with Coinbase as fallback; refreshed every two minutes while the tab is visible",
+    "No third-party widget scripts load any more"
+  ],
+  "backup": "backups/2026-11-10T18-10-00Z-market-quotes/"
+}
