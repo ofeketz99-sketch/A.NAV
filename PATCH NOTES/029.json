@@ -1,0 +1,13 @@
+{
+  "version": 29,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Pastel grainy background, calmer motion, no corner-growing panels",
+  "changes": [
+    "The tab background is a soft pastel of the tab colour with a fine, static film grain",
+    "Panel transitions no longer morph size and position, which made the data panel's items appear to grow from different corners",
+    "Panel motion is shorter and gentler: 10px out, 14px in, no overshoot; the colour push is 0.8s without a bounce",
+    "The always-running header line and the logo sheen are switched off to reduce clutter"
+  ],
+  "backup": "backups/2026-11-10T14-30-00Z-pastel-grain/"
+}

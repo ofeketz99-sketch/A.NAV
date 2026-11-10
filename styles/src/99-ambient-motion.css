@@ -26,22 +26,22 @@ html:not([dir="rtl"]) .notes-mode{--thumb-dir:1}
 @property --ay{syntax:'<percentage>';inherits:false;initial-value:20%}
 #financeApp.shell{
   isolation:isolate;overflow-x:clip;
-  --edge:color-mix(in srgb,var(--ambient,var(--accent)) 94%,#1b140e);
-  --edge-prev:color-mix(in srgb,var(--ambient-prev,var(--ambient,var(--accent))) 94%,#1b140e);
+  --edge:color-mix(in srgb,var(--ambient,var(--accent)) 30%,#fcfaf6);
+  --edge-prev:color-mix(in srgb,var(--ambient-prev,var(--ambient,var(--accent))) 30%,#fcfaf6);
 }
 /* Two flat layers: ::before is the current tab colour, ::after the colour being pushed out. Both are fully opaque
    and wider than the frame, so no cream background or light seam can show through during a transition. */
 #financeApp.shell::before,#financeApp.shell::after{
   content:"";display:block;position:absolute;inset:0 -12%;border:0;border-radius:0;pointer-events:none;z-index:-1;
 }
-#financeApp.shell::before{background:var(--edge)}
-#financeApp.shell::after{background:var(--edge-prev);opacity:0}
+#financeApp.shell::before{background-color:var(--edge);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .27 0 0 0 0 .22 0 0 0 .9 -.28'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:240px 240px}
+#financeApp.shell::after{background-color:var(--edge-prev);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .27 0 0 0 0 .22 0 0 0 .9 -.28'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:240px 240px;opacity:0}
 
 /* 3 · Tab navigation: the new colour slides in from the chosen tab's side and pushes the old one out, with a small settle at the end. */
-#financeApp.shell[data-sweep="a"]::before{animation:push-in-a .9s cubic-bezier(.3,1.05,.4,1) both}
-#financeApp.shell[data-sweep="b"]::before{animation:push-in-b .9s cubic-bezier(.3,1.05,.4,1) both}
-#financeApp.shell[data-sweep="a"]::after{animation:push-out-a .9s cubic-bezier(.3,1.05,.4,1) both}
-#financeApp.shell[data-sweep="b"]::after{animation:push-out-b .9s cubic-bezier(.3,1.05,.4,1) both}
+#financeApp.shell[data-sweep="a"]::before{animation:push-in-a .8s cubic-bezier(.22,.9,.3,1) both}
+#financeApp.shell[data-sweep="b"]::before{animation:push-in-b .8s cubic-bezier(.22,.9,.3,1) both}
+#financeApp.shell[data-sweep="a"]::after{animation:push-out-a .8s cubic-bezier(.22,.9,.3,1) both}
+#financeApp.shell[data-sweep="b"]::after{animation:push-out-b .8s cubic-bezier(.22,.9,.3,1) both}
 @keyframes push-in-a{from{transform:translateX(calc(var(--nav-x,0) * 100%))}to{transform:translateX(0)}}
 @keyframes push-in-b{from{transform:translateX(calc(var(--nav-x,0) * 100%))}to{transform:translateX(0)}}
 @keyframes push-out-a{from{opacity:1;transform:translateX(0)}to{opacity:1;transform:translateX(calc(var(--nav-x,0) * -100%))}}
@@ -53,25 +53,26 @@ html.nav-vt #controlsBody{view-transition-name:vt-controls}
 html.nav-vt .results{view-transition-name:vt-results}
 ::view-transition-old(root){display:none}
 ::view-transition-group(root),::view-transition-new(root){animation:none}
-::view-transition-group(vt-controls),::view-transition-group(vt-results){animation-duration:.8s}
+/* No size/position morph: the old snapshot used to stretch from a corner towards the new panel size. */
+::view-transition-group(vt-controls),::view-transition-group(vt-results){animation:none}
 ::view-transition-image-pair(vt-controls),::view-transition-image-pair(vt-results){isolation:auto}
 /* Fade-through: the old panel leaves quickly, the new one arrives right after, so two texts are never visible on top of each other. */
 ::view-transition-old(vt-controls),::view-transition-old(vt-results){
-  mix-blend-mode:normal;animation:vt-out .16s cubic-bezier(.3,.6,.5,1) both;
+  mix-blend-mode:normal;animation:vt-out .14s ease-in both;
 }
 ::view-transition-new(vt-controls),::view-transition-new(vt-results){
   mix-blend-mode:normal;
-  animation:vt-in .75s cubic-bezier(.25,1.08,.4,1) .1s both,vt-fade .24s ease-out .1s both;
+  animation:vt-in .5s cubic-bezier(.22,1,.36,1) .08s both,vt-fade .3s ease-out .08s both;
 }
-@keyframes vt-out{to{opacity:0;transform:translateX(calc(var(--nav-x,0) * -22px))}}
-@keyframes vt-in{from{transform:translateX(calc(var(--nav-x,0) * 36px))}to{transform:translateX(0)}}
+@keyframes vt-out{to{opacity:0;transform:translateX(calc(var(--nav-x,0) * -10px))}}
+@keyframes vt-in{from{transform:translateX(calc(var(--nav-x,0) * 14px))}to{transform:translateX(0)}}
 @keyframes vt-fade{from{opacity:0}to{opacity:1}}
 
 #controlsBody.animate-in,.results.animate-in{
-  animation:nav-slide .7s cubic-bezier(.25,1.08,.4,1) both,nav-fade .25s ease-out both;
+  animation:nav-slide .5s cubic-bezier(.22,1,.36,1) both,nav-fade .3s ease-out both;
 }
 @keyframes nav-slide{
-  from{transform:translateX(calc(var(--nav-x,0) * 40px))}
+  from{transform:translateX(calc(var(--nav-x,0) * 14px))}
   to{transform:translateX(0)}
 }
 @keyframes nav-fade{from{opacity:.25}to{opacity:1}}
@@ -82,3 +83,6 @@ html.nav-vt .results{view-transition-name:vt-results}
   #controlsBody.animate-in,.results.animate-in{animation:none!important}
   ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
 }
+
+/* Calmer chrome: the running header line and the logo sheen are switched off. */
+.frame-chrome::after,.frame-monogram::after{display:none!important}
