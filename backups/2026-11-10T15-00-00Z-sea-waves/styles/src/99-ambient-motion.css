@@ -1,0 +1,88 @@
+
+/* A.NAV 025 — sliding notes switch, ambient accent background, direction-aware tab navigation. */
+
+/* 1 · Notes switch: one thumb that glides between "shared" and "per tab". */
+.notes-mode{position:relative;isolation:isolate}
+.notes-mode::before{
+  content:"";position:absolute;z-index:-1;top:3px;bottom:3px;inset-inline-start:3px;
+  width:calc((100% - 9px)/2);border-radius:7px;
+  background:color-mix(in srgb,var(--accent-soft) 45%,#fffaf3);
+  box-shadow:0 1px 3px rgba(40,30,20,.16),inset 0 -2px 0 color-mix(in srgb,var(--accent) 55%,transparent);
+  transition:transform .42s cubic-bezier(.34,1.32,.5,1),background-color .4s ease,box-shadow .4s ease;
+}
+html[dir="rtl"] .notes-mode{--thumb-dir:-1}
+html:not([dir="rtl"]) .notes-mode{--thumb-dir:1}
+.notes-mode:has(> #notesModeSeparate[aria-pressed="true"])::before{
+  transform:translateX(calc(var(--thumb-dir) * (100% + 3px)));
+}
+.notes-mode button,.notes-mode button[aria-pressed="true"],.notes-mode button:hover{
+  background:transparent!important;box-shadow:none!important;position:relative;
+  transition:color .3s ease,transform .15s ease;
+}
+.notes-mode button:not([aria-pressed="true"]):hover{color:var(--surface-ink,#3b332b)}
+
+/* 2 · Ambient background: the frame's rim carries the tab colour, the centre stays calmer. */
+@property --ax{syntax:'<percentage>';inherits:false;initial-value:10%}
+@property --ay{syntax:'<percentage>';inherits:false;initial-value:20%}
+#financeApp.shell{
+  isolation:isolate;overflow-x:clip;
+  --edge:color-mix(in srgb,var(--ambient,var(--accent)) 30%,#fcfaf6);
+  --edge-prev:color-mix(in srgb,var(--ambient-prev,var(--ambient,var(--accent))) 30%,#fcfaf6);
+}
+/* Two flat layers: ::before is the current tab colour, ::after the colour being pushed out. Both are fully opaque
+   and wider than the frame, so no cream background or light seam can show through during a transition. */
+#financeApp.shell::before,#financeApp.shell::after{
+  content:"";display:block;position:absolute;inset:0 -12%;border:0;border-radius:0;pointer-events:none;z-index:-1;
+}
+#financeApp.shell::before{background-color:var(--edge);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .27 0 0 0 0 .22 0 0 0 .9 -.28'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:240px 240px}
+#financeApp.shell::after{background-color:var(--edge-prev);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .27 0 0 0 0 .22 0 0 0 .9 -.28'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:240px 240px;opacity:0}
+
+/* 3 · Tab navigation: the new colour slides in from the chosen tab's side and pushes the old one out, with a small settle at the end. */
+#financeApp.shell[data-sweep="a"]::before{animation:push-in-a .8s cubic-bezier(.22,.9,.3,1) both}
+#financeApp.shell[data-sweep="b"]::before{animation:push-in-b .8s cubic-bezier(.22,.9,.3,1) both}
+#financeApp.shell[data-sweep="a"]::after{animation:push-out-a .8s cubic-bezier(.22,.9,.3,1) both}
+#financeApp.shell[data-sweep="b"]::after{animation:push-out-b .8s cubic-bezier(.22,.9,.3,1) both}
+@keyframes push-in-a{from{transform:translateX(calc(var(--nav-x,0) * 100%))}to{transform:translateX(0)}}
+@keyframes push-in-b{from{transform:translateX(calc(var(--nav-x,0) * 100%))}to{transform:translateX(0)}}
+@keyframes push-out-a{from{opacity:1;transform:translateX(0)}to{opacity:1;transform:translateX(calc(var(--nav-x,0) * -100%))}}
+@keyframes push-out-b{from{opacity:1;transform:translateX(0)}to{opacity:1;transform:translateX(calc(var(--nav-x,0) * -100%))}}
+
+/* Panels: with View Transitions the old panel leaves while the new one arrives (no empty frame);
+   without support they simply slide in. */
+html.nav-vt #controlsBody{view-transition-name:vt-controls}
+html.nav-vt .results{view-transition-name:vt-results}
+::view-transition-old(root){display:none}
+::view-transition-group(root),::view-transition-new(root){animation:none}
+/* No size/position morph: the old snapshot used to stretch from a corner towards the new panel size. */
+::view-transition-group(vt-controls),::view-transition-group(vt-results){animation:none}
+::view-transition-image-pair(vt-controls),::view-transition-image-pair(vt-results){isolation:auto}
+/* Fade-through: the old panel leaves quickly, the new one arrives right after, so two texts are never visible on top of each other. */
+::view-transition-old(vt-controls),::view-transition-old(vt-results){
+  mix-blend-mode:normal;animation:vt-out .14s ease-in both;
+}
+::view-transition-new(vt-controls),::view-transition-new(vt-results){
+  mix-blend-mode:normal;
+  animation:vt-in .5s cubic-bezier(.22,1,.36,1) .08s both,vt-fade .3s ease-out .08s both;
+}
+@keyframes vt-out{to{opacity:0;transform:translateX(calc(var(--nav-x,0) * -10px))}}
+@keyframes vt-in{from{transform:translateX(calc(var(--nav-x,0) * 14px))}to{transform:translateX(0)}}
+@keyframes vt-fade{from{opacity:0}to{opacity:1}}
+
+#controlsBody.animate-in,.results.animate-in{
+  animation:nav-slide .5s cubic-bezier(.22,1,.36,1) both,nav-fade .3s ease-out both;
+}
+@keyframes nav-slide{
+  from{transform:translateX(calc(var(--nav-x,0) * 14px))}
+  to{transform:translateX(0)}
+}
+@keyframes nav-fade{from{opacity:.25}to{opacity:1}}
+
+@media (prefers-reduced-motion:reduce){
+  #financeApp.shell::before,#financeApp.shell::after{animation:none!important}
+  .notes-mode::before{transition:none}
+  #controlsBody.animate-in,.results.animate-in{animation:none!important}
+  ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
+}
+
+/* Calmer chrome: the running header line and the logo sheen are switched off. */
+.frame-chrome::after,.frame-monogram::after{display:none!important}
