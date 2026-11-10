@@ -17,10 +17,24 @@
     }catch(e){show=true;}
     if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)show=false;
     if(!show){el.remove();return;}
-    document.documentElement.classList.add('splash-run');
+    // Measure the resting layout first so the shine band can be positioned per piece, then start once fonts are ready.
+    const start=()=>{
+      if(!el.isConnected)return;
+      const word=el.querySelector('.splash-word');
+      if(word){
+        const wr=word.getBoundingClientRect();
+        word.style.setProperty('--ww',wr.width+'px');
+        word.style.setProperty('--s0',(-wr.width*.45)+'px');
+        word.style.setProperty('--s1',(wr.width*1.05)+'px');
+        word.querySelectorAll('.sp').forEach(piece=>piece.style.setProperty('--ox',(piece.getBoundingClientRect().left-wr.left)+'px'));
+      }
+      document.documentElement.classList.add('splash-run');
+    };
+    const fontsReady=document.fonts&&document.fonts.ready?Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,500))]):Promise.resolve();
+    fontsReady.then(start);
     const done=()=>{el.remove();document.documentElement.classList.remove('splash-run');};
     el.addEventListener('animationend',e=>{if(e.target===el)done();});
     el.addEventListener('click',done);
     document.addEventListener('keydown',done,{once:true});
-    setTimeout(done,4000);
+    setTimeout(done,5500);
   })();

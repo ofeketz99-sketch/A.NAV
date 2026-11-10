@@ -1,0 +1,12 @@
+{
+  "version": 36,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Logo A.NAV with a large centred dot; pieces-and-shine entry splash",
+  "changes": [
+    "The brand is A.NAV again, with a large dot centred at mid-height of the letters (header and splash); title and labels read A.NAV",
+    "The entry splash assembles the logo from five pieces that fly in from alternating sides, a light shine sweeps left to right across the name, and then the pieces leave towards the opposite sides while the beige fades out (about 3.5s)",
+    "The caption under the splash logo was removed"
+  ],
+  "backup": "backups/2026-11-10T19-20-00Z-splash-pieces/"
+}
