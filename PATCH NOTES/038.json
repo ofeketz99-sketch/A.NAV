@@ -1,0 +1,12 @@
+{
+  "version": 38,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Meter widget: percentage inside the ring, label below, no collisions",
+  "changes": [
+    "The meter label moved out of the dial and sits under it; the percentage is alone inside the inner ring, so text no longer touches the rings or the ticks",
+    "The dial (including the 2- and 3-ring index variants) is capped by screen height so the dial and its label always fit inside the hero card",
+    "Checked in all five tabs at five screen sizes, including values like 210 and 511 percent"
+  ],
+  "backup": "backups/2026-11-10T20-00-00Z-meter-fix/"
+}
