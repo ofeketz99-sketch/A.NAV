@@ -2785,6 +2785,7 @@
       tile.classList.add(pct>=0?'mk-up':'mk-down');
     }
     async function loadSpx(){
+      if(lastSpx){setQuote('mkSpx',lastSpx[0],(lastSpx[0]/lastSpx[1]-1)*100,2,'');return;}
       try{
         const j=await getJson(viaProxies('https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=1d&interval=1d'));
         const m=j.chart.result[0].meta;
@@ -2807,19 +2808,19 @@
     const rate=v=>v<25?'EXTREME FEAR':v<45?'FEAR':v<55?'NEUTRAL':v<75?'GREED':'EXTREME GREED';
     // points: oldest first, numbers 0-100
     function drawFng(points,label,source){
-      const tile=q('mkFng'),line=q('mkFngLine'),val=q('mkFngVal'),lbl=q('mkFngLbl'),pin=q('mkFngPin');
+      const tile=q('mkFng'),val=q('mkFngVal'),lbl=q('mkFngLbl'),pin=q('mkFngPin');
       const values=points.filter(Number.isFinite);
       if(!values.length){tile.classList.add('mk-offline');return;}
       const now=Math.max(0,Math.min(100,values[values.length-1]));
-      if(values.length>1)line.setAttribute('points',values.map((v,i)=>(i/(values.length-1)*100).toFixed(1)+','+(28-v/100*26).toFixed(1)).join(' '));
       const col=fngColor(now);
-      line.style.stroke=col;val.textContent=String(Math.round(now));val.style.color=col;
+      val.textContent=String(Math.round(now));val.style.color=col;
       lbl.textContent=label||rate(now);lbl.style.color=col;
       pin.style.insetInlineStart=now+'%';
       tile.title='Fear & Greed '+Math.round(now)+' · '+lbl.textContent+(source==='crypto'?' · crypto index':' · CNN');
       tile.classList.toggle('mk-crypto',source==='crypto');
       tile.classList.remove('mk-offline');
     }
+    let lastSpx=null;
     const CNN='https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
     const ROUTES=[CNN,'https://corsproxy.io/?'+encodeURIComponent(CNN),'https://api.allorigins.win/raw?url='+encodeURIComponent(CNN)];
     async function fromCnn(){
@@ -2830,10 +2831,12 @@
           const j=await r.json();
           const score=Number(j&&j.fear_and_greed&&j.fear_and_greed.score);
           const hist=((j&&j.fear_and_greed_historical&&j.fear_and_greed_historical.data)||[]).slice(-30).map(d=>Number(d.y));
+          const sp=((j&&j.market_momentum_sp500&&j.market_momentum_sp500.data)||[]).map(d=>Number(d.y)).filter(Number.isFinite);
+          if(sp.length>1)lastSpx=[sp[sp.length-1],sp[sp.length-2]];
           if(Number.isFinite(score)){
             if(hist.length)hist[hist.length-1]=score;else hist.push(score);
             const rating=String(j.fear_and_greed.rating||'').replace(/_/g,' ').toUpperCase();
-            return {points:hist,label:rating&&rating!=='UNDEFINED'?rating:rate(score),source:'cnn'};
+            return {points:hist,label:rating&&rating!=='UNDEFINED'?rating:rate(score),source:'cnn',spx:lastSpx};
           }
         }catch(e){}
       }
@@ -2848,7 +2851,7 @@
     async function loadFng(){
       const KEY='anav.fng.v2';let cached=null;
       try{cached=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
-      if(cached&&cached.res&&Date.now()-cached.t<1800000){drawFng(cached.res.points,cached.res.label,cached.res.source);return;}
+      if(cached&&cached.res&&Date.now()-cached.t<1800000){lastSpx=cached.res.spx||null;drawFng(cached.res.points,cached.res.label,cached.res.source);return;}
       let res=null;
       try{res=await fromCnn();}catch(e){try{res=await fromCrypto();}catch(e2){}}
       if(res){drawFng(res.points,res.label,res.source);try{localStorage.setItem(KEY,JSON.stringify({t:Date.now(),res}));}catch(e){}}
@@ -2857,8 +2860,9 @@
     }
     function start(){
       if(!strip.getClientRects().length)return; // hidden in narrow layouts: do not load anything
-      loadSpx();loadBtc();loadFng();
-      setInterval(()=>{if(!document.hidden){loadSpx();loadBtc();}},120000);
+      loadBtc();loadFng().then(loadSpx);
+      setInterval(()=>{if(!document.hidden)loadBtc();},120000);
+      setInterval(()=>{if(!document.hidden){try{localStorage.removeItem('anav.fng.v2');}catch(e){}loadFng().then(loadSpx);}},600000);
     }
     const later=()=>('requestIdleCallback' in window?requestIdleCallback(start,{timeout:4000}):setTimeout(start,1500));
     if(document.readyState==='complete')later();else window.addEventListener('load',later,{once:true});

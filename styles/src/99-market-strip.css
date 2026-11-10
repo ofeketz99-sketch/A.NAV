@@ -1,51 +1,24 @@
 
-/* A.NAV 040 — header market strip: SPX and BTC mini charts plus a Fear & Greed sparkline. */
-.market-strip{flex:1 1 auto;max-width:700px;flex-direction:row!important;align-items:center;justify-content:center;gap:10px;padding:0 12px;min-width:0}
+/* A.NAV 044 — header market strip: three uniform tiles (S&P 500, Bitcoin, Fear & Greed). */
+.market-strip{flex:1 1 auto;width:min(100%,660px);max-width:660px;flex-direction:row!important;align-items:center;justify-content:center;gap:10px;padding:0;min-width:0}
 .mk{
-  position:relative;flex:1 1 0;min-width:96px;max-width:176px;height:46px;border-radius:10px;overflow:hidden;
-  background:rgba(255,255,255,.55);border:1px solid rgba(40,30,20,.08);
+  position:relative;flex:1 1 200px;min-width:170px;height:50px;border-radius:12px;overflow:hidden;direction:ltr;text-align:left;
+  background:rgba(255,255,255,.58);border:1px solid rgba(60,45,30,.09);box-shadow:0 1px 3px rgba(60,45,30,.07);
+  transition:background .4s,border-color .4s;
 }
-.mk b{position:absolute;z-index:2;top:3px;inset-inline-start:7px;font-size:10px;font-weight:700;letter-spacing:.07em;color:#6d6358;pointer-events:none}
-.mk-chart,.mk-chart .tradingview-widget-container__widget,.mk-chart iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;pointer-events:none;border:0}
-.mk-fng svg{position:absolute;inset:15px 8px 4px 8px;width:calc(100% - 16px);height:calc(100% - 19px);overflow:visible}
-.mk-fng polyline{stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
-.mk-val{position:absolute;z-index:2;top:2px;inset-inline-end:8px;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;color:#534a40;pointer-events:none}
-.mk.mk-offline::after{content:"–";position:absolute;inset:0;display:grid;place-items:center;color:#b3a896;font-size:16px}
-.mk.mk-offline .mk-chart,.mk.mk-offline svg,.mk.mk-offline .mk-val{display:none}
-@media print{.market-strip{display:none!important}}
-
-/* 041: Fear & Greed tile (CNN scale) */
-.mk-fng{flex:2 1 0;max-width:290px;min-width:236px;direction:ltr}
-.mk-fng b{inset-inline-start:8px;top:4px}
-.mk-fng .mk-val{inset-inline-end:auto;inset-inline-start:8px;top:15px;font-size:22px;line-height:1}
-.mk-fng .mk-lbl{position:absolute;z-index:2;top:17px;inset-inline-start:46px;font-size:10px;font-weight:800;letter-spacing:.05em;white-space:nowrap;pointer-events:none}
-.mk-fng svg{inset:6px 8px 12px 138px;width:calc(100% - 146px);height:calc(100% - 18px);opacity:.55}
-.mk-gauge{position:absolute;z-index:2;left:8px;right:8px;bottom:5px;height:3px;border-radius:3px;background:linear-gradient(90deg,hsl(0 62% 45%),hsl(30 70% 50%),hsl(55 65% 52%),hsl(90 50% 45%),hsl(125 50% 38%))}
+.mk b{position:absolute;top:7px;inset-inline-start:11px;font-size:9.5px;font-weight:700;letter-spacing:.09em;color:#6d6358;pointer-events:none;white-space:nowrap}
+.mk-chg{position:absolute;top:6px;inset-inline-end:11px;font-size:11px;font-weight:800;letter-spacing:.03em;font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none;color:#6d6358}
+.mk-val{position:absolute;top:19px;inset-inline-start:11px;font-size:19px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums;color:#4a4238;pointer-events:none}
+.mk-bar{position:absolute;left:11px;right:11px;bottom:6px;height:3px;border-radius:3px;background:rgba(60,45,30,.12)}
+.mk-gauge{background:linear-gradient(90deg,hsl(0 62% 45%),hsl(30 70% 50%),hsl(55 65% 52%),hsl(90 50% 45%),hsl(125 50% 38%))}
 .mk-gauge u{position:absolute;top:-3px;width:3px;height:9px;margin-inline-start:-1.5px;border-radius:2px;background:#2d2822;box-shadow:0 0 0 1.5px rgba(255,255,255,.85);text-decoration:none}
-.mk-fng.mk-offline .mk-gauge,.mk-fng.mk-offline .mk-lbl{display:none}
+.mk.mk-up{background:rgba(60,160,95,.13);border-color:rgba(60,160,95,.30)}
+.mk.mk-down{background:rgba(205,70,60,.12);border-color:rgba(205,70,60,.30)}
+.mk.mk-up .mk-val,.mk.mk-up .mk-chg{color:hsl(145 58% 27%)}
+.mk.mk-down .mk-val,.mk.mk-down .mk-chg{color:hsl(2 62% 40%)}
+.mk.mk-up .mk-bar{background:hsl(145 50% 40%)}
+.mk.mk-down .mk-bar{background:hsl(2 62% 50%)}
+.mk.mk-offline .mk-val,.mk.mk-offline .mk-chg,.mk.mk-offline .mk-gauge u{display:none}
+.mk.mk-offline::after{content:"–";position:absolute;top:17px;inset-inline-start:11px;color:#b3a896;font-size:19px;line-height:1}
 .mk-fng.mk-crypto b::after{content:" · CRYPTO"}
-.mk:not(.mk-fng) b{background:rgba(255,255,255,.7);padding:0 4px;border-radius:4px;top:4px}
-
-/* 042: calmer tiles — soft chart and logo, stronger Fear & Greed sparkline */
-.mk-chart iframe{opacity:.55;filter:saturate(.7)}
-.mk:not(.mk-fng){flex:0 1 132px}
-.mk-fng svg{opacity:.95}
-.mk-fng polyline{stroke-width:2}
-.mk{box-shadow:0 1px 3px rgba(60,45,30,.07)}
-
-/* 043: quote tiles with direction colour (replace the TradingView charts) */
-.mk-px{flex:0 1 128px;direction:ltr;text-align:left;transition:background .4s,border-color .4s}
-.mk-px b{inset-inline-start:9px;top:5px;background:none;padding:0}
-.mk-px .mk-val{inset-inline-end:auto;inset-inline-start:9px;top:17px;font-size:17px;line-height:1.1;font-weight:800}
-.mk-px .mk-chg{position:absolute;z-index:2;top:6px;inset-inline-end:9px;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;pointer-events:none}
-.mk-px.mk-up{background:rgba(60,160,95,.13);border-color:rgba(60,160,95,.28)}
-.mk-px.mk-down{background:rgba(205,70,60,.12);border-color:rgba(205,70,60,.28)}
-.mk-px.mk-up .mk-val,.mk-px.mk-up .mk-chg{color:hsl(145 58% 27%)}
-.mk-px.mk-down .mk-val,.mk-px.mk-down .mk-chg{color:hsl(2 62% 40%)}
-.mk-px.mk-offline .mk-val,.mk-px.mk-offline .mk-chg{display:none}
-.mk-px.mk-offline::after{display:grid}
-.mk.mk-px b{background:none;padding:0;font-size:9.5px}
-.mk-px{flex:0 1 150px}
-.mk-px .mk-chg{font-size:10.5px}
-.mk-px{flex:0 0 150px;min-width:150px}
-.mk-fng{flex:0 0 250px}
+@media print{.market-strip{display:none!important}}

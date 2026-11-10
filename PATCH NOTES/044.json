@@ -1,0 +1,12 @@
+{
+  "version": 44,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Market strip: uniform tiles; S&P 500 taken from the CNN payload",
+  "changes": [
+    "S&P 500, Bitcoin and Fear & Greed share one tile layout: label, change or rating, large value and a bottom bar (direction colour, or the 0 to 100 gauge with a pin)",
+    "The S&P 500 value and daily change now come from the same CNN request as Fear & Greed (market_momentum_sp500), since Yahoo Finance was unreachable from the browser; Yahoo stays as a fallback",
+    "The Fear & Greed sparkline was removed for visual consistency; CNN data is refreshed every ten minutes, Bitcoin every two"
+  ],
+  "backup": "backups/2026-11-10T18-25-00Z-market-uniform/"
+}
