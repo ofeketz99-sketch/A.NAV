@@ -1,5 +1,6 @@
 {
   "javascript": [
+    "00-splash",
     "00-helpers",
     "05-config",
     "10-state-model",
@@ -80,6 +81,7 @@
     "99-per-tab-accents",
     "99-text-clarity",
     "99-ambient-motion",
-    "99-toolbar-print"
+    "99-toolbar-print",
+    "99-splash"
   ]
 }

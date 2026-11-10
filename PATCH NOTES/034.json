@@ -1,0 +1,13 @@
+{
+  "version": 34,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Brand A/NAV and animated entry splash",
+  "changes": [
+    "The visible brand, page title and header label read A/NAV instead of A.NAV",
+    "A full-screen entry splash in the site's beige shows the logo large in the centre, fades it in and then fades the whole screen out (about 2.5s)",
+    "The splash appears on the first visit after 5 minutes away, after the site was updated (page last-modified changed) and on a manual reload; it is skipped for reduced-motion users and can be dismissed by click or key",
+    "It keeps its own storage key (anav.splash.v1); the main data key is untouched"
+  ],
+  "backup": "backups/2026-11-10T18-40-00Z-splash-brand/"
+}

@@ -9,16 +9,16 @@ test('build outputs exactly match the ordered source modules',()=>{
  assert.equal(css,combine('css','styles','.css'));
  assert.equal(js,combine('javascript','scripts','.js'));
 });
-test('the live HTML entrypoint preserves linked assets and A.NAV branding',()=>{
+test('the live HTML entrypoint preserves linked assets and A/NAV branding',()=>{
  assert.match(html,/^<!doctype html>/i);
  assert.match(html,/<html lang="he" dir="rtl">/);
  assert.match(html,/<link rel="stylesheet" href="styles\/app\.css">/);
  assert.match(html,/<script src="scripts\/app\.js" defer><\/script>/);
  assert.doesNotMatch(html,/<style>/);
  assert.doesNotMatch(html,/<script>/);
- assert.match(html,/<strong>A\.NAV<\/strong>/);
- assert.match(html,/<title>A\.NAV[^<]*<\/title>/);
- assert.match(html,/<meta name="application-name" content="A\.NAV">/);
+ assert.match(html,/<strong>A\/NAV<\/strong>/);
+ assert.match(html,/<title>A\/NAV[^<]*<\/title>/);
+ assert.match(html,/<meta name="application-name" content="A\/NAV">/);
  assert.doesNotMatch(html,/<strong>מרווח<\/strong>/);
 });
 test('browser script parses and five tabs remain',()=>{
@@ -150,11 +150,11 @@ test('illustrative volatility fan is deterministic and percentile-ordered',()=>{
  assert.ok(Math.abs(fixed.high.at(-1)-fixed.low.at(-1))<.01);
 });
 
-test('visual polish uses responsive plot bounds and a structured A.NAV masthead',()=>{
+test('visual polish uses responsive plot bounds and a structured A/NAV masthead',()=>{
  const css=fs.readFileSync(path.join(root,'styles/src/99-visual-polish.css'),'utf8');
  const renderer=fs.readFileSync(path.join(root,'scripts/src/62-chart-rendering.js'),'utf8');
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
- assert.match(html,/<strong>A\.NAV<\/strong>/);
+ assert.match(html,/<strong>A\/NAV<\/strong>/);
  assert.match(html,/frame-chrome-center/);
  assert.match(renderer,/getBoundingClientRect\(\)/);
  assert.match(renderer,/const x0=34,x1=w-36,y0=h-38,y1=26/);
