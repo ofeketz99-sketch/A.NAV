@@ -1,0 +1,16 @@
+{
+  "version": 23,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Per-tab accent colors and smooth accent transitions",
+  "changes": [
+    "Default tab accents are more distinct: indigo (mortgage), amber (savings), leaf green (S&P), plum (loan), ocean teal (budget)",
+    "Accent bank entries indigo, bronze (renamed to amber), olive, plum and ocean carry richer tones; ids unchanged so saved palettes keep working",
+    "Saved state that still holds the previous default tab colors migrates to the new defaults; custom palette choices are kept",
+    "Each tab receives its own --tab-accent so every tab shows its color dot and the active tab is tinted with it",
+    "--accent and --accent-soft are registered properties and transition smoothly (0.5s) when switching tabs; disabled under prefers-reduced-motion",
+    "Ambient accent glow behind the page, gradient hero card, accent edge on KPI cards and accent top border on the input and chart panels",
+    "Long field labels wrap instead of truncating and numeric inputs are wide enough for seven-digit values"
+  ],
+  "backup": "backups/2026-11-10T11-10-00Z-per-tab-accents/"
+}

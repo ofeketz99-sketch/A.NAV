@@ -150,24 +150,29 @@
     {id:'terracotta',name:'טרקוטה',dark:'#935d47',soft:'#f2e3d9'},
     {id:'cognac',name:'קוניאק',dark:'#7a5136',soft:'#eee0d3'},
     {id:'sand',name:'חול עמוק',dark:'#806b58',soft:'#ece3d9'},
-    {id:'bronze',name:'ברונזה',dark:'#7b623d',soft:'#eee5d7'},
+    {id:'bronze',name:'ענבר',dark:'#9b6623',soft:'#f1e3cc'},
     {id:'moss',name:'טחב',dark:'#626a42',soft:'#e9eadc'},
-    {id:'olive',name:'זית',dark:'#4e6142',soft:'#e3eadc'},
+    {id:'olive',name:'ירוק עלה',dark:'#4f7a45',soft:'#dfead9'},
     {id:'forest',name:'יער',dark:'#3c6152',soft:'#e1ece5'},
     {id:'teal',name:'טורקיז מעושן',dark:'#396c68',soft:'#dfedeb'},
-    {id:'ocean',name:'אוקיינוס',dark:'#345d68',soft:'#dbe8eb'},
+    {id:'ocean',name:'אוקיינוס',dark:'#2f6f7a',soft:'#d6eaed'},
     {id:'slate',name:'צפחה',dark:'#505e6f',soft:'#e2e7ec'},
-    {id:'indigo',name:'אינדיגו',dark:'#535776',soft:'#e4e5ee'},
-    {id:'plum',name:'שזיף',dark:'#6c536b',soft:'#ede2ec'},
+    {id:'indigo',name:'אינדיגו',dark:'#3f4f8f',soft:'#dde3f4'},
+    {id:'plum',name:'שזיף',dark:'#7d4a6b',soft:'#efdde8'},
     {id:'wine',name:'בורדו',dark:'#76495b',soft:'#efdee5'},
     {id:'charcoal',name:'פחם',dark:'#1f2528',soft:'#e6e0d6'}
   ];
-  const defaultTabColors={mortgage:'charcoal',savings:'cognac',index:'olive',loan:'clay',budget:'ocean'};
+  const legacyTabColors={mortgage:'charcoal',savings:'cognac',index:'olive',loan:'clay',budget:'ocean'};
+  const defaultTabColors={mortgage:'indigo',savings:'bronze',index:'olive',loan:'plum',budget:'ocean'};
   const tabColors={...defaultTabColors};
   function applyTabAccent(){
     const tone=accentBank.find(x=>x.id===tabColors[active])||accentBank[0];
     app.style.setProperty('--accent',tone.dark);
     app.style.setProperty('--accent-soft',tone.soft);
+    document.querySelectorAll('.tab').forEach(b=>{
+      const t=accentBank.find(x=>x.id===tabColors[b.dataset.tab]);
+      if(t){b.style.setProperty('--tab-accent',t.dark);b.style.setProperty('--tab-accent-soft',t.soft);}
+    });
     const chip=q('paletteChip');if(chip)chip.style.background=tone.dark;
     const button=q('paletteToggle');if(button)button.title='צבע הלשונית: '+tone.name+' · לחץ להחלפה';
   }
@@ -317,7 +322,7 @@
       }
     }
     // Accept older backups without color data, and never allow two tabs to claim one color.
-    if(saved.tabColors && typeof saved.tabColors==='object' && !Array.isArray(saved.tabColors)){
+    if(saved.tabColors && typeof saved.tabColors==='object' && !Array.isArray(saved.tabColors) && !defaultOrder.every(tab=>saved.tabColors[tab]===legacyTabColors[tab])){
       const requested=defaultOrder.map(tab=>[tab,saved.tabColors[tab]]).filter(([tab,id])=>accentBank.some(t=>t.id===id));
       const taken=new Set();
       for(const [tab,id] of requested){if(!taken.has(id)){tabColors[tab]=id;taken.add(id);}}

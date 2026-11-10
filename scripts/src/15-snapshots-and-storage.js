@@ -131,7 +131,7 @@
       }
     }
     // Accept older backups without color data, and never allow two tabs to claim one color.
-    if(saved.tabColors && typeof saved.tabColors==='object' && !Array.isArray(saved.tabColors)){
+    if(saved.tabColors && typeof saved.tabColors==='object' && !Array.isArray(saved.tabColors) && !defaultOrder.every(tab=>saved.tabColors[tab]===legacyTabColors[tab])){
       const requested=defaultOrder.map(tab=>[tab,saved.tabColors[tab]]).filter(([tab,id])=>accentBank.some(t=>t.id===id));
       const taken=new Set();
       for(const [tab,id] of requested){if(!taken.has(id)){tabColors[tab]=id;taken.add(id);}}

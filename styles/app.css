@@ -2805,3 +2805,70 @@ body{padding:0!important}
 .allocation-content .tool-hint{margin:0;font-size:10px;line-height:1.5}
 @media(max-width:540px){.allocation-content{padding:10px;gap:8px}.allocation-dialog .tool-head{padding:12px}.allocation-row{padding:8px;gap:5px}.allocation-summary strong{font-size:20px}.allocation-summary small{width:100%;margin:0}.allocation-content .tool-hint{font-size:9px}.allocation-amount-input{width:76px}.allocation-field-trigger{font-size:10px;padding:3px 6px}}
 @media(max-height:680px){.allocation-row{padding:7px;gap:4px}.allocation-content{gap:7px}}
+
+/* v30 · Per-tab accent: smooth theme transitions, coloured tab bar, ambient wash. */
+    @property --accent      { syntax:'<color>'; inherits:true; initial-value:#252420; }
+    @property --accent-soft { syntax:'<color>'; inherits:true; initial-value:#e9e5dd; }
+    @property --tab-accent  { syntax:'<color>'; inherits:true; initial-value:#252420; }
+    .shell {
+      position:relative;
+      transition:--accent .5s cubic-bezier(.22,1,.36,1),--accent-soft .5s cubic-bezier(.22,1,.36,1);
+    }
+    /* Soft glow of the active accent behind the whole page. */
+    .shell::before {
+      content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+      background:
+        radial-gradient(900px 460px at 88% -8%,color-mix(in srgb,var(--accent) 13%,transparent),transparent 72%),
+        radial-gradient(760px 420px at 6% 104%,color-mix(in srgb,var(--accent) 8%,transparent),transparent 70%);
+    }
+    .topbar {border-bottom-color:color-mix(in srgb,var(--accent) 16%,#ddd5c9);}
+    .brand-mark {background:var(--accent);}
+    .status-dot {background:var(--accent);}
+
+    /* Tabs: every tab carries its own colour, the active one is tinted with it. */
+    .tab {--ta:var(--tab-accent,var(--accent));}
+    .tab::before {
+      content:""; flex:0 0 auto; width:8px; height:8px; border-radius:50%;
+      background:var(--ta); opacity:.5;
+      transition:opacity .25s ease,transform .25s ease,box-shadow .25s ease;
+    }
+    .tab:hover::before {opacity:.9;}
+    .tab:hover {background:color-mix(in srgb,var(--ta) 8%,#eee6da);color:color-mix(in srgb,var(--ta) 70%,#2b251f);}
+    .tab[aria-selected="true"] {
+      background:linear-gradient(180deg,color-mix(in srgb,var(--ta) 13%,#fffdf9),color-mix(in srgb,var(--ta) 6%,#fffdf9));
+      border-color:color-mix(in srgb,var(--ta) 34%,#d9d1c5);
+      color:var(--ta);
+      box-shadow:0 6px 16px color-mix(in srgb,var(--ta) 18%,transparent),inset 0 -2px 0 var(--ta);
+    }
+    .tab[aria-selected="true"]::before {opacity:1;transform:scale(1.15);box-shadow:0 0 0 3px color-mix(in srgb,var(--ta) 22%,transparent);}
+
+    /* Hero card: a lit gradient instead of a flat fill. */
+    .hero-result {
+      background:linear-gradient(135deg,
+        color-mix(in srgb,var(--accent) 84%,#fff) 0%,
+        var(--accent) 48%,
+        color-mix(in srgb,var(--accent) 78%,#000) 100%);
+      box-shadow:0 14px 30px -12px color-mix(in srgb,var(--accent) 55%,transparent);
+    }
+
+    /* KPI cards: a thin accent edge and accent-tinted figures. */
+    .stat::before {
+      content:""; position:absolute; z-index:-1; top:0; inset-inline:18px; height:3px;
+      border-radius:0 0 4px 4px;
+      background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 25%,transparent));
+      opacity:.85;
+    }
+    .stat-number {color:color-mix(in srgb,var(--accent) 58%,#251f19);}
+
+    /* Chart + panel details. */
+    .chart-panel {border-top:3px solid color-mix(in srgb,var(--accent) 55%,transparent);}
+    .controls {border-top:3px solid color-mix(in srgb,var(--accent) 55%,transparent);}
+    input[type="range"]::-webkit-slider-thumb {box-shadow:0 1px 4px #463c3580,0 0 0 4px color-mix(in srgb,var(--accent) 14%,transparent);}
+
+    /* Clipped text: let long labels wrap and give 7-digit values room. */
+    .field-heading label {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.2;max-width:none;}
+    .number-input {width:100px;max-width:none;}
+
+    @media (prefers-reduced-motion:reduce) {
+      .shell,.tab::before {transition:none!important;}
+    }
