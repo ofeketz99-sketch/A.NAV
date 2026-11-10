@@ -1,0 +1,13 @@
+{
+  "version": 33,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Export/backup menu, printable report, notes collapsed by default, quieter help icons",
+  "changes": [
+    "Excel export, backup and restore moved into one 'export and backup' menu; a new 'print / PDF' item prints the current tab (inputs, results and chart on one landscape A4 page). Original button ids are unchanged",
+    "The menu reminds that data is stored only in this browser",
+    "The notes panel starts collapsed for new users; a saved preference is still respected",
+    "The '?' help icons are dimmed until the field is hovered or focused"
+  ],
+  "backup": "backups/2026-11-10T16-00-00Z-simplify-ui/"
+}

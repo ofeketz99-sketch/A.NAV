@@ -25,7 +25,7 @@
   let notesText=''; // Existing shared notebook, including notes created in older versions.
   let notesMode='shared';
   const notesByTab=Object.fromEntries(defaultOrder.map(tab=>[tab,'']));
-  let notesCollapsed=false;
+  let notesCollapsed=true;
   const advanced={mortgage:{insurance:0,purchaseCosts:0,stressRise:0,income:0},index:{taxEnabled:false,taxRate:25},budget:{annualItems:[]}};
   const scenarios=Object.fromEntries(defaultOrder.map(tab=>[tab,[]]));
   const compareIds=Object.fromEntries(defaultOrder.map(tab=>[tab,null]));

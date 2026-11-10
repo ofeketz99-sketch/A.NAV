@@ -1,0 +1,42 @@
+
+/* A.NAV 033 — one export/backup menu, quieter help icons, printable report. */
+
+/* 1 · Export / backup menu */
+.data-menu{position:relative;flex:0 0 auto}
+.data-menu-list{
+  position:absolute;z-index:60;top:calc(100% + 6px);inset-inline-end:0;min-width:190px;padding:6px;
+  background:#fffdf9;border:1px solid #dcd0c1;border-radius:12px;box-shadow:0 14px 34px rgba(41,32,21,.16);
+  display:flex;flex-direction:column;gap:2px;
+}
+.data-menu-list[hidden]{display:none}
+.data-menu-list button{
+  display:block;width:100%;text-align:start;padding:8px 11px;border:0;border-radius:8px;background:transparent;
+  color:#3b332b;font:inherit;font-size:13px;cursor:pointer;
+}
+.data-menu-list button:hover,.data-menu-list button:focus-visible{background:color-mix(in srgb,var(--accent-soft) 55%,#fffdf9);color:var(--accent)}
+.data-menu-note{margin:4px 6px 2px;padding-top:7px;border-top:1px solid #e7ddd1;font-size:11px;line-height:1.5;color:#8a7d6e}
+
+/* 2 · Help icons stay quiet until the field is hovered or focused */
+.field .field-help{opacity:.38;transition:opacity .2s ease}
+.field:hover .field-help,.field:focus-within .field-help,.field .field-help:hover,.field .field-help:focus-visible,.field .field-help.is-open{opacity:1}
+
+/* 3 · Print / save as PDF: inputs and results of the current tab on plain paper */
+@page{size:A4 landscape;margin:12mm}
+@media print{
+  html,body{height:auto!important;overflow:visible!important;background:#fff!important}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;animation:none!important;transition:none!important}
+  #financeApp.shell{height:auto!important;max-height:none!important;width:100%!important;margin:0!important;overflow:visible!important;box-shadow:none!important;background:#fff!important;border:0!important}
+  #financeApp.shell::before,#financeApp.shell::after,.sea{display:none!important}
+  .tabs-bar .workspace-tools,.tab-grip,.tab-rename,.side-rail,.notes-panel,.calc-dock,.quick-calc,.quick-calc-trigger,
+  .panel-actions,.field-handle,.field-rename,.field-pin-btn,.field-help,.field-pager,.controls-foot,footer,.frame-chrome::after,.schedule-overlay,.tool-overlay{display:none!important}
+  .tabs-bar{height:auto!important;margin:0 0 8px!important;background:#fff!important;box-shadow:none!important}
+  .tabs-bar .tabs{transform:none!important}
+  .tab:not([aria-selected="true"]){display:none!important}
+  .content-layout,.main-column,.workspace{display:block!important;height:auto!important;overflow:visible!important}
+  .workspace{display:grid!important;grid-template-columns:1fr 1.5fr!important;gap:10px!important}
+  .controls,.results,#controlsBody,.chart-panel{height:auto!important;max-height:none!important;overflow:visible!important}
+  #financeApp.shell{zoom:.6}
+  .workspace{break-before:avoid!important;break-inside:auto!important}
+  .panel,.stat,.hero-result,.chart-panel{box-shadow:none!important}
+  .stat,.hero-result{break-inside:avoid}
+}

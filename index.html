@@ -39,9 +39,16 @@
         <div class="workspace-tools" role="group" aria-label="ניהול נתונים">
           <button type="button" class="mini-tool palette-trigger" id="paletteToggle" aria-label="בחירת צבע ללשונית" title="בחירת צבע ללשונית הנוכחית"><i id="paletteChip" aria-hidden="true"></i>צבע</button>
           <button type="button" class="mini-tool" id="undoBtn" title="ביטול פעולה אחרונה (Ctrl+Z)" aria-label="בטל פעולה אחרונה" disabled>↶ <span>ביטול</span></button>
-          <button type="button" class="mini-tool" id="excelBtn" title="ייצוא כל המחשבונים והנתונים ל־Excel">אקסל</button>
-          <button type="button" class="mini-tool" id="backupBtn" title="ייצוא הנתונים לקובץ JSON">גיבוי</button>
-          <button type="button" class="mini-tool" id="restoreBtn" title="ייבוא גיבוי מקובץ JSON">שחזור</button>
+          <div class="data-menu" id="dataMenu">
+            <button type="button" class="mini-tool" id="dataMenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="dataMenuList" title="ייצוא, גיבוי, שחזור והדפסה">ייצוא וגיבוי ▾</button>
+            <div class="data-menu-list" id="dataMenuList" role="menu" hidden>
+              <button type="button" role="menuitem" id="excelBtn" title="ייצוא כל המחשבונים והנתונים ל־Excel">ייצוא ל־Excel</button>
+              <button type="button" role="menuitem" id="backupBtn" title="ייצוא הנתונים לקובץ JSON">גיבוי לקובץ</button>
+              <button type="button" role="menuitem" id="restoreBtn" title="ייבוא גיבוי מקובץ JSON">שחזור מגיבוי</button>
+              <button type="button" role="menuitem" id="printBtn" title="הדפסה או שמירה כ־PDF של הלשונית הנוכחית">הדפסה / PDF</button>
+              <p class="data-menu-note">הנתונים נשמרים רק בדפדפן הזה. מומלץ לגבות מדי פעם.</p>
+            </div>
+          </div>
           <input type="file" id="restoreFile" accept=".json,application/json" hidden aria-label="בחירת קובץ גיבוי">
         </div>
       </div>

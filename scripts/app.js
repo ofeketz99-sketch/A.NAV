@@ -132,7 +132,7 @@
   let notesText=''; // Existing shared notebook, including notes created in older versions.
   let notesMode='shared';
   const notesByTab=Object.fromEntries(defaultOrder.map(tab=>[tab,'']));
-  let notesCollapsed=false;
+  let notesCollapsed=true;
   const advanced={mortgage:{insurance:0,purchaseCosts:0,stressRise:0,income:0},index:{taxEnabled:false,taxRate:25},budget:{annualItems:[]}};
   const scenarios=Object.fromEntries(defaultOrder.map(tab=>[tab,[]]));
   const compareIds=Object.fromEntries(defaultOrder.map(tab=>[tab,null]));
@@ -2703,6 +2703,18 @@
     });
     get('allocationPrev').addEventListener('click',()=>{page--;render();});
     get('allocationNext').addEventListener('click',()=>{page++;render();});
+  })();
+
+  // Export / backup / restore / print live in one menu; the original button ids are unchanged.
+  (function(){
+    const menu=q('dataMenu'),btn=q('dataMenuBtn'),list=q('dataMenuList');
+    if(!menu||!btn||!list)return;
+    const setOpen=open=>{list.hidden=!open;btn.setAttribute('aria-expanded',String(open));};
+    btn.addEventListener('click',e=>{e.stopPropagation();setOpen(list.hidden);});
+    list.addEventListener('click',e=>{if(e.target.closest('button'))setOpen(false);});
+    document.addEventListener('click',e=>{if(!list.hidden&&!menu.contains(e.target))setOpen(false);});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!list.hidden){setOpen(false);btn.focus();}});
+    q('printBtn').addEventListener('click',()=>{setTimeout(()=>window.print(),50);});
   })();
   // Double click a slider, including its surrounding track, restores its factory default.
   controlList.addEventListener('dblclick',e=>{

@@ -35,6 +35,7 @@
     "98-fixed-screen",
     "98-dialog-pages",
     "98-allocation-planner",
+    "98-toolbar-menu",
     "99-startup"
   ],
   "css": [
@@ -78,6 +79,7 @@
     "99-allocation-planner",
     "99-per-tab-accents",
     "99-text-clarity",
-    "99-ambient-motion"
+    "99-ambient-motion",
+    "99-toolbar-print"
   ]
 }
