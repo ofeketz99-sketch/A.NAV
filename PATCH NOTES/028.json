@@ -1,0 +1,12 @@
+{
+  "version": 28,
+  "date": "2026-11-10",
+  "branch": "dev",
+  "title": "Solid, uniform tab background colour; no light streak during tab transitions",
+  "changes": [
+    "The ambient background is now one flat, fully opaque tab colour across the whole frame instead of edge glows with a calmer centre",
+    "The colour push uses two opaque layers, so the light frame background and feathered seams can no longer flash through mid-transition",
+    "The drift animation was removed; the push is shorter (0.9s) with a small settle"
+  ],
+  "backup": "backups/2026-11-10T14-00-00Z-solid-background/"
+}

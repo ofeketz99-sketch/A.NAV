@@ -135,3 +135,6 @@
 - `activate()` ב-`90-notes-and-activation.js` עוטף את ההחלפה ב-`document.startViewTransition` כשיש כיוון ניווט ותנועה מותרת; `--nav-x` נקבע על `documentElement` ו-`html.nav-vt` קיים רק בזמן המעבר, ורק אז `#controlsBody` ו-`.results` מקבלים `view-transition-name` (`vt-controls`, `vt-results`).
 - `99-ambient-motion.css`: הפאנל הישן נעלם ב-0.16s והחדש נכנס אחריו (fade-through) עם הזזה קצרה; דחיפת הצבע התקצרה ל-1.15s עם שוליים מטושטשים במסכה. בלי View Transitions או עם reduced-motion יש נסיגה לאנימציה במקום או ללא אנימציה.
 - הסיבה לריצוד שדווח: חיתוך של פריים אחד ואחריו הופעה מ-opacity 0 (מסך ריק) וקצה אנכי חד של הצבע.
+
+## רקע אחיד מלא — 2026-11-10 (v028)
+- `99-ambient-motion.css`: `#financeApp.shell::before/::after` הם שכבות צבע שטוחות ואטומות (`--edge` / `--edge-prev`, 94% מצבע הלשונית) ברוחב 124% מהמסגרת; הוסרו הגרדיאנטים, המסכה המטושטשת ואנימציית הדריפט. הסיבה: בסרטון נראה פס בהיר אנכי באמצע המעבר, שנוצר מהשוליים המטושטשים שחשפו את רקע המסגרת הבהיר.

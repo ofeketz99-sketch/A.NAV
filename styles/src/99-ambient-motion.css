@@ -26,43 +26,22 @@ html:not([dir="rtl"]) .notes-mode{--thumb-dir:1}
 @property --ay{syntax:'<percentage>';inherits:false;initial-value:20%}
 #financeApp.shell{
   isolation:isolate;overflow-x:clip;
-  --edge:color-mix(in srgb,var(--ambient,var(--accent)) 88%,#1b140e);
-  --edge-prev:color-mix(in srgb,var(--ambient-prev,var(--ambient,var(--accent))) 88%,#1b140e);
+  --edge:color-mix(in srgb,var(--ambient,var(--accent)) 94%,#1b140e);
+  --edge-prev:color-mix(in srgb,var(--ambient-prev,var(--ambient,var(--accent))) 94%,#1b140e);
 }
-/* Two layers share one drawing: ::before is the current tab colour, ::after the colour being pushed out. */
+/* Two flat layers: ::before is the current tab colour, ::after the colour being pushed out. Both are fully opaque
+   and wider than the frame, so no cream background or light seam can show through during a transition. */
 #financeApp.shell::before,#financeApp.shell::after{
   content:"";display:block;position:absolute;inset:0 -12%;border:0;border-radius:0;pointer-events:none;z-index:-1;
-  animation:ambient-drift 24s ease-in-out infinite alternate;
-  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 9%,#000 91%,transparent 100%);
-  mask-image:linear-gradient(90deg,transparent 0,#000 9%,#000 91%,transparent 100%);
 }
-#financeApp.shell::before{
-  background:
-    radial-gradient(60% 50% at var(--ax) 0%,color-mix(in srgb,var(--edge) 56%,transparent),transparent 100%),
-    radial-gradient(60% 50% at calc(100% - var(--ax)) 100%,color-mix(in srgb,var(--edge) 56%,transparent),transparent 100%),
-    radial-gradient(44% 62% at 9.7% var(--ay),color-mix(in srgb,var(--edge) 50%,transparent),transparent 100%),
-    radial-gradient(44% 62% at 90.3% calc(100% - var(--ay)),color-mix(in srgb,var(--edge) 50%,transparent),transparent 100%),
-    radial-gradient(ellipse 78% 74% at 50% 50%,color-mix(in srgb,var(--edge) 6%,transparent) 30%,color-mix(in srgb,var(--edge) 30%,transparent) 100%);
-}
-#financeApp.shell::after{
-  opacity:0;
-  background:
-    radial-gradient(60% 50% at var(--ax) 0%,color-mix(in srgb,var(--edge-prev) 56%,transparent),transparent 100%),
-    radial-gradient(60% 50% at calc(100% - var(--ax)) 100%,color-mix(in srgb,var(--edge-prev) 56%,transparent),transparent 100%),
-    radial-gradient(44% 62% at 9.7% var(--ay),color-mix(in srgb,var(--edge-prev) 50%,transparent),transparent 100%),
-    radial-gradient(44% 62% at 90.3% calc(100% - var(--ay)),color-mix(in srgb,var(--edge-prev) 50%,transparent),transparent 100%),
-    radial-gradient(ellipse 78% 74% at 50% 50%,color-mix(in srgb,var(--edge-prev) 6%,transparent) 30%,color-mix(in srgb,var(--edge-prev) 30%,transparent) 100%);
-}
-@keyframes ambient-drift{
-  from{--ax:8%;--ay:12%}
-  to{--ax:92%;--ay:88%}
-}
+#financeApp.shell::before{background:var(--edge)}
+#financeApp.shell::after{background:var(--edge-prev);opacity:0}
 
 /* 3 · Tab navigation: the new colour slides in from the chosen tab's side and pushes the old one out, with a small settle at the end. */
-#financeApp.shell[data-sweep="a"]::before{animation:ambient-drift 24s ease-in-out infinite alternate,push-in-a 1.15s cubic-bezier(.25,1.1,.4,1) both}
-#financeApp.shell[data-sweep="b"]::before{animation:ambient-drift 24s ease-in-out infinite alternate,push-in-b 1.15s cubic-bezier(.25,1.1,.4,1) both}
-#financeApp.shell[data-sweep="a"]::after{animation:ambient-drift 24s ease-in-out infinite alternate,push-out-a 1.15s cubic-bezier(.25,1.1,.4,1) both}
-#financeApp.shell[data-sweep="b"]::after{animation:ambient-drift 24s ease-in-out infinite alternate,push-out-b 1.15s cubic-bezier(.25,1.1,.4,1) both}
+#financeApp.shell[data-sweep="a"]::before{animation:push-in-a .9s cubic-bezier(.3,1.05,.4,1) both}
+#financeApp.shell[data-sweep="b"]::before{animation:push-in-b .9s cubic-bezier(.3,1.05,.4,1) both}
+#financeApp.shell[data-sweep="a"]::after{animation:push-out-a .9s cubic-bezier(.3,1.05,.4,1) both}
+#financeApp.shell[data-sweep="b"]::after{animation:push-out-b .9s cubic-bezier(.3,1.05,.4,1) both}
 @keyframes push-in-a{from{transform:translateX(calc(var(--nav-x,0) * 100%))}to{transform:translateX(0)}}
 @keyframes push-in-b{from{transform:translateX(calc(var(--nav-x,0) * 100%))}to{transform:translateX(0)}}
 @keyframes push-out-a{from{opacity:1;transform:translateX(0)}to{opacity:1;transform:translateX(calc(var(--nav-x,0) * -100%))}}
