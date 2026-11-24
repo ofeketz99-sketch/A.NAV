@@ -38,6 +38,7 @@
     "98-allocation-planner",
     "98-toolbar-menu",
     "98-market-strip",
+    "98-area-shell",
     "99-startup"
   ],
   "css": [
@@ -85,6 +86,7 @@
     "99-toolbar-print",
     "99-splash",
     "99-meter-layout",
-    "99-market-strip"
+    "99-market-strip",
+    "99-area-shell"
   ]
 }

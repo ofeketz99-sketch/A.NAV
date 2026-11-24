@@ -204,3 +204,11 @@
 
 ## התאמת המד ורוחב אחיד — 2026-11-10 (v046)
 - המד ב-`#mkDial` קטן יותר וללא כיתובי 0 ו-100 (נחתכו בתחתית האריח); שלושת האריחים ב-`flex:1 1 0` ו-`min-width:200px`.
+
+## שני אזורים: מחשבונים והשקעות — 2026-11-24 (v047, ענף `feature/investments`)
+- `index.html`: מתג `#areaSwitch` (כפתורים עם `data-area-target="calc|invest"`) בתוך `.frame-identity`, אחרי הלוגו; מבנה ה-`<strong>` של הלוגו לא השתנה. אזור `#investApp` נוסף אחרי `#contentLayout`, עם ארבע לשוניות (`data-invest-view`: log, holdings, performance, cash) וארבעה `tabpanel`.
+- `scripts/src/98-area-shell.js` (לפני `99-startup` ב-manifest): מציב `data-area` על `#financeApp`, מסתיר את `#investApp` או מגדיר `inert` ל-`#contentLayout`/`#screenViews`, שומר את המצב ב-`anav.shell.v1` ({area, view}), משתמש ב-`playNavMotion` למעבר הצבע ומריץ `applyViewportLayout()` ו-`renderResults()` בחזרה למחשבונים. Ctrl+Z נחסם ב-capture על `window` רק כשאזור ההשקעות פתוח.
+- `styles/src/99-area-shell.css` (אחרון ב-manifest): אקסנט ההשקעות `#2f6461` מוגדר ב-CSS עם `!important`, כך שהוא גובר על ה-`--accent` שנכתב inline על ידי `applyTabAccent` בלי לשנות אותה. במצב השקעות `.screen-views`, `.content-layout` ו-`.mobile-summary` מוסתרים.
+- אין עדיין נתונים באזור ההשקעות. ערכים חסרים מוצגים כ-"—", לא כאפס. התוכנית המלאה: `docs/investments/PLAN.md`.
+- בדיקות: `tests/area-shell.test.cjs` (חיווט ה-HTML וה-manifest, והתנהגות המעבר מול DOM מדומה).
+- ידוע ולא קשור לשינוי: במסך טלפון (375px) אזור המחשבונים מוצג שבור גם ב-`dev` (`cc83f16`). פס הלשוניות נמתח לגובה מלא והשדות לא נראים.
