@@ -23,10 +23,10 @@ test('each investments tab controls exactly one matching panel',()=>{
  }
 });
 
-test('investments placeholders show missing values as a dash, never as zero',()=>{
+test('investments views are rendered from data: no figures are hard-coded in the HTML',()=>{
  const area=html.slice(html.indexOf('id="investApp"'),html.indexOf('class="mobile-summary"'));
- assert.doesNotMatch(area,/<strong>[₪$]?0([.,]0+)?%?<\/strong>/);
- assert.match(area,/<strong>—<\/strong><small>אין נתונים<\/small>/);
+ for(const v of views)assert.match(area,new RegExp('<div class="invest-body" id="investBody-'+v+'"></div>'));
+ assert.doesNotMatch(area,/[₪$]\s?\d|\d\s?[₪$%]/);
 });
 
 test('calculator DOM and storage are untouched by the shell',()=>{
@@ -35,10 +35,11 @@ test('calculator DOM and storage are untouched by the shell',()=>{
  assert.match(source,/'anav\.shell\.v1'/);
 });
 
-test('module loads inside the app closure, before startup; CSS loads last',()=>{
- const js=manifest.javascript;
- assert.ok(js.indexOf('98-area-shell')>-1&&js.indexOf('98-area-shell')<js.indexOf('99-startup'));
- assert.equal(manifest.css.at(-1),'99-area-shell');
+test('modules load inside the app closure in dependency order, before startup',()=>{
+ const js=manifest.javascript,at=n=>js.indexOf(n);
+ assert.ok(at('97-portfolio-engine')>-1&&at('97-portfolio-engine')<at('98-investments'));
+ assert.ok(at('98-area-shell')>-1&&at('98-area-shell')<at('98-investments')&&at('98-investments')<at('99-startup'));
+ assert.deepEqual(manifest.css.slice(-2),['99-area-shell','99-investments']);
 });
 
 // Minimal fake DOM for running the module on its own.

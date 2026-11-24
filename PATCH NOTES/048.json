@@ -1,0 +1,18 @@
+{
+  "version": 48,
+  "date": "2026-11-25",
+  "branch": "feature/investments",
+  "title": "Investments: the Excel workflow as screens — log, holdings, performance, cash, Excel export",
+  "changes": [
+    "Portfolio engine (scripts/src/97-portfolio-engine.js): one calculation layer for every table, card, chart and export; money summed in whole cents, quantities to 8 decimals",
+    "Transaction form: buy, sell, deposit, withdrawal, currency conversion; default fee filled in per market ($7.5 US, ₪7 Tel Aviv, 0 crypto), editable per transaction and in settings without touching history; live preview of the cash effect and, for a sale, the realized result",
+    "Trades are detected automatically from first buy until the position is back to zero (the Excel blocks); net always includes every fee",
+    "Log: Excel SUMMARY as cards (net, win rate, fees, average holding days of closed trades), net-per-trade bar chart, trades table with sort, filter, search, expandable actions, edit and delete with undo",
+    "Holdings: quantity, average cost, cost, manual price, value, unrealized P&L, weight of the whole portfolio including cash, donut chart; missing prices stay '—' with the reason",
+    "Performance: broker account value entries, value vs net deposits chart with change-since-previous bars, profit = value − net deposits, chained return that ignores deposits",
+    "Cash: ₪ and $ balances derived from all actions, deposits/withdrawals/conversions list",
+    "Data menu: Excel export (5 sheets, real dates and numbers), JSON backup and restore (previous data kept in the browser before a restore)",
+    "Storage: anav.portfolio.v1 (user data) and anav.market.v1 (prices), separate from the calculators"
+  ],
+  "backup": "backups/2026-11-24T22-08-00Z-investments-flow/"
+}

@@ -32,6 +32,8 @@
       selectTabs(areaButtons,'areaTarget',area);
       selectTabs(viewButtons,'investView',view);
       investApp.querySelectorAll('.invest-view').forEach(panel=>{panel.hidden=panel.dataset.view!==view;});
+      // Views that draw charts measure themselves once visible.
+      if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('anav:invest-view',{detail:{area,view}}));
     }
     function enter(el){
       if(!motionAllowed())return;

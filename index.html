@@ -157,52 +157,35 @@
         <button type="button" role="tab" id="investTab-performance" data-invest-view="performance" aria-controls="investView-performance" aria-selected="false" tabindex="-1">ביצועים</button>
         <button type="button" role="tab" id="investTab-cash" data-invest-view="cash" aria-controls="investView-cash" aria-selected="false" tabindex="-1">תנועות כספיות</button>
       </nav>
-      <span class="invest-badge" title="מבנה הנתונים ייקבע לפי קובץ האקסל. אין כאן עדיין נתונים אמיתיים או נתוני הדגמה.">בבנייה</span>
+      <div class="invest-tools" id="investTools">
+        <button type="button" class="invest-btn invest-primary" id="invAdd"><span aria-hidden="true">+</span> פעולה</button>
+        <div class="invest-menu"><button type="button" class="invest-btn" id="invMenuBtn" aria-haspopup="menu" aria-expanded="false">נתונים ▾</button>
+          <div class="invest-menu-list" id="invMenu" role="menu" hidden>
+            <button type="button" role="menuitem" data-act="export-xlsx">ייצוא לאקסל</button>
+            <button type="button" role="menuitem" data-act="backup">גיבוי (JSON)</button>
+            <button type="button" role="menuitem" data-act="restore">שחזור מגיבוי</button>
+            <button type="button" role="menuitem" data-act="settings">עמלות ברירת מחדל</button>
+          </div>
+        </div>
+        <input type="file" id="invRestoreFile" accept="application/json,.json" hidden>
+      </div>
     </div>
     <div class="invest-stage">
       <section class="invest-view" id="investView-log" role="tabpanel" aria-labelledby="investTab-log" data-view="log">
-        <header class="invest-head"><h2>לוג השקעות</h2><p>כל פעולות הקנייה והמכירה, העמלות ותוכנית המסחר. מכאן מתעדכנים האחזקות, המזומן והביצועים.</p></header>
-        <div class="invest-empty">
-          <svg class="invest-empty-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="7" width="30" height="34" rx="5"/><path d="M16 17h16M16 24h16M16 31h9"/></svg>
-          <strong>עדיין אין פעולות</strong>
-          <p>הוספת פעולה וייבוא מהאקסל ייפתחו אחרי שמבנה הנתונים ייקבע לפי קובץ האקסל.</p>
-        </div>
+        <header class="invest-head"><h2>לוג השקעות</h2><p>כל עסקה מהקנייה הראשונה ועד שהכמות חוזרת לאפס, עם עמלות, ימי החזקה ורווח נטו.</p></header>
+        <div class="invest-body" id="investBody-log"></div>
       </section>
       <section class="invest-view" id="investView-holdings" role="tabpanel" aria-labelledby="investTab-holdings" data-view="holdings" hidden>
-        <header class="invest-head"><h2>פילוח תיק</h2><p>אחזקות נוכחיות, עלות ושווי, משקל בתיק ויתרת מזומן, עם פילוח לפי מניה, סקטור, סוג נכס ומטבע.</p></header>
-        <div class="invest-kpis">
-          <div class="invest-kpi"><span>שווי תיק</span><strong>—</strong><small>אין נתונים</small></div>
-          <div class="invest-kpi"><span>עלות</span><strong>—</strong><small>אין נתונים</small></div>
-          <div class="invest-kpi"><span>רווח / הפסד</span><strong>—</strong><small>אין נתונים</small></div>
-          <div class="invest-kpi"><span>מזומן</span><strong>—</strong><small>אין נתונים</small></div>
-        </div>
-        <div class="invest-empty">
-          <svg class="invest-empty-icon" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="15"/><path d="M24 9v15l11 10"/></svg>
-          <strong>אין עדיין אחזקות</strong>
-          <p>האחזקות יחושבו אוטומטית מהפעולות בלוג.</p>
-        </div>
+        <header class="invest-head"><h2>פילוח תיק</h2><p>מה מוחזק עכשיו, בכמה נקנה, כמה שווה ואיזה חלק מהתיק.</p></header>
+        <div class="invest-body" id="investBody-holdings"></div>
       </section>
       <section class="invest-view" id="investView-performance" role="tabpanel" aria-labelledby="investTab-performance" data-view="performance" hidden>
-        <header class="invest-head"><h2>ביצועים</h2><p>שווי התיק לאורך זמן, שינוי יומי, רווח והפסד ותשואה לתקופה, בנפרד מהפקדות ומשיכות.</p></header>
-        <div class="invest-kpis">
-          <div class="invest-kpi"><span>שינוי יומי</span><strong>—</strong><small>אין נתונים</small></div>
-          <div class="invest-kpi"><span>תשואה לתקופה</span><strong>—</strong><small>אין נתונים</small></div>
-          <div class="invest-kpi"><span>רווח מצטבר</span><strong>—</strong><small>אין נתונים</small></div>
-          <div class="invest-kpi"><span>הפקדות נטו</span><strong>—</strong><small>אין נתונים</small></div>
-        </div>
-        <div class="invest-empty">
-          <svg class="invest-empty-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M8 38h32"/><path d="M11 31l8-9 7 5 11-14"/></svg>
-          <strong>אין עדיין היסטוריה</strong>
-          <p>הגרף יוצג כשיהיו פעולות ומחירים היסטוריים. ימים בלי נתונים יסומנו כחסרים, לא כאפס.</p>
-        </div>
+        <header class="invest-head"><h2>ביצועים</h2><p>שווי החשבון מול ההפקדות לאורך זמן. הפקדה אינה רווח, ומשיכה אינה הפסד.</p></header>
+        <div class="invest-body" id="investBody-performance"></div>
       </section>
       <section class="invest-view" id="investView-cash" role="tabpanel" aria-labelledby="investTab-cash" data-view="cash" hidden>
-        <header class="invest-head"><h2>תנועות כספיות</h2><p>הפקדות, משיכות ותנועות נוספות. תנועות מזומן של קניות ומכירות נרשמות אוטומטית ולא מוזנות פעמיים.</p></header>
-        <div class="invest-empty">
-          <svg class="invest-empty-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M14 18h22l-6-6M34 30H12l6 6"/></svg>
-          <strong>אין עדיין תנועות</strong>
-          <p>רישום הפקדות ומשיכות ייפתח יחד עם הלוג.</p>
-        </div>
+        <header class="invest-head"><h2>תנועות כספיות</h2><p>הפקדות, משיכות והמרות מט״ח. תנועות המזומן של קניות ומכירות נרשמות לבד.</p></header>
+        <div class="invest-body" id="investBody-cash"></div>
       </section>
     </div>
   </section>
