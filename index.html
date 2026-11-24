@@ -161,6 +161,7 @@
         <button type="button" class="invest-btn invest-primary" id="invAdd"><span aria-hidden="true">+</span> פעולה</button>
         <div class="invest-menu"><button type="button" class="invest-btn" id="invMenuBtn" aria-haspopup="menu" aria-expanded="false">נתונים ▾</button>
           <div class="invest-menu-list" id="invMenu" role="menu" hidden>
+            <button type="button" role="menuitem" data-act="import">ייבוא מאקסל</button>
             <button type="button" role="menuitem" data-act="export-xlsx">ייצוא לאקסל</button>
             <button type="button" role="menuitem" data-act="backup">גיבוי (JSON)</button>
             <button type="button" role="menuitem" data-act="restore">שחזור מגיבוי</button>
@@ -168,6 +169,7 @@
           </div>
         </div>
         <input type="file" id="invRestoreFile" accept="application/json,.json" hidden>
+        <input type="file" id="invImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
       </div>
     </div>
     <div class="invest-stage">

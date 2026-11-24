@@ -1,0 +1,18 @@
+{
+  "version": 49,
+  "date": "2026-11-25",
+  "branch": "feature/investments",
+  "title": "Import from Excel with a full preview, duplicate detection and undo",
+  "changes": [
+    "Data menu → Import from Excel (.xlsx); the file is read in the browser with no libraries and nothing is uploaded",
+    "Sheets are recognised by their headers: trade log (WallStreet layout, including the older layout with a currency column), deposits and withdrawals, daily account value, and the holdings snapshot (prices and the dollar rate)",
+    "Trade blocks: symbol and action type carry down to the rows below; ticker taken from names such as 'ACME CORP (ACME)' or 'GAMA US'; summary and label rows skipped; dates read both as Excel dates and as dd/mm/yyyy text",
+    "Preview per sheet: new / existing / conflict / error for every row, with the reason, and a note explaining where the sheet's own totals differ (fee left out of the total, reversed sign)",
+    "Each sheet can be excluded; sales are re-checked against what would be held",
+    "Re-importing the same file adds nothing: every row has an import key; an identical manually typed action is also recognised",
+    "The equity sheet's deposit column is not imported, so deposits are never counted twice; a date repeated with the same value is imported once",
+    "Prices from the sheet never replace a price already on the site and are labelled 'from Excel'",
+    "One confirmed write: the previous data is kept in the browser and the import can be undone from the notification"
+  ],
+  "backup": "backups/2026-11-24T22-22-00Z-excel-import/"
+}

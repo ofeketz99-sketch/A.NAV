@@ -3111,6 +3111,255 @@
     return {SCHEMA,MARKETS,TYPES,defaults,normalize,compute,validate,heldOn,cashFlows,instrumentOf,ordered,cleanSymbol,isDate,todayIso,uid,cents,dayDiff};
   })();
 
+  // Excel import: reads the user's workbook (no libraries), recognises sheets by their headers and turns rows into
+  // transactions, broker snapshots and prices. Nothing is written until the user confirms the preview.
+  // Re-importing the same file finds every row again by its import key and skips it, so nothing is doubled silently.
+  const ExcelImport=(()=>{
+    const E=PortfolioEngine;
+    // ---------- unzip (.xlsx is a zip; entries are stored or deflated) ----------
+    async function unzip(buffer){
+      const u=new Uint8Array(buffer),dv=new DataView(u.buffer,u.byteOffset,u.byteLength),dec=new TextDecoder();
+      let eocd=-1;for(let i=u.length-22;i>=Math.max(0,u.length-66000);i--)if(dv.getUint32(i,true)===0x06054b50){eocd=i;break;}
+      if(eocd<0)throw Error('הקובץ אינו קובץ Excel תקין (xlsx)');
+      const count=dv.getUint16(eocd+10,true);let p=dv.getUint32(eocd+16,true);const out={};
+      for(let k=0;k<count;k++){
+        if(dv.getUint32(p,true)!==0x02014b50)throw Error('מבנה קובץ פגום');
+        const method=dv.getUint16(p+10,true),csize=dv.getUint32(p+20,true),nlen=dv.getUint16(p+28,true),xlen=dv.getUint16(p+30,true),clen=dv.getUint16(p+32,true),loc=dv.getUint32(p+42,true);
+        const name=dec.decode(u.subarray(p+46,p+46+nlen));p+=46+nlen+xlen+clen;
+        if(!/\.(xml|rels)$/i.test(name))continue;
+        const start=loc+30+dv.getUint16(loc+26,true)+dv.getUint16(loc+28,true),raw=u.subarray(start,start+csize);
+        let bytes;
+        if(method===0)bytes=raw;
+        else if(method===8){
+          if(typeof DecompressionStream!=='function')throw Error('הדפדפן לא תומך בפתיחת הקובץ. נסה דפדפן עדכני');
+          bytes=new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+        }else continue;
+        out[name]=dec.decode(bytes);
+      }
+      return out;
+    }
+    // ---------- workbook XML → sheets of cells ----------
+    const xmlText=s=>String(s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&#(\d+);/g,(m,n)=>String.fromCharCode(+n)).replace(/&amp;/g,'&');
+    const texts=x=>[...x.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map(m=>xmlText(m[1])).join('');
+    function colIndex(ref){let n=0;for(const ch of ref.replace(/\d+/g,''))n=n*26+ch.charCodeAt(0)-64;return n-1;}
+    function readWorkbook(files){
+      const wb=files['xl/workbook.xml'];if(!wb)throw Error('לא נמצא workbook בקובץ');
+      const shared=files['xl/sharedStrings.xml']?[...files['xl/sharedStrings.xml'].matchAll(/<si>([\s\S]*?)<\/si>/g)].map(m=>texts(m[1])):[];
+      const rels={};for(const m of (files['xl/_rels/workbook.xml.rels']||'').matchAll(/<Relationship\b[^>]*>/g)){const id=(m[0].match(/Id="([^"]+)"/)||[])[1],t=(m[0].match(/Target="([^"]+)"/)||[])[1];if(id&&t)rels[id]=t.replace(/^\/?(xl\/)?/,'xl/');}
+      const sheets=[];
+      for(const m of wb.matchAll(/<sheet\b[^>]*>/g)){
+        const name=xmlText((m[0].match(/name="([^"]*)"/)||[])[1]||''),rid=(m[0].match(/r:id="([^"]+)"/)||[])[1];
+        const x=files[rels[rid]];if(!x)continue;
+        const rows=[];
+        for(const r of x.matchAll(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)){
+          const rn=+((r[0].match(/\br="(\d+)"/)||[])[1]||rows.length+1),cells=[];
+          for(const c of (r[1]||'').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
+            const ref=(c[1].match(/\br="([A-Z]+\d+)"/)||[])[1];if(!ref)continue;
+            const t=(c[1].match(/\bt="(\w+)"/)||[])[1]||'n',inner=c[2]||'',v=(inner.match(/<v>([\s\S]*?)<\/v>/)||[])[1];
+            let val=null;
+            if(t==='s')val=v===undefined?null:shared[+v]??'';
+            else if(t==='inlineStr')val=texts(inner);
+            else if(t==='str'||t==='e')val=v===undefined?null:xmlText(v);
+            else if(t==='b')val=v==='1';
+            else val=v===undefined?null:Number(v);
+            cells[colIndex(ref)]={v:val,f:/<f[\s>/]/.test(inner)};
+          }
+          rows.push({n:rn,cells});
+        }
+        sheets.push({name,rows});
+      }
+      return {sheets};
+    }
+    // ---------- recognising sheets by header ----------
+    const norm=s=>String(s??'').replace(/["'״׳`]/g,'').replace(/\\/g,'/').replace(/\s+/g,' ').trim();
+    const KINDS={
+      trades:{label:'לוג עסקאות',need:['תאריך','סוג פעולה','שם נייר','כמות','שער ביצוע'],opt:{fee:'עמלת פעולה',total:['תמורה במטח','תמורה במט ח'],currency:'מטבע'}},
+      cashflows:{label:'הפקדות ומשיכות',need:['תאריך','סוג פעולה','סכום פעולה']},
+      equity:{label:'שווי חשבון יומי',need:['תאריך','ערך חשבון'],opt:{flow:'הפקדה/משיכה'}},
+      holdings:{label:'מחירים מתמונת התיק',need:['סימבול','שער']}
+    };
+    function detect(sheet){
+      for(const row of sheet.rows.slice(0,6)){
+        const heads=row.cells.map(c=>norm(c?.v));
+        for(const [kind,def] of Object.entries(KINDS)){
+          if(!def.need.every(h=>heads.includes(norm(h))))continue;
+          const col={};def.need.forEach(h=>col[h]=heads.indexOf(norm(h)));
+          for(const [k,h] of Object.entries(def.opt||{})){const list=Array.isArray(h)?h:[h];const i=heads.findIndex(x=>list.map(norm).includes(x));if(i>=0)col[k]=i;}
+          return {kind,headerRow:row.n,col};
+        }
+      }
+      return null;
+    }
+    // ---------- cell helpers ----------
+    function parseDate(v){
+      if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Date.UTC(1899,11,30)+Math.round(v)*864e5);return d.toISOString().slice(0,10);}
+      if(typeof v!=='string')return null;
+      const s=v.trim();let m=s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/);
+      if(m){const y=m[3].length===2?2000+ +m[3]:+m[3],mo=+m[2],d=+m[1];const iso=y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');return mo>=1&&mo<=12&&d>=1&&d<=31&&E.isDate(iso)&&new Date(iso+'T00:00:00Z').getUTCDate()===d?iso:null;}
+      m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m&&E.isDate(m[0])?m[0]:null;
+    }
+    const numOf=v=>typeof v==='number'&&Number.isFinite(v)?v:typeof v==='string'&&v.trim()!==''&&Number.isFinite(Number(v.replace(/[,₪$\s]/g,'')))?Number(v.replace(/[,₪$\s]/g,'')):null;
+    // A text cell in the date column that does not even look like a date is a label row (SUMMARY, totals).
+    const isLabel=v=>typeof v==='string'&&v.trim()!==''&&!/\d{1,4}[/.-]\d{1,2}/.test(v);
+    const textOf=v=>v===null||v===undefined?'':String(v).trim();
+    // "ACME CORP (ACME)" → ACME, "BETA LTD (BTA US)" → BTA, "GAMA US" → GAMA, "DELTA SYSTEM(DLT" → DLT
+    function symbolOf(text){
+      const s=textOf(text);if(!s)return '';
+      const par=s.match(/\(([^)]*)\)?\s*$/);
+      const core=par?par[1]:s;
+      const tok=core.trim().split(/\s+/);
+      const pick=tok.length>1&&/^(US|TA|IL|UN|UQ)$/i.test(tok[tok.length-1])?tok.slice(0,-1).join(''):par?tok.join(''):tok[0];
+      return E.cleanSymbol(pick);
+    }
+    const r2=v=>Math.round(v*100)/100;
+    // ---------- planning: every row gets a status before anything is saved ----------
+    function plan(state,workbook,market){
+      const haveQuote=s=>!!market?.quotes?.[s],haveFx=!!market?.fx?.USDILS;
+      const existingKeys=new Set(state.transactions.map(t=>t.importKey).filter(Boolean));
+      const sig=t=>[t.type,t.date,t.symbol||'',t.qty??'',t.price??'',t.amount??'',t.currency||''].join('|');
+      const existingSig=new Set(state.transactions.filter(t=>!t.importKey).map(sig));
+      const snapByDate=Object.fromEntries(state.snapshots.map(s=>[s.date,s]));
+      const result={sheets:[],instruments:{}};
+      for(const sheet of workbook.sheets){
+        const d=detect(sheet);
+        if(!d){result.sheets.push({name:sheet.name,kind:null,rows:[],notes:['לא זוהה כגיליון נתונים. לא ייובא.']});continue;}
+        const out={name:sheet.name,kind:d.kind,label:KINDS[d.kind].label,rows:[],notes:[]};
+        const seen={};
+        const keyOf=(parts)=>{const base=sheet.name+'|'+d.kind+'|'+parts.join('|');seen[base]=(seen[base]||0)+1;return base+'#'+seen[base];};
+        const body=sheet.rows.filter(r=>r.n>d.headerRow);
+        const cell=(r,i)=>i===undefined||i<0?null:r.cells[i]?.v??null;
+        if(d.kind==='trades'){
+          let lastType='',block='';const stats={noFee:0,sign:0};
+          for(const r of body){
+            const c=d.col,typeText=textOf(cell(r,c['סוג פעולה'])),symText=textOf(cell(r,c['שם נייר']));
+            const dateRaw=cell(r,c['תאריך']),date=parseDate(dateRaw),qty=numOf(cell(r,c['כמות'])),price=numOf(cell(r,c['שער ביצוע']));
+            if(typeText)lastType=typeText;
+            if(symText)block=symText;
+            if(!date&&qty===null&&price===null)continue;               // empty or summary line
+            if(isLabel(dateRaw))continue;                                // label row such as SUMMARY
+            const row={row:r.n,status:'new',message:'',excel:{date:dateRaw,type:typeText||lastType,symbol:block,qty,price}};
+            out.rows.push(row);
+            const type=/קני/.test(lastType)?'buy':/מכיר/.test(lastType)?'sell':null;
+            if(!date){row.status='error';row.message='תאריך לא מזוהה';continue;}
+            if(!type){row.status='error';row.message='סוג פעולה לא מזוהה: '+(lastType||'ריק');continue;}
+            const symbol=symbolOf(block);
+            if(!symbol){row.status='error';row.message='חסר שם נייר';continue;}
+            if(!(qty>0)||!(price>0)){row.status='error';row.message='כמות או מחיר חסרים';continue;}
+            const curText=textOf(cell(r,c.currency));
+            const market=/שקל/.test(lastType)||/₪|ש"?ח|ILS/i.test(curText)?'TASE':/^(BTC|ETH|SOL|XRP|ADA|DOGE)(USD|USDT)?$/.test(symbol)?'CRYPTO':'US';
+            const feeCell=numOf(cell(r,c.fee)),fee=feeCell!==null&&feeCell>=0?feeCell:state.settings.fees[market];
+            const tx={id:E.uid(),type,date,symbol,qty:Math.round(qty*1e8)/1e8,price,fee,note:'',source:'excel'};
+            tx.importKey=keyOf([date,type,symbol,qty,price,fee]);
+            row.record=tx;row.market=market;
+            if(!state.instruments[symbol]&&!result.instruments[symbol])result.instruments[symbol]={symbol,market,currency:E.MARKETS[market].currency,name:block!==symbol?block:'',sector:'',kind:''};
+            if(feeCell===null)row.message='עמלה לא רשומה, נלקחה ברירת המחדל';
+            // Compare with the sheet's own total, and explain a difference instead of copying it.
+            const total=numOf(cell(r,c.total));
+            if(total!==null){
+              const site=type==='buy'?-(qty*price+fee):qty*price-fee;
+              if(Math.abs(total-site)>0.05){
+                if(Math.sign(total)!==Math.sign(site)&&Math.abs(Math.abs(total)-Math.abs(site))<0.05+2*fee){stats.sign++;row.note='באקסל הסימן של התמורה הפוך';}
+                else if(Math.abs(Math.abs(total)-qty*price)<0.05&&fee>0){stats.noFee++;row.note='באקסל העמלה לא נכללה בתמורה';}
+                else row.note='באקסל: '+r2(total)+' · באתר: '+r2(site);
+              }
+            }
+            if(existingKeys.has(tx.importKey)){row.status='dup';row.message='יובא כבר בעבר';}
+            else if(existingSig.has(sig(tx))){row.status='dup';row.message='קיימת כבר פעולה זהה';}
+          }
+          if(stats.noFee)out.notes.push('ב־'+stats.noFee+' שורות התמורה באקסל לא כוללת עמלה. באתר העמלה נכללת תמיד, ולכן הנטו קטן יותר.');
+          if(stats.sign)out.notes.push('ב־'+stats.sign+' שורות הסימן של התמורה באקסל הפוך. באתר הסימן נקבע לפי סוג הפעולה.');
+        }else if(d.kind==='cashflows'){
+          for(const r of body){
+            const c=d.col,dateRaw=cell(r,c['תאריך']),date=parseDate(dateRaw),typeText=textOf(cell(r,c['סוג פעולה'])),amount=numOf(cell(r,c['סכום פעולה']));
+            if(isLabel(dateRaw)||(!date&&amount===null))continue;          // total line
+            const row={row:r.n,status:'new',message:'',excel:{date:dateRaw,type:typeText,amount}};out.rows.push(row);
+            if(!date){row.status='error';row.message='תאריך לא מזוהה';continue;}
+            if(amount===null||amount===0){row.status='error';row.message='סכום חסר';continue;}
+            const type=/משיכ/.test(typeText)||(!/הפקד/.test(typeText)&&amount<0)?'withdrawal':'deposit';
+            const tx={id:E.uid(),type,date,currency:'ILS',amount:Math.abs(amount),note:'',source:'excel'};
+            tx.importKey=keyOf([date,type,Math.abs(amount)]);row.record=tx;
+            if(existingKeys.has(tx.importKey)){row.status='dup';row.message='יובא כבר בעבר';}
+            else if(existingSig.has(sig(tx))){row.status='dup';row.message='קיימת כבר פעולה זהה';}
+          }
+        }else if(d.kind==='equity'){
+          let flowSum=0;
+          for(const r of body){
+            const c=d.col,dateRaw=cell(r,c['תאריך']),date=parseDate(dateRaw),value=numOf(cell(r,c['ערך חשבון']));
+            if(isLabel(dateRaw)||(!date&&value===null))continue;
+            flowSum+=numOf(cell(r,c.flow))||0;
+            const row={row:r.n,status:'new',message:'',excel:{date:dateRaw,value}};out.rows.push(row);
+            if(!date){row.status='error';row.message='תאריך לא מזוהה';continue;}
+            if(value===null){row.status='error';row.message='שווי חסר';continue;}
+            row.record={id:E.uid('s'),date,value,currency:'ILS',note:''};
+            const old=snapByDate[date];
+            if(old&&Math.abs(old.value-value)<0.005){row.status='dup';row.message='כבר רשום';}
+            else if(old){row.status='conflict';row.message='כבר רשום שווי אחר לתאריך הזה: '+old.value;}
+          }
+          // A date repeated in the sheet: the same value is imported once; different values are a conflict for the user.
+          const byDate={};for(const r of out.rows)if(r.record)(byDate[r.record.date]||(byDate[r.record.date]=[])).push(r);
+          for(const list of Object.values(byDate)){
+            if(list.length<2)continue;
+            const same=list.every(r=>Math.abs(r.record.value-list[0].record.value)<0.005);
+            list.forEach((r,i)=>{if(r.status!=='new')return;
+              if(same&&i>0){r.status='dup';r.message='שורה כפולה בגיליון (שורה '+list[0].row+')';}
+              else if(!same){r.status='conflict';r.message='לתאריך הזה יש בגיליון כמה ערכים שונים';}});
+          }
+          if(d.col.flow!==undefined)out.notes.push('עמודת ההפקדות בגיליון הזה לא מיובאת. ההפקדות נלקחות מגיליון ההפקדות, כדי שלא ייספרו פעמיים'+(flowSum?' (סכום העמודה כאן: ₪'+r2(flowSum).toLocaleString('en-US')+')':'')+'.');
+        }else if(d.kind==='holdings'){
+          for(const r of body){
+            const c=d.col,s=textOf(cell(r,c['סימבול'])),price=numOf(cell(r,c['שער']));
+            if(!s||price===null)continue;
+            const row={row:r.n,status:'new',message:'',excel:{symbol:s,price}};out.rows.push(row);
+            if(s.toUpperCase()==='USD'){row.record={fx:'USDILS',rate:price};row.message='שער דולר';if(haveFx){row.status='dup';row.message='שער דולר כבר קיים באתר';}}
+            else{const sym=symbolOf(s);if(!sym||!/^[A-Z0-9.]+$/.test(sym)){row.status='skip';row.message='לא סימול';continue;}row.record={symbol:sym,price};if(haveQuote(sym)){row.status='dup';row.message='מחיר כבר קיים באתר';}}
+          }
+          out.notes.push('תאריך המחירים לא מופיע באקסל, ולכן הם יסומנו "מהאקסל" עד שיעודכנו. מחיר שכבר הוזן באתר לא יוחלף.');
+        }
+        result.sheets.push(out);
+      }
+      validate(state,result);
+      return result;
+    }
+    // Run the whole ledger with the new rows; a sale that finds nothing to sell becomes a row error instead of a silent skip.
+    function validate(state,result){
+      for(let pass=0;pass<5;pass++){
+        const merged=merge(state,result);
+        const r=E.compute(merged.state,{},{});
+        if(!r.issues.length)return;
+        let changed=false;
+        for(const issue of r.issues)for(const sh of result.sheets)for(const row of sh.rows)
+          if(row.record&&row.record.id===issue.txId&&row.status==='new'){row.status='error';row.oversell=true;row.message='מכירה ללא אחזקה מספקת ('+issue.held+' מוחזקות)';changed=true;}
+        if(!changed)return;
+      }
+    }
+    // After the user includes or excludes a sheet, sale checks are redone from scratch.
+    function revalidate(state,result){
+      for(const sh of result.sheets)for(const row of sh.rows)if(row.oversell){row.status='new';row.message='';row.oversell=false;}
+      validate(state,result);
+    }
+    // Same day: deposits, then buys, then sales (the 2025 sheet lists a trade's sale row first).
+    const RANK={deposit:0,withdrawal:0,fx:1,buy:2,sell:3};
+    function merge(state,result){
+      const take=sh=>sh.include!==false;
+      const tx=[],snaps=[],quotes={};let fx=null;
+      for(const sh of result.sheets){
+        if(!sh.kind||!take(sh))continue;
+        for(const row of sh.rows){
+          if(row.status!=='new'||!row.record)continue;
+          if(sh.kind==='trades'||sh.kind==='cashflows')tx.push(row.record);
+          else if(sh.kind==='equity')snaps.push(row.record);
+          else if(row.record.fx)fx=row.record.rate;else quotes[row.record.symbol]=row.record.price;
+        }
+      }
+      tx.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(RANK[a.type]??5)-(RANK[b.type]??5));
+      const instruments={...state.instruments};
+      for(const t of tx)if(t.symbol&&!instruments[t.symbol]&&result.instruments[t.symbol])instruments[t.symbol]=result.instruments[t.symbol];
+      return {state:{...state,instruments,transactions:[...state.transactions,...tx],snapshots:[...state.snapshots,...snaps]},quotes,fx,counts:{transactions:tx.length,snapshots:snaps.length,prices:Object.keys(quotes).length+(fx?1:0)}};
+    }
+    function counts(sheet){const c={new:0,dup:0,error:0,conflict:0,skip:0};for(const r of sheet.rows)c[r.status]=(c[r.status]||0)+1;return c;}
+    return {unzip,readWorkbook,detect,parseDate,symbolOf,plan,revalidate,merge,counts,KINDS};
+  })();
+
   // Top-level areas: the existing calculators and the investments workspace share one frame (logo, header, footer).
   // The calculator DOM stays mounted while hidden, so its ids, state and storage are untouched by switching.
   // The investments accent comes from CSS (!important beats the inline per-tab accent), so applyTabAccent can keep running.
@@ -3256,7 +3505,7 @@
 
     function renderLog(){
       const box=q('investBody-log'),s=calc.summary;
-      if(!pf.transactions.length){box.innerHTML=empty(ICON.log,'עדיין אין פעולות','כל קנייה ומכירה שתרשום כאן הופכת אוטומטית לעסקה, לאחזקה ולתנועת מזומן. אין צורך בנוסחאות.','<button type="button" class="invest-btn invest-primary" data-act="add" data-type="buy">+ רישום קנייה ראשונה</button>');return;}
+      if(!pf.transactions.length){box.innerHTML=empty(ICON.log,'עדיין אין פעולות','כל קנייה ומכירה שתרשום כאן הופכת אוטומטית לעסקה, לאחזקה ולתנועת מזומן. אין צורך בנוסחאות.','<div class="inv-quick"><button type="button" class="invest-btn invest-primary" data-act="add" data-type="buy">+ רישום קנייה ראשונה</button><button type="button" class="invest-btn" data-act="import">ייבוא מהאקסל שלי</button></div>');return;}
       const u=s.byCurrency.USD,i=s.byCurrency.ILS;
       const net={USD:u.net,ILS:i.net},fees={USD:u.fees,ILS:i.fees};
       let h='<div class="invest-kpis">'+
@@ -3335,13 +3584,13 @@
         kpi('שווי תיק (₪)',c.totalIls===null?DASH:money(c.totalIls,'ILS'),c.totalIls===null?(c.missingPrices.length?'חסר מחיר: '+c.missingPrices.map(esc).join(', '):'חסר שער דולר'):'כולל מזומן')+
         kpi('מזומן',money(c.cash.USD,'USD')+' · '+money(c.cash.ILS,'ILS'),c.cash.USD<0?'<span class="inv-neg">מזומן דולרי שלילי: חסרה המרת מט״ח?</span>':'נגזר מכל הפעולות')+
         kpi('רווח שטרם מומש',unrealKnown?curTotals(unreal):DASH,unrealKnown?'לפי המחירים שהוזנו':'חסרים מחירים')+
-        '<div class="invest-kpi"><span>שער דולר (USDILS)</span><strong><input class="inv-inline" type="text" inputmode="decimal" data-act="fx" value="'+(rate?rate.rate:'')+'" placeholder="הזן שער" aria-label="שער דולר"></strong><small>'+(rate?'הוזן ידנית · '+date(rate.asOf):'נדרש לשווי בשקלים')+'</small></div>'+
+        '<div class="invest-kpi"><span>שער דולר (USDILS)</span><strong><input class="inv-inline" type="text" inputmode="decimal" data-act="fx" value="'+(rate?rate.rate:'')+'" placeholder="הזן שער" aria-label="שער דולר"></strong><small>'+(rate?(rate.source==='excel'?'מהאקסל, כדאי לעדכן':'הוזן ידנית · '+date(rate.asOf)):'נדרש לשווי בשקלים')+'</small></div>'+
         '</div>';
       if(!c.holdings.length){box.innerHTML=h+empty(ICON.pie,'אין כרגע אחזקות','אחזקות מחושבות אוטומטית מהקניות והמכירות בלוג.');return;}
       h+='<div class="inv-split">'+donut()+'<div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>נייר</th><th>כמות</th><th>עלות ממוצעת</th><th>עלות</th><th>מחיר נוכחי</th><th>שווי</th><th>רווח / הפסד</th><th>משקל</th></tr></thead><tbody>';
       for(const x of c.holdings){
         h+='<tr><td>'+sym(x.symbol)+' <small class="inv-tag">'+E.MARKETS[x.market].label+'</small></td><td>'+num(x.qty)+'</td><td>'+money(x.avgCost===null?null:E.cents(x.avgCost),x.currency)+'</td><td>'+money(x.cost,x.currency)+'</td>'+
-          '<td><input class="inv-inline" type="text" inputmode="decimal" data-act="price" data-symbol="'+esc(x.symbol)+'" value="'+(x.price??'')+'" placeholder="מחיר" aria-label="מחיר נוכחי של '+esc(x.symbol)+'"><small class="inv-muted inv-src">'+(x.price===null?'חסר':'ידני · '+date(x.priceAsOf))+'</small></td>'+
+          '<td><input class="inv-inline" type="text" inputmode="decimal" data-act="price" data-symbol="'+esc(x.symbol)+'" value="'+(x.price??'')+'" placeholder="מחיר" aria-label="מחיר נוכחי של '+esc(x.symbol)+'"><small class="inv-muted inv-src">'+(x.price===null?'חסר':x.priceSource==='excel'?'מהאקסל':'ידני · '+date(x.priceAsOf))+'</small></td>'+
           '<td>'+money(x.value,x.currency)+'</td><td>'+money(x.unrealized,x.currency,{signed:true})+' <small>'+pct(x.unrealizedPct,{signed:true})+'</small></td><td>'+pct(x.weight,{d:1})+'</td></tr>';
       }
       h+='</tbody></table></div></div><p class="inv-foot">משקל = שווי הנייר בשקלים מתוך כלל התיק <b>כולל מזומן</b>. המחירים הוזנו ידנית, וחיבור לספק מחירים יתווסף בהמשך. עלות כוללת עמלות קנייה (שיטת עלות ממוצעת).</p>';
@@ -3600,6 +3849,7 @@
       else if(act==='sort'){const k=el.dataset.key;ui.sort=ui.sort.key===k?{key:k,dir:-ui.sort.dir}:{key:k,dir:k==='symbol'?1:-1};renderLog();}
       else if(act==='del-snap'){const id=el.dataset.id,i=pf.snapshots.findIndex(s=>s.id===id),rem=pf.snapshots[i];if(i<0)return;pf={...pf,snapshots:pf.snapshots.filter(s=>s.id!==id)};persist();refresh();
         toast('רישום השווי נמחק',()=>{pf={...pf,snapshots:[...pf.snapshots,rem]};persist();refresh();});}
+      else if(act==='import')q('invImportFile').click();
       else if(act==='export-xlsx')exportXlsx();
       else if(act==='backup')downloadBackup();
       else if(act==='restore')q('invRestoreFile').click();
@@ -3656,6 +3906,87 @@
         try{localStorage.setItem(PREV_KEY,JSON.stringify({savedAt:new Date().toISOString(),portfolio:pf,market:mk}));}catch(_){}
         pf=next;mk=normalizeMarket(data.market);persist();refresh();toast('הגיבוי שוחזר');
       }catch(err){toast('השחזור נכשל: '+(err.message||'קובץ לא תקין'));}
+    });
+
+    // ---------- Excel import: preview first, then one confirmed write with undo ----------
+    document.body.insertAdjacentHTML('beforeend','<div class="tool-overlay inv-overlay" id="invImpOverlay" hidden><section class="tool-dialog inv-dialog inv-import" role="dialog" aria-modal="true" aria-labelledby="invImpTitle">'+
+      '<header class="tool-head"><div><h2 id="invImpTitle">ייבוא מאקסל</h2><p id="invImpSub"></p></div><button type="button" class="tool-close" data-imp-close aria-label="סגירה">×</button></header>'+
+      '<div class="tool-content inv-imp-body" id="invImpBody"></div>'+
+      '<footer class="inv-imp-foot"><span id="invImpSum" aria-live="polite"></span><button type="button" class="inv-ghost" data-imp-close>ביטול</button><button type="button" class="tool-primary" id="invImpGo">ייבוא</button></footer></section></div>');
+    const STATUS={new:['חדש','inv-st-new'],dup:['קיים','inv-st-dup'],error:['שגיאה','inv-st-err'],conflict:['התנגשות','inv-st-warn'],skip:['דילוג','inv-st-dup']};
+    let imp=null;
+    q('invImportFile').addEventListener('change',async e=>{
+      const file=e.target.files[0];e.target.value='';if(!file)return;
+      try{await openImport(file.name,await file.arrayBuffer());}
+      catch(err){toast('לא הצלחתי לקרוא את הקובץ: '+(err.message||err));}
+    });
+    async function openImport(name,buffer){
+      opener=document.activeElement;
+      const wb=ExcelImport.readWorkbook(await ExcelImport.unzip(buffer));
+      imp={file:name,plan:ExcelImport.plan(pf,wb,mk),active:0,filter:'all'};
+      imp.active=Math.max(0,imp.plan.sheets.findIndex(s=>s.kind));
+      renderImport();q('invImpOverlay').hidden=false;document.body.classList.add('schedule-open');q('invImpGo').focus();
+    }
+    function impCell(sh,r){
+      const x=r.excel||{},rec=r.record||{};
+      if(sh.kind==='trades')return [rec.date?date(rec.date):esc(x.date),esc(x.type),rec.symbol?sym(rec.symbol):esc(x.symbol),num(x.qty),num(x.price),rec.fee!==undefined?num(rec.fee):DASH];
+      if(sh.kind==='cashflows')return [rec.date?date(rec.date):esc(x.date),esc(x.type),'',num(x.amount),'',''];
+      if(sh.kind==='equity')return [rec.date?date(rec.date):esc(x.date),'','',num(x.value,2),'',''];
+      return ['',rec.fx?'שער דולר':'מחיר',esc(x.symbol),num(x.price,4),'',''];
+    }
+    function renderImport(){
+      const P=imp.plan,sheets=P.sheets;
+      q('invImpSub').textContent=imp.file+' · שום דבר לא נשמר עד שלוחצים "ייבוא", ואפשר לבטל גם אחרי.';
+      let h='<div class="inv-imp-sheets" role="list">';
+      sheets.forEach((sh,i)=>{
+        const c=ExcelImport.counts(sh),on=sh.include!==false;
+        const chips=sh.kind?'<span class="inv-imp-counts">'+(c.new?'<i class="inv-st-new">'+c.new+' חדשות</i>':'')+(c.dup?'<i class="inv-st-dup">'+c.dup+' קיימות</i>':'')+(c.conflict?'<i class="inv-st-warn">'+c.conflict+' התנגשויות</i>':'')+(c.error?'<i class="inv-st-err">'+c.error+' שגיאות</i>':'')+(c.skip?'<i class="inv-st-dup">'+c.skip+' דילוג</i>':'')+'</span>':'';
+        h+='<div class="inv-imp-sheet'+(i===imp.active?' is-active':'')+(sh.kind?'':' is-off')+(on?'':' is-excluded')+'" role="listitem">'+
+          (sh.kind?'<label class="inv-imp-check" title="לכלול בייבוא"><input type="checkbox" data-imp-include="'+i+'"'+(on?' checked':'')+'><span class="inv-sr">לייבא את '+esc(sh.name)+'</span></label>':'')+
+          '<button type="button" class="inv-imp-sheet-btn" data-imp-sheet="'+i+'"'+(sh.kind?'':' disabled')+'><strong>'+esc(sh.name)+'</strong><small>'+(sh.kind?sh.label:'לא זוהה, לא ייובא')+'</small>'+chips+'</button></div>';
+      });
+      h+='</div>';
+      const sh=sheets[imp.active];
+      if(sh&&sh.kind){
+        if(sh.notes.length)h+='<ul class="inv-imp-notes">'+sh.notes.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul>';
+        const c=ExcelImport.counts(sh);
+        h+='<div class="inv-toolbar"><div class="inv-chips" role="group" aria-label="סינון שורות">'+
+          [['all','הכול ('+sh.rows.length+')'],['new','חדשות ('+c.new+')'],['problem','לבדיקה ('+(c.error+c.conflict)+')'],['dup','קיימות ('+(c.dup+c.skip)+')']].map(([k,l])=>'<button type="button" class="inv-chip" data-imp-filter="'+k+'" aria-pressed="'+(imp.filter===k)+'">'+l+'</button>').join('')+'</div></div>';
+        const rows=sh.rows.filter(r=>imp.filter==='all'||(imp.filter==='new'&&r.status==='new')||(imp.filter==='problem'&&(r.status==='error'||r.status==='conflict'))||(imp.filter==='dup'&&(r.status==='dup'||r.status==='skip')));
+        const heads=sh.kind==='trades'?['תאריך','סוג','נייר','כמות','מחיר','עמלה']:sh.kind==='cashflows'?['תאריך','סוג','','סכום','','']:sh.kind==='equity'?['תאריך','','','שווי','','']:['','','נייר','מחיר','',''];
+        h+=rows.length?'<div class="inv-table-wrap inv-imp-table"><table class="inv-table"><thead><tr><th>שורה</th>'+heads.map(x=>'<th>'+x+'</th>').join('')+'<th>מצב</th><th>הערה</th></tr></thead><tbody>'+
+          rows.slice(0,400).map(r=>{const st=STATUS[r.status]||STATUS.skip;return '<tr><td>'+num(r.row)+'</td>'+impCell(sh,r).map(x=>'<td>'+(x||'')+'</td>').join('')+'<td><span class="inv-st '+st[1]+'">'+st[0]+'</span></td><td class="inv-note">'+esc([r.message,r.note].filter(Boolean).join(' · '))+'</td></tr>';}).join('')+
+          '</tbody></table></div>'+(rows.length>400?'<p class="inv-none">מוצגות 400 השורות הראשונות מתוך '+rows.length+'.</p>':''):'<p class="inv-none">אין שורות בסינון הזה.</p>';
+      }
+      q('invImpBody').innerHTML=h;
+      const c=ExcelImport.merge(pf,P).counts;
+      const parts=[c.transactions&&c.transactions+' פעולות',c.snapshots&&c.snapshots+' רישומי שווי',c.prices&&c.prices+' מחירים'].filter(Boolean);
+      q('invImpSum').textContent=parts.length?'ייובאו: '+parts.join(', '):'אין שורות חדשות לייבוא';
+      q('invImpGo').disabled=!parts.length;
+    }
+    q('invImpOverlay').addEventListener('click',e=>{
+      const s=e.target.closest('[data-imp-sheet]');if(s){imp.active=+s.dataset.impSheet;imp.filter='all';renderImport();return;}
+      const f=e.target.closest('[data-imp-filter]');if(f){imp.filter=f.dataset.impFilter;renderImport();return;}
+      if(e.target.closest('[data-imp-close]'))closeImport();
+    });
+    q('invImpOverlay').addEventListener('change',e=>{
+      const i=e.target.dataset.impInclude;if(i===undefined)return;
+      imp.plan.sheets[+i].include=e.target.checked;ExcelImport.revalidate(pf,imp.plan);renderImport();
+    });
+    q('invImpOverlay').addEventListener('pointerdown',e=>{if(e.target===q('invImpOverlay'))closeImport();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!q('invImpOverlay').hidden){e.preventDefault();closeImport();}});
+    function closeImport(){q('invImpOverlay').hidden=true;document.body.classList.remove('schedule-open');imp=null;opener?.focus?.();}
+    q('invImpGo').addEventListener('click',()=>{
+      if(!imp)return;
+      const m=ExcelImport.merge(pf,imp.plan),before={pf,mk:JSON.parse(JSON.stringify(mk))};
+      try{localStorage.setItem(PREV_KEY,JSON.stringify({savedAt:new Date().toISOString(),reason:'import',portfolio:pf,market:mk}));}catch(_){}
+      pf=E.normalize(m.state);
+      // Prices from the sheet never replace a price already entered on the site.
+      for(const [sy,price] of Object.entries(m.quotes))if(!mk.quotes[sy])mk.quotes[sy]={price,asOf:'',source:'excel'};
+      if(m.fx&&!mk.fx.USDILS)mk.fx.USDILS={rate:m.fx,asOf:'',source:'excel'};
+      persist();closeImport();refresh();
+      const c=m.counts;
+      toast('יובאו '+c.transactions+' פעולות ו־'+c.snapshots+' רישומי שווי',()=>{pf=before.pf;mk=before.mk;persist();refresh();toast('הייבוא בוטל');});
     });
 
     // ---------- Excel export: real numbers and dates, one sheet per table ----------

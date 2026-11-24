@@ -62,7 +62,7 @@
 
     function renderLog(){
       const box=q('investBody-log'),s=calc.summary;
-      if(!pf.transactions.length){box.innerHTML=empty(ICON.log,'עדיין אין פעולות','כל קנייה ומכירה שתרשום כאן הופכת אוטומטית לעסקה, לאחזקה ולתנועת מזומן. אין צורך בנוסחאות.','<button type="button" class="invest-btn invest-primary" data-act="add" data-type="buy">+ רישום קנייה ראשונה</button>');return;}
+      if(!pf.transactions.length){box.innerHTML=empty(ICON.log,'עדיין אין פעולות','כל קנייה ומכירה שתרשום כאן הופכת אוטומטית לעסקה, לאחזקה ולתנועת מזומן. אין צורך בנוסחאות.','<div class="inv-quick"><button type="button" class="invest-btn invest-primary" data-act="add" data-type="buy">+ רישום קנייה ראשונה</button><button type="button" class="invest-btn" data-act="import">ייבוא מהאקסל שלי</button></div>');return;}
       const u=s.byCurrency.USD,i=s.byCurrency.ILS;
       const net={USD:u.net,ILS:i.net},fees={USD:u.fees,ILS:i.fees};
       let h='<div class="invest-kpis">'+
@@ -141,13 +141,13 @@
         kpi('שווי תיק (₪)',c.totalIls===null?DASH:money(c.totalIls,'ILS'),c.totalIls===null?(c.missingPrices.length?'חסר מחיר: '+c.missingPrices.map(esc).join(', '):'חסר שער דולר'):'כולל מזומן')+
         kpi('מזומן',money(c.cash.USD,'USD')+' · '+money(c.cash.ILS,'ILS'),c.cash.USD<0?'<span class="inv-neg">מזומן דולרי שלילי: חסרה המרת מט״ח?</span>':'נגזר מכל הפעולות')+
         kpi('רווח שטרם מומש',unrealKnown?curTotals(unreal):DASH,unrealKnown?'לפי המחירים שהוזנו':'חסרים מחירים')+
-        '<div class="invest-kpi"><span>שער דולר (USDILS)</span><strong><input class="inv-inline" type="text" inputmode="decimal" data-act="fx" value="'+(rate?rate.rate:'')+'" placeholder="הזן שער" aria-label="שער דולר"></strong><small>'+(rate?'הוזן ידנית · '+date(rate.asOf):'נדרש לשווי בשקלים')+'</small></div>'+
+        '<div class="invest-kpi"><span>שער דולר (USDILS)</span><strong><input class="inv-inline" type="text" inputmode="decimal" data-act="fx" value="'+(rate?rate.rate:'')+'" placeholder="הזן שער" aria-label="שער דולר"></strong><small>'+(rate?(rate.source==='excel'?'מהאקסל, כדאי לעדכן':'הוזן ידנית · '+date(rate.asOf)):'נדרש לשווי בשקלים')+'</small></div>'+
         '</div>';
       if(!c.holdings.length){box.innerHTML=h+empty(ICON.pie,'אין כרגע אחזקות','אחזקות מחושבות אוטומטית מהקניות והמכירות בלוג.');return;}
       h+='<div class="inv-split">'+donut()+'<div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>נייר</th><th>כמות</th><th>עלות ממוצעת</th><th>עלות</th><th>מחיר נוכחי</th><th>שווי</th><th>רווח / הפסד</th><th>משקל</th></tr></thead><tbody>';
       for(const x of c.holdings){
         h+='<tr><td>'+sym(x.symbol)+' <small class="inv-tag">'+E.MARKETS[x.market].label+'</small></td><td>'+num(x.qty)+'</td><td>'+money(x.avgCost===null?null:E.cents(x.avgCost),x.currency)+'</td><td>'+money(x.cost,x.currency)+'</td>'+
-          '<td><input class="inv-inline" type="text" inputmode="decimal" data-act="price" data-symbol="'+esc(x.symbol)+'" value="'+(x.price??'')+'" placeholder="מחיר" aria-label="מחיר נוכחי של '+esc(x.symbol)+'"><small class="inv-muted inv-src">'+(x.price===null?'חסר':'ידני · '+date(x.priceAsOf))+'</small></td>'+
+          '<td><input class="inv-inline" type="text" inputmode="decimal" data-act="price" data-symbol="'+esc(x.symbol)+'" value="'+(x.price??'')+'" placeholder="מחיר" aria-label="מחיר נוכחי של '+esc(x.symbol)+'"><small class="inv-muted inv-src">'+(x.price===null?'חסר':x.priceSource==='excel'?'מהאקסל':'ידני · '+date(x.priceAsOf))+'</small></td>'+
           '<td>'+money(x.value,x.currency)+'</td><td>'+money(x.unrealized,x.currency,{signed:true})+' <small>'+pct(x.unrealizedPct,{signed:true})+'</small></td><td>'+pct(x.weight,{d:1})+'</td></tr>';
       }
       h+='</tbody></table></div></div><p class="inv-foot">משקל = שווי הנייר בשקלים מתוך כלל התיק <b>כולל מזומן</b>. המחירים הוזנו ידנית, וחיבור לספק מחירים יתווסף בהמשך. עלות כוללת עמלות קנייה (שיטת עלות ממוצעת).</p>';
@@ -406,6 +406,7 @@
       else if(act==='sort'){const k=el.dataset.key;ui.sort=ui.sort.key===k?{key:k,dir:-ui.sort.dir}:{key:k,dir:k==='symbol'?1:-1};renderLog();}
       else if(act==='del-snap'){const id=el.dataset.id,i=pf.snapshots.findIndex(s=>s.id===id),rem=pf.snapshots[i];if(i<0)return;pf={...pf,snapshots:pf.snapshots.filter(s=>s.id!==id)};persist();refresh();
         toast('רישום השווי נמחק',()=>{pf={...pf,snapshots:[...pf.snapshots,rem]};persist();refresh();});}
+      else if(act==='import')q('invImportFile').click();
       else if(act==='export-xlsx')exportXlsx();
       else if(act==='backup')downloadBackup();
       else if(act==='restore')q('invRestoreFile').click();
@@ -462,6 +463,87 @@
         try{localStorage.setItem(PREV_KEY,JSON.stringify({savedAt:new Date().toISOString(),portfolio:pf,market:mk}));}catch(_){}
         pf=next;mk=normalizeMarket(data.market);persist();refresh();toast('הגיבוי שוחזר');
       }catch(err){toast('השחזור נכשל: '+(err.message||'קובץ לא תקין'));}
+    });
+
+    // ---------- Excel import: preview first, then one confirmed write with undo ----------
+    document.body.insertAdjacentHTML('beforeend','<div class="tool-overlay inv-overlay" id="invImpOverlay" hidden><section class="tool-dialog inv-dialog inv-import" role="dialog" aria-modal="true" aria-labelledby="invImpTitle">'+
+      '<header class="tool-head"><div><h2 id="invImpTitle">ייבוא מאקסל</h2><p id="invImpSub"></p></div><button type="button" class="tool-close" data-imp-close aria-label="סגירה">×</button></header>'+
+      '<div class="tool-content inv-imp-body" id="invImpBody"></div>'+
+      '<footer class="inv-imp-foot"><span id="invImpSum" aria-live="polite"></span><button type="button" class="inv-ghost" data-imp-close>ביטול</button><button type="button" class="tool-primary" id="invImpGo">ייבוא</button></footer></section></div>');
+    const STATUS={new:['חדש','inv-st-new'],dup:['קיים','inv-st-dup'],error:['שגיאה','inv-st-err'],conflict:['התנגשות','inv-st-warn'],skip:['דילוג','inv-st-dup']};
+    let imp=null;
+    q('invImportFile').addEventListener('change',async e=>{
+      const file=e.target.files[0];e.target.value='';if(!file)return;
+      try{await openImport(file.name,await file.arrayBuffer());}
+      catch(err){toast('לא הצלחתי לקרוא את הקובץ: '+(err.message||err));}
+    });
+    async function openImport(name,buffer){
+      opener=document.activeElement;
+      const wb=ExcelImport.readWorkbook(await ExcelImport.unzip(buffer));
+      imp={file:name,plan:ExcelImport.plan(pf,wb,mk),active:0,filter:'all'};
+      imp.active=Math.max(0,imp.plan.sheets.findIndex(s=>s.kind));
+      renderImport();q('invImpOverlay').hidden=false;document.body.classList.add('schedule-open');q('invImpGo').focus();
+    }
+    function impCell(sh,r){
+      const x=r.excel||{},rec=r.record||{};
+      if(sh.kind==='trades')return [rec.date?date(rec.date):esc(x.date),esc(x.type),rec.symbol?sym(rec.symbol):esc(x.symbol),num(x.qty),num(x.price),rec.fee!==undefined?num(rec.fee):DASH];
+      if(sh.kind==='cashflows')return [rec.date?date(rec.date):esc(x.date),esc(x.type),'',num(x.amount),'',''];
+      if(sh.kind==='equity')return [rec.date?date(rec.date):esc(x.date),'','',num(x.value,2),'',''];
+      return ['',rec.fx?'שער דולר':'מחיר',esc(x.symbol),num(x.price,4),'',''];
+    }
+    function renderImport(){
+      const P=imp.plan,sheets=P.sheets;
+      q('invImpSub').textContent=imp.file+' · שום דבר לא נשמר עד שלוחצים "ייבוא", ואפשר לבטל גם אחרי.';
+      let h='<div class="inv-imp-sheets" role="list">';
+      sheets.forEach((sh,i)=>{
+        const c=ExcelImport.counts(sh),on=sh.include!==false;
+        const chips=sh.kind?'<span class="inv-imp-counts">'+(c.new?'<i class="inv-st-new">'+c.new+' חדשות</i>':'')+(c.dup?'<i class="inv-st-dup">'+c.dup+' קיימות</i>':'')+(c.conflict?'<i class="inv-st-warn">'+c.conflict+' התנגשויות</i>':'')+(c.error?'<i class="inv-st-err">'+c.error+' שגיאות</i>':'')+(c.skip?'<i class="inv-st-dup">'+c.skip+' דילוג</i>':'')+'</span>':'';
+        h+='<div class="inv-imp-sheet'+(i===imp.active?' is-active':'')+(sh.kind?'':' is-off')+(on?'':' is-excluded')+'" role="listitem">'+
+          (sh.kind?'<label class="inv-imp-check" title="לכלול בייבוא"><input type="checkbox" data-imp-include="'+i+'"'+(on?' checked':'')+'><span class="inv-sr">לייבא את '+esc(sh.name)+'</span></label>':'')+
+          '<button type="button" class="inv-imp-sheet-btn" data-imp-sheet="'+i+'"'+(sh.kind?'':' disabled')+'><strong>'+esc(sh.name)+'</strong><small>'+(sh.kind?sh.label:'לא זוהה, לא ייובא')+'</small>'+chips+'</button></div>';
+      });
+      h+='</div>';
+      const sh=sheets[imp.active];
+      if(sh&&sh.kind){
+        if(sh.notes.length)h+='<ul class="inv-imp-notes">'+sh.notes.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul>';
+        const c=ExcelImport.counts(sh);
+        h+='<div class="inv-toolbar"><div class="inv-chips" role="group" aria-label="סינון שורות">'+
+          [['all','הכול ('+sh.rows.length+')'],['new','חדשות ('+c.new+')'],['problem','לבדיקה ('+(c.error+c.conflict)+')'],['dup','קיימות ('+(c.dup+c.skip)+')']].map(([k,l])=>'<button type="button" class="inv-chip" data-imp-filter="'+k+'" aria-pressed="'+(imp.filter===k)+'">'+l+'</button>').join('')+'</div></div>';
+        const rows=sh.rows.filter(r=>imp.filter==='all'||(imp.filter==='new'&&r.status==='new')||(imp.filter==='problem'&&(r.status==='error'||r.status==='conflict'))||(imp.filter==='dup'&&(r.status==='dup'||r.status==='skip')));
+        const heads=sh.kind==='trades'?['תאריך','סוג','נייר','כמות','מחיר','עמלה']:sh.kind==='cashflows'?['תאריך','סוג','','סכום','','']:sh.kind==='equity'?['תאריך','','','שווי','','']:['','','נייר','מחיר','',''];
+        h+=rows.length?'<div class="inv-table-wrap inv-imp-table"><table class="inv-table"><thead><tr><th>שורה</th>'+heads.map(x=>'<th>'+x+'</th>').join('')+'<th>מצב</th><th>הערה</th></tr></thead><tbody>'+
+          rows.slice(0,400).map(r=>{const st=STATUS[r.status]||STATUS.skip;return '<tr><td>'+num(r.row)+'</td>'+impCell(sh,r).map(x=>'<td>'+(x||'')+'</td>').join('')+'<td><span class="inv-st '+st[1]+'">'+st[0]+'</span></td><td class="inv-note">'+esc([r.message,r.note].filter(Boolean).join(' · '))+'</td></tr>';}).join('')+
+          '</tbody></table></div>'+(rows.length>400?'<p class="inv-none">מוצגות 400 השורות הראשונות מתוך '+rows.length+'.</p>':''):'<p class="inv-none">אין שורות בסינון הזה.</p>';
+      }
+      q('invImpBody').innerHTML=h;
+      const c=ExcelImport.merge(pf,P).counts;
+      const parts=[c.transactions&&c.transactions+' פעולות',c.snapshots&&c.snapshots+' רישומי שווי',c.prices&&c.prices+' מחירים'].filter(Boolean);
+      q('invImpSum').textContent=parts.length?'ייובאו: '+parts.join(', '):'אין שורות חדשות לייבוא';
+      q('invImpGo').disabled=!parts.length;
+    }
+    q('invImpOverlay').addEventListener('click',e=>{
+      const s=e.target.closest('[data-imp-sheet]');if(s){imp.active=+s.dataset.impSheet;imp.filter='all';renderImport();return;}
+      const f=e.target.closest('[data-imp-filter]');if(f){imp.filter=f.dataset.impFilter;renderImport();return;}
+      if(e.target.closest('[data-imp-close]'))closeImport();
+    });
+    q('invImpOverlay').addEventListener('change',e=>{
+      const i=e.target.dataset.impInclude;if(i===undefined)return;
+      imp.plan.sheets[+i].include=e.target.checked;ExcelImport.revalidate(pf,imp.plan);renderImport();
+    });
+    q('invImpOverlay').addEventListener('pointerdown',e=>{if(e.target===q('invImpOverlay'))closeImport();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!q('invImpOverlay').hidden){e.preventDefault();closeImport();}});
+    function closeImport(){q('invImpOverlay').hidden=true;document.body.classList.remove('schedule-open');imp=null;opener?.focus?.();}
+    q('invImpGo').addEventListener('click',()=>{
+      if(!imp)return;
+      const m=ExcelImport.merge(pf,imp.plan),before={pf,mk:JSON.parse(JSON.stringify(mk))};
+      try{localStorage.setItem(PREV_KEY,JSON.stringify({savedAt:new Date().toISOString(),reason:'import',portfolio:pf,market:mk}));}catch(_){}
+      pf=E.normalize(m.state);
+      // Prices from the sheet never replace a price already entered on the site.
+      for(const [sy,price] of Object.entries(m.quotes))if(!mk.quotes[sy])mk.quotes[sy]={price,asOf:'',source:'excel'};
+      if(m.fx&&!mk.fx.USDILS)mk.fx.USDILS={rate:m.fx,asOf:'',source:'excel'};
+      persist();closeImport();refresh();
+      const c=m.counts;
+      toast('יובאו '+c.transactions+' פעולות ו־'+c.snapshots+' רישומי שווי',()=>{pf=before.pf;mk=before.mk;persist();refresh();toast('הייבוא בוטל');});
     });
 
     // ---------- Excel export: real numbers and dates, one sheet per table ----------
