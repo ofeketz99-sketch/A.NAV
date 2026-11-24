@@ -1,0 +1,98 @@
+
+/* A.NAV 047 — top-level areas (calculators / investments) inside one frame.
+   The header, logo, footer and frame stay identical; only the content below the header changes. */
+
+/* Investments accent: !important wins over the inline per-tab accent that applyTabAccent writes. */
+#financeApp.shell[data-area="invest"]{--accent:#2f6461!important;--accent-soft:#dcebe8!important;--ambient:#2f6461!important}
+#financeApp[data-area="invest"]>.screen-views,
+#financeApp[data-area="invest"]>.content-layout,
+#financeApp[data-area="invest"]>.mobile-summary{display:none!important}
+
+/* 1 · Area switch, next to the logo in both areas so nothing shifts. */
+.frame-identity{min-width:0}
+.area-switch{
+  display:inline-flex;flex:none;gap:2px;margin-inline-start:12px;padding:3px;
+  background:#f5efe7;border:1px solid #ded0c1;border-radius:10px;
+}
+.area-switch button{
+  height:29px;padding:0 14px;border:1px solid transparent;border-radius:7px;background:transparent;
+  font:inherit;font-size:12.5px;font-weight:650;color:#5d564d;cursor:pointer;white-space:nowrap;
+  transition:background-color .2s ease,color .2s ease,box-shadow .2s ease;
+}
+.area-switch button:hover{color:#2b2621;background:#fffaf3}
+.area-switch button[aria-selected="true"]{
+  background:#fffdf9;border-color:#c9bba9;color:var(--accent);
+  box-shadow:0 2px 9px #35231714,inset 0 -2px 0 var(--accent);
+}
+.area-switch button:focus-visible,.invest-tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* 2 · Investments workspace: same rhythm as the calculator tabs bar and panels. */
+.invest-app{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.invest-app[hidden]{display:none!important}
+.invest-bar{
+  flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  height:43px;margin:0 0 10px;padding:4px 6px;box-sizing:border-box;
+  background:#f5efe7;border:1px solid #ded0c1;border-radius:13px;
+}
+.invest-tabs{display:flex;align-items:center;gap:4px;min-width:0;height:100%}
+.invest-tabs button{
+  height:31px;padding:0 30px;border:1px solid transparent;border-radius:8px;background:transparent;
+  font:inherit;font-size:12.5px;font-weight:600;color:#5d564d;cursor:pointer;white-space:nowrap;
+  transition:background-color .2s ease,color .2s ease,box-shadow .2s ease;
+}
+.invest-tabs button:hover{background:#fffaf3;color:#2b2621}
+.invest-tabs button[aria-selected="true"]{
+  background:#fffdf9;border-color:#c9bba9;color:var(--accent);
+  box-shadow:0 2px 9px #35231714,inset 0 -2px 0 var(--accent);
+}
+.invest-badge{
+  flex:none;padding:4px 11px;border-radius:999px;font-size:10.5px;font-weight:700;
+  color:var(--accent);background:color-mix(in srgb,var(--accent-soft) 70%,#fffdf9);border:1px solid color-mix(in srgb,var(--accent) 18%,transparent);
+}
+.invest-stage{
+  flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;
+  border:1px solid #e1d9cd;border-radius:15px;box-shadow:0 3px 15px #5b4b3506;
+  background:linear-gradient(165deg,color-mix(in srgb,var(--accent-soft) 38%,#fffdf9) 0%,#fffdf9 64%);
+}
+.invest-view{display:flex;flex-direction:column;gap:14px;min-height:100%;box-sizing:border-box;padding:16px 20px 20px}
+.invest-view[hidden]{display:none}
+.invest-head h2{margin:0;font-size:17px;font-weight:780;color:color-mix(in srgb,var(--accent) 82%,#181511)}
+.invest-head p{margin:4px 0 0;font-size:12px;line-height:1.5;color:#6f665c;max-width:78ch}
+
+.invest-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.invest-kpi{
+  display:flex;flex-direction:column;gap:3px;padding:11px 16px;border:1px solid #dcd0c1;border-radius:12px;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--accent-soft) 32%,#f4f1ee),#f6f3ef);
+}
+.invest-kpi span{font-size:12.5px;font-weight:600;color:#5a5660}
+.invest-kpi strong{font-size:27px;font-weight:780;line-height:1.15;color:color-mix(in srgb,var(--accent) 70%,#1c1a22);font-variant-numeric:tabular-nums}
+.invest-kpi small{font-size:11.25px;color:#6d665d}
+
+.invest-empty{
+  flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  min-height:180px;padding:28px 20px;text-align:center;
+  border:1px dashed #d6c7b5;border-radius:14px;background:#fffdf9a6;
+}
+.invest-empty-icon{width:44px;height:44px;margin-bottom:4px;fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+.invest-empty strong{font-size:15px;font-weight:750;color:#2b2621}
+.invest-empty p{margin:0;font-size:12.5px;line-height:1.55;color:#6f665c;max-width:46ch}
+
+/* 3 · Narrow screens: the bar becomes a four-column grid, KPIs fold to two columns. */
+@media (max-width:1050px){
+  .area-switch{margin-inline-start:8px}
+  .area-switch button{height:26px;padding:0 10px;font-size:11.5px}
+  .invest-bar{height:auto;margin:0 0 6px;padding:4px;flex-wrap:wrap}
+  .invest-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;height:auto}
+  .invest-tabs button{height:auto;min-height:29px;padding:6px 3px;font-size:11px;white-space:normal;line-height:1.2}
+  .invest-badge{display:none}
+  .invest-view{padding:12px 12px 14px;gap:10px}
+  .invest-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .invest-kpi{padding:8px 11px}
+  .invest-kpi strong{font-size:21px}
+  .invest-empty{min-height:140px;padding:20px 14px}
+}
+@media (max-width:420px){
+  .area-switch{margin-inline-start:6px}
+  .area-switch button{padding:0 8px;font-size:11px}
+}
+@media print{.area-switch{display:none!important}}
