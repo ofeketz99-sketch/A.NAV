@@ -3360,6 +3360,115 @@
     return {unzip,readWorkbook,detect,parseDate,symbolOf,plan,revalidate,merge,counts,KINDS};
   })();
 
+  // Market data layer: one interface over several providers, so the portfolio never depends on a specific vendor.
+  // - Crypto (BTC, ETH…): Coinbase public API, no key, live spot price.
+  // - USD/ILS: ECB reference rate via Frankfurter, no key, one rate per business day.
+  // - Stocks and ETFs (US, TASE): a keyed provider behind the site's own server function (/api/market),
+  //   so the API key never reaches the browser or the repository. Until it is configured, stocks keep manual prices.
+  // Every quote keeps its source, the time of the price, and when it was fetched; old quotes are marked stale, never hidden.
+  const MarketData=(()=>{
+    const CRYPTO=/^(BTC|ETH|SOL|XRP|ADA|DOGE|LTC|AVAX|LINK|DOT)(USD|USDT)?$/;
+    const HOUR=36e5,DAY=864e5;
+    // How old a price may be before it is shown as stale. Stocks: the last close is valid over a weekend.
+    const MAX_AGE={crypto:HOUR,fx:4*DAY,stock:4*DAY};
+    // How often to ask again (separate from staleness): live crypto often, stocks every 15 minutes, the daily FX rate a few times a day.
+    const REFRESH_AFTER={crypto:5*6e4,fx:6*HOUR,stock:15*6e4};
+    const needsRefresh=(q,kind,now)=>!q||['manual','excel'].includes(q.source)||!(now-Date.parse(q.fetchedAt||q.asOf||0)<REFRESH_AFTER[kind]);
+    const SOURCES={
+      manual:{label:'הוזן ידנית'},excel:{label:'מהאקסל'},
+      coinbase:{label:'Coinbase',url:'https://www.coinbase.com',note:'מחיר ספוט חי'},
+      ecb:{label:'ECB (Frankfurter)',url:'https://www.frankfurter.app',note:'שער ייחוס יומי של הבנק המרכזי האירופי'},
+      twelvedata:{label:'Twelve Data',url:'https://twelvedata.com',note:'לפי תנאי התוכנית'}
+    };
+    const kindOf=(symbol,market)=>market==='CRYPTO'||CRYPTO.test(symbol)?'crypto':'stock';
+    const baseCoin=s=>s.replace(/(USD|USDT)$/,'');
+    function isStale(q,kind,now){
+      if(!q||!q.asOf)return true;
+      if(q.source==='manual'||q.source==='excel')return false;   // the user's own number: shown with its date, not judged
+      const t=Date.parse(q.asOf);
+      return !Number.isFinite(t)||now-t>MAX_AGE[kind];
+    }
+    // Same request twice at once → one network call.
+    const inflight=new Map();
+    function once(key,fn){if(inflight.has(key))return inflight.get(key);const p=Promise.resolve().then(fn).finally(()=>inflight.delete(key));inflight.set(key,p);return p;}
+    async function getJson(fetchFn,url,timeout=9000){
+      const ctl=typeof AbortController==='function'?new AbortController():null;
+      const t=ctl?setTimeout(()=>ctl.abort(),timeout):null;
+      try{
+        const r=await fetchFn(url,ctl?{signal:ctl.signal}:undefined);
+        if(!r.ok){const e=new Error('HTTP '+r.status);e.status=r.status;throw e;}
+        return await r.json();
+      }finally{if(t)clearTimeout(t);}
+    }
+    const providers={
+      async crypto(symbols,fetchFn){
+        const out={};
+        await Promise.all(symbols.map(async s=>{
+          const j=await once('cb:'+s,()=>getJson(fetchFn,'https://api.exchange.coinbase.com/products/'+baseCoin(s)+'-USD/ticker'));
+          const price=Number(j.price);
+          if(Number.isFinite(price)&&price>0)out[s]={price,asOf:j.time||new Date().toISOString(),source:'coinbase',currency:'USD'};
+        }));
+        return out;
+      },
+      async fx(fetchFn){
+        const j=await once('fx',()=>getJson(fetchFn,'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ILS'));
+        const rate=Number(j?.rates?.ILS);
+        if(!(rate>0))throw new Error('אין שער בתשובה');
+        return {rate,asOf:j.date,source:'ecb'};
+      },
+      // Daily USD/ILS history (ECB). Used to suggest the rate on a trade date; missing days stay missing.
+      async fxHistory(from,to,fetchFn){
+        const j=await once('fxh:'+from+':'+to,()=>getJson(fetchFn,'https://api.frankfurter.dev/v1/'+from+'..'+to+'?base=USD&symbols=ILS'));
+        const out={};for(const [d,v] of Object.entries(j?.rates||{}))if(v?.ILS>0)out[d]=v.ILS;return out;
+      },
+      async stocks(items,fetchFn,endpoint){
+        const qs=items.map(i=>i.market==='TASE'?i.symbol+':TASE':i.symbol).join(',');
+        const j=await once('st:'+qs,()=>getJson(fetchFn,endpoint+'?symbols='+encodeURIComponent(qs),12000));
+        const out={};
+        for(const x of j?.quotes||[]){
+          const s=String(x.symbol||'').split(':')[0].toUpperCase();
+          if(Number.isFinite(x.price)&&x.price>0)out[s]={price:x.price,asOf:x.asOf||null,source:x.source||'twelvedata',currency:x.currency||null,previousClose:Number.isFinite(x.previousClose)?x.previousClose:null};
+        }
+        return {quotes:out,errors:j?.errors||[]};
+      },
+      async stockStatus(fetchFn,endpoint){
+        try{const j=await once('ping',()=>getJson(fetchFn,endpoint+'?ping=1',5000));return {available:!!j?.ok,provider:j?.provider||null};}
+        catch(e){return {available:false,provider:null,error:e.status===404?'no-function':'unreachable'};}
+      }
+    };
+    // Refresh what the portfolio needs. Failures keep the previous quote and record the error next to it.
+    async function refresh(state,market,opts){
+      const fetchFn=opts?.fetch||(typeof fetch==='function'?fetch.bind(globalThis):null);
+      const now=opts?.now??Date.now(),force=!!opts?.force,endpoint=opts?.endpoint||'/api/market';
+      const next={quotes:{...market.quotes},fx:{...market.fx},status:{...(market.status||{})}};
+      const report={updated:[],failed:[],unsupported:[],fresh:[]};
+      const symbols=opts?.symbols||[];
+      const want=symbols.map(s=>({symbol:s,market:state.instruments[s]?.market||(CRYPTO.test(s)?'CRYPTO':'US')}));
+      const due=want.filter(i=>force||needsRefresh(next.quotes[i.symbol],kindOf(i.symbol,i.market),now));
+      for(const i of want)if(!due.includes(i))report.fresh.push(i.symbol);
+      const jobs=[];
+      const crypto=due.filter(i=>kindOf(i.symbol,i.market)==='crypto').map(i=>i.symbol);
+      if(crypto.length)jobs.push(providers.crypto(crypto,fetchFn).then(q=>{for(const s of crypto){if(q[s]){next.quotes[s]={...q[s],fetchedAt:new Date(now).toISOString()};report.updated.push(s);}else report.failed.push(s);}})
+        .catch(e=>{for(const s of crypto){report.failed.push(s);next.status[s]={error:String(e.message||e),at:new Date(now).toISOString()};}}));
+      const stocks=due.filter(i=>kindOf(i.symbol,i.market)==='stock');
+      if(stocks.length)jobs.push(providers.stockStatus(fetchFn,endpoint).then(async st=>{
+        next.stockProvider=st;
+        if(!st.available){for(const i of stocks)report.unsupported.push(i.symbol);return;}
+        const r=await providers.stocks(stocks,fetchFn,endpoint);
+        for(const i of stocks){if(r.quotes[i.symbol]){next.quotes[i.symbol]={...r.quotes[i.symbol],fetchedAt:new Date(now).toISOString()};report.updated.push(i.symbol);}else report.failed.push(i.symbol);}
+      }).catch(e=>{for(const i of stocks)report.failed.push(i.symbol);}));
+      // Like stock prices: a typed or imported rate is a fallback until a provider answers.
+      const cur=next.fx.USDILS;
+      const fxDue=opts?.fx!==false&&(force||needsRefresh(cur,'fx',now));
+      if(fxDue)jobs.push(providers.fx(fetchFn).then(fx=>{next.fx.USDILS={...fx,fetchedAt:new Date(now).toISOString()};report.updated.push('USDILS');}).catch(()=>report.failed.push('USDILS')));
+      await Promise.all(jobs);
+      for(const s of report.updated)delete next.status[s];
+      next.lastRefresh=new Date(now).toISOString();
+      return {market:next,report};
+    }
+    return {refresh,isStale,needsRefresh,kindOf,SOURCES,MAX_AGE,REFRESH_AFTER,providers,CRYPTO};
+  })();
+
   // Top-level areas: the existing calculators and the investments workspace share one frame (logo, header, footer).
   // The calculator DOM stays mounted while hidden, so its ids, state and storage are untouched by switching.
   // The investments accent comes from CSS (!important beats the inline per-tab accent), so applyTabAccent can keep running.
@@ -3456,9 +3565,13 @@
     let calc=null;
     const ui={logMode:'trades',filter:'all',search:'',sort:{key:'startDate',dir:-1},open:new Set(),range:'all',holdBy:'value'};
     function normalizeMarket(raw){
-      const m={quotes:{},fx:{}};
-      for(const [s,v] of Object.entries(raw?.quotes||{}))if(Number.isFinite(v?.price)&&v.price>0)m.quotes[E.cleanSymbol(s)]={price:v.price,asOf:String(v.asOf||''),source:String(v.source||'manual')};
-      if(Number.isFinite(raw?.fx?.USDILS?.rate)&&raw.fx.USDILS.rate>0)m.fx.USDILS={rate:raw.fx.USDILS.rate,asOf:String(raw.fx.USDILS.asOf||''),source:String(raw.fx.USDILS.source||'manual')};
+      const m={quotes:{},fx:{},status:{}};
+      const meta=v=>({asOf:String(v.asOf||''),source:String(v.source||'manual'),...(v.fetchedAt?{fetchedAt:String(v.fetchedAt)}:{}),...(Number.isFinite(v.previousClose)?{previousClose:v.previousClose}:{})});
+      for(const [s,v] of Object.entries(raw?.quotes||{}))if(Number.isFinite(v?.price)&&v.price>0)m.quotes[E.cleanSymbol(s)]={price:v.price,...meta(v)};
+      if(Number.isFinite(raw?.fx?.USDILS?.rate)&&raw.fx.USDILS.rate>0)m.fx.USDILS={rate:raw.fx.USDILS.rate,...meta(raw.fx.USDILS)};
+      for(const [s,v] of Object.entries(raw?.status||{}))if(v&&typeof v==='object')m.status[s]={error:String(v.error||''),at:String(v.at||'')};
+      if(raw?.lastRefresh)m.lastRefresh=String(raw.lastRefresh);
+      if(raw?.stockProvider&&typeof raw.stockProvider==='object')m.stockProvider={available:!!raw.stockProvider.available,provider:raw.stockProvider.provider||null};
       return m;
     }
     function persist(){
@@ -3584,16 +3697,17 @@
         kpi('שווי תיק (₪)',c.totalIls===null?DASH:money(c.totalIls,'ILS'),c.totalIls===null?(c.missingPrices.length?'חסר מחיר: '+c.missingPrices.map(esc).join(', '):'חסר שער דולר'):'כולל מזומן')+
         kpi('מזומן',money(c.cash.USD,'USD')+' · '+money(c.cash.ILS,'ILS'),c.cash.USD<0?'<span class="inv-neg">מזומן דולרי שלילי: חסרה המרת מט״ח?</span>':'נגזר מכל הפעולות')+
         kpi('רווח שטרם מומש',unrealKnown?curTotals(unreal):DASH,unrealKnown?'לפי המחירים שהוזנו':'חסרים מחירים')+
-        '<div class="invest-kpi"><span>שער דולר (USDILS)</span><strong><input class="inv-inline" type="text" inputmode="decimal" data-act="fx" value="'+(rate?rate.rate:'')+'" placeholder="הזן שער" aria-label="שער דולר"></strong><small>'+(rate?(rate.source==='excel'?'מהאקסל, כדאי לעדכן':'הוזן ידנית · '+date(rate.asOf)):'נדרש לשווי בשקלים')+'</small></div>'+
+        '<div class="invest-kpi"><span>שער דולר (USDILS)</span><strong><input class="inv-inline" type="text" inputmode="decimal" data-act="fx" value="'+(rate?rate.rate:'')+'" placeholder="הזן שער" aria-label="שער דולר"></strong><small>'+(rate?srcLabel(rate,'fx'):'נדרש לשווי בשקלים')+'</small></div>'+
         '</div>';
-      if(!c.holdings.length){box.innerHTML=h+empty(ICON.pie,'אין כרגע אחזקות','אחזקות מחושבות אוטומטית מהקניות והמכירות בלוג.');return;}
+      if(!c.holdings.length){box.innerHTML=h+priceBar()+empty(ICON.pie,'אין כרגע אחזקות','אחזקות מחושבות אוטומטית מהקניות והמכירות בלוג.');return;}
+      h+=priceBar();
       h+='<div class="inv-split">'+donut()+'<div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>נייר</th><th>כמות</th><th>עלות ממוצעת</th><th>עלות</th><th>מחיר נוכחי</th><th>שווי</th><th>רווח / הפסד</th><th>משקל</th></tr></thead><tbody>';
       for(const x of c.holdings){
         h+='<tr><td>'+sym(x.symbol)+' <small class="inv-tag">'+E.MARKETS[x.market].label+'</small></td><td>'+num(x.qty)+'</td><td>'+money(x.avgCost===null?null:E.cents(x.avgCost),x.currency)+'</td><td>'+money(x.cost,x.currency)+'</td>'+
-          '<td><input class="inv-inline" type="text" inputmode="decimal" data-act="price" data-symbol="'+esc(x.symbol)+'" value="'+(x.price??'')+'" placeholder="מחיר" aria-label="מחיר נוכחי של '+esc(x.symbol)+'"><small class="inv-muted inv-src">'+(x.price===null?'חסר':x.priceSource==='excel'?'מהאקסל':'ידני · '+date(x.priceAsOf))+'</small></td>'+
+          '<td><input class="inv-inline" type="text" inputmode="decimal" data-act="price" data-symbol="'+esc(x.symbol)+'" value="'+(x.price??'')+'" placeholder="מחיר" aria-label="מחיר נוכחי של '+esc(x.symbol)+'"><small class="inv-muted inv-src">'+(x.price===null?'חסר':srcLabel(mk.quotes[x.symbol],MarketData.kindOf(x.symbol,x.market)))+'</small></td>'+
           '<td>'+money(x.value,x.currency)+'</td><td>'+money(x.unrealized,x.currency,{signed:true})+' <small>'+pct(x.unrealizedPct,{signed:true})+'</small></td><td>'+pct(x.weight,{d:1})+'</td></tr>';
       }
-      h+='</tbody></table></div></div><p class="inv-foot">משקל = שווי הנייר בשקלים מתוך כלל התיק <b>כולל מזומן</b>. המחירים הוזנו ידנית, וחיבור לספק מחירים יתווסף בהמשך. עלות כוללת עמלות קנייה (שיטת עלות ממוצעת).</p>';
+      h+='</tbody></table></div></div><p class="inv-foot">משקל = שווי הנייר בשקלים מתוך כלל התיק <b>כולל מזומן</b>. עלות כוללת עמלות קנייה (שיטת עלות ממוצעת). ליד כל מחיר מוצגים המקור וזמן המחיר. מחיר שהוקלד ידנית משמש עד שמתקבל מחיר מספק. קריפטו: מחיר ספוט חי מ־Coinbase. דולר: שער הייחוס היומי של הבנק המרכזי האירופי (ECB), שאינו השער היציג של בנק ישראל.</p>';
       box.innerHTML=h;
     }
     function donut(){
@@ -3854,6 +3968,7 @@
       else if(act==='backup')downloadBackup();
       else if(act==='restore')q('invRestoreFile').click();
       else if(act==='settings')openSettings();
+      else if(act==='prices')refreshPrices(true);
       if(el.closest('#invMenu'))setMenu(false);
     });
     root.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr[data-act="toggle"]')){e.preventDefault();e.target.click();}});
@@ -3887,7 +4002,48 @@
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){setMenu(false);menuBtn.focus();}});
     function activateView(v){q('investTab-'+v)?.click();}
     // Charts measure their container; redraw when a view becomes visible or the window size changes.
-    window.addEventListener('anav:invest-view',()=>{if(calc)refresh();});
+    window.addEventListener('anav:invest-view',e=>{if(calc)refresh();if(e.detail?.area==='invest')autoPrices();});
+
+    // ---------- market prices ----------
+    const ago=iso=>{const t=Date.parse(iso);if(!Number.isFinite(t))return '';const m=Math.round((Date.now()-t)/6e4);
+      return m<1?'עכשיו':m<60?'לפני '+m+' דק׳':m<24*60?'לפני '+Math.round(m/60)+' שע׳':date(new Date(t).toISOString().slice(0,10));};
+    // "Coinbase · לפני 3 דק׳", "ECB · 24/11/26", "ידני · 20/11/26", with a stale mark when a provider price is too old.
+    function srcLabel(qt,kind){
+      if(!qt)return 'חסר';
+      const s=MarketData.SOURCES[qt.source]||{label:qt.source};
+      const when=qt.source==='ecb'||/^\d{4}-\d{2}-\d{2}$/.test(qt.asOf||'')?date(qt.asOf):qt.asOf?ago(qt.asOf):'תאריך לא ידוע';
+      const stale=MarketData.isStale(qt,kind,Date.now());
+      return '<span'+(stale?' class="inv-stale" title="המחיר ישן. כדאי לרענן או לבדוק את המקור."':' title="'+esc(s.note||'')+'"')+'>'+esc(s.label)+' · '+when+(stale?' · ישן':'')+'</span>';
+    }
+    let priceJob=null,priceMsg='',lastAuto=0;
+    function priceBar(){
+      const sp=mk.stockProvider,hasStocks=calc.holdings.some(h=>MarketData.kindOf(h.symbol,h.market)==='stock');
+      const stockLine=!hasStocks?'':sp?.available?'מניות: '+esc((MarketData.SOURCES[sp.provider]||{label:sp.provider}).label):'מניות: עדיין אין ספק מחירים מחובר, ולכן המחירים ידניים';
+      return '<div class="inv-pricebar" role="status"><span>'+(priceJob?'מעדכן מחירים…':mk.lastRefresh?'רענון אחרון '+ago(mk.lastRefresh):'המחירים עוד לא רועננו')+'</span>'+
+        '<span class="inv-muted">קריפטו: Coinbase · דולר: ECB'+(stockLine?' · '+stockLine:'')+'</span>'+(priceMsg?'<span class="inv-neg">'+esc(priceMsg)+'</span>':'')+
+        '<button type="button" class="invest-btn" data-act="prices"'+(priceJob?' disabled':'')+'>רענון מחירים</button></div>';
+    }
+    async function refreshPrices(force){
+      if(priceJob)return priceJob;
+      const symbols=calc.holdings.map(h=>h.symbol);
+      priceMsg='';
+      priceJob=(async()=>{
+        renderHoldings();
+        try{
+          const r=await MarketData.refresh(pf,mk,{symbols,force});
+          mk=normalizeMarket(r.market);persist();
+          const f=r.report.failed;
+          if(f.length)priceMsg='לא התקבל מחיר עבור: '+f.join(', ')+'. מוצג המחיר האחרון שנשמר.';
+        }catch(e){priceMsg='עדכון המחירים נכשל. מוצגים המחירים האחרונים שנשמרו.';}
+        finally{priceJob=null;refresh();}
+      })();
+      return priceJob;
+    }
+    // Automatic refresh when the investments area is open, at most once a minute; prices that are still fresh are skipped.
+    function autoPrices(){
+      if(root.hidden||Date.now()-lastAuto<6e4||!calc||(!calc.holdings.length&&mk.fx.USDILS))return;
+      lastAuto=Date.now();refreshPrices(false);
+    }
     let rz=null;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(!root.hidden&&calc)refresh();},150);});
 
     // ---------- backup / restore ----------
@@ -4052,6 +4208,7 @@
     }
 
     refresh();
+    if(!root.hidden)setTimeout(autoPrices,600);
   })();
   // Double click a slider, including its surrounding track, restores its factory default.
   controlList.addEventListener('dblclick',e=>{

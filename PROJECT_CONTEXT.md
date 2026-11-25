@@ -254,3 +254,21 @@
   - ייבוא חוזר לא הוסיף דבר.
   - הפערים בנטו לעסקה מוסברים בעמלות שחסרו באקסל.
   - השינוי היומי זהה לאקסל, חוץ משורה אחת שבה האחוז באקסל לא תואם את הערכים של אותו גיליון.
+
+## נתוני שוק — 2026-11-25 (v050, ענף `feature/investments`)
+- **`scripts/src/97-market-data.js`** (`MarketData`, בלי DOM): `refresh(state, market, {symbols, force, fetch, endpoint})` מחזיר `market` חדש ודוח (`updated`, `failed`, `unsupported`, `fresh`).
+  - **מקורות:** קריפטו מ-Coinbase, ‏USDILS מ-Frankfurter (ECB), מניות דרך `/api/market`.
+  - **שני ספים נפרדים:** `isStale` (מתי מחיר נחשב ישן) ו-`needsRefresh` (מתי לבקש שוב).
+  - בקשות זהות בו-זמנית מאוחדות דרך `once()`.
+- **`netlify/functions/market.mjs`** (Netlify Functions v2, ‏`config.path='/api/market'`):
+  - קורא את `TWELVEDATA_API_KEY` ממשתני הסביבה. `?ping=1` מחזיר אם המפתח מוגדר, בלי לחשוף אותו.
+  - בודק תקינות סימולים, מטמון של 60 שניות, והמרה מ-`ILA` (אגורות) לשקלים.
+  - בכשל ספק מחזיר רק מה שבמטמון.
+  - נבדק ב-`tests/market.test.mjs` מול ספק מדומה. עוד לא נפרס.
+- **`anav.market.v1`:** לכל מחיר נשמרים `source`, ‏`asOf`, ‏`fetchedAt`, ואם קיים `previousClose`. נוספו `lastRefresh` ו-`stockProvider`. `normalizeMarket` ב-`98-investments.js` שומר את כל השדות.
+- **ממשק:** `priceBar()` ו-`srcLabel()` בתצוגת פילוח התיק. רענון אוטומטי (`autoPrices`) בפתיחת אזור ההשקעות.
+- **תיעוד:** בדיקת הספקים, הבחירה וההגדרה ב-`docs/investments/MARKET_DATA.md`.
+- **מגבלות ידועות:**
+  - ממשק בנק ישראל החזיר 404 בכתובות שבמדריך שלו.
+  - אין מקור מאומת ל-VIX.
+  - הפונקציה תפעל רק אחרי פריסה ואחרי שהמשתמש יגדיר מפתח.

@@ -1,0 +1,17 @@
+{
+  "version": 50,
+  "date": "2026-11-25",
+  "branch": "feature/investments",
+  "title": "Market data: live crypto, daily USD/ILS, server function for stock prices",
+  "changes": [
+    "Provider layer (scripts/src/97-market-data.js): one interface over several sources; the portfolio engine does not change when a provider changes",
+    "Crypto prices from Coinbase (live spot, no key); USD/ILS from the ECB reference rate via Frankfurter (daily, no key), labelled ECB so it is not mistaken for the Bank of Israel representative rate",
+    "Stocks and ETFs through the site's own function /api/market (netlify/functions/market.mjs) with a Twelve Data adapter; the key is read only from the TWELVEDATA_API_KEY environment variable; symbols are validated, quotes cached for 60 seconds, Tel Aviv prices converted from agorot",
+    "Holdings: price status bar with last refresh, sources and a refresh button; every price shows its source and time, old prices are marked stale; a failed provider keeps the last price and says so",
+    "Refresh timing: crypto 5 min, stocks 15 min, dollar 6 h; automatic when the investments area opens (at most once a minute); identical requests share one call",
+    "Manual prices stay as a fallback until a provider answers",
+    "docs/investments/MARKET_DATA.md: provider comparison from official pages, the choice, and setup steps",
+    "npm test now also runs .mjs tests"
+  ],
+  "backup": "backups/2026-11-24T22-42-00Z-market-data/"
+}

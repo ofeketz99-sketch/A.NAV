@@ -13,9 +13,13 @@
     let calc=null;
     const ui={logMode:'trades',filter:'all',search:'',sort:{key:'startDate',dir:-1},open:new Set(),range:'all',holdBy:'value'};
     function normalizeMarket(raw){
-      const m={quotes:{},fx:{}};
-      for(const [s,v] of Object.entries(raw?.quotes||{}))if(Number.isFinite(v?.price)&&v.price>0)m.quotes[E.cleanSymbol(s)]={price:v.price,asOf:String(v.asOf||''),source:String(v.source||'manual')};
-      if(Number.isFinite(raw?.fx?.USDILS?.rate)&&raw.fx.USDILS.rate>0)m.fx.USDILS={rate:raw.fx.USDILS.rate,asOf:String(raw.fx.USDILS.asOf||''),source:String(raw.fx.USDILS.source||'manual')};
+      const m={quotes:{},fx:{},status:{}};
+      const meta=v=>({asOf:String(v.asOf||''),source:String(v.source||'manual'),...(v.fetchedAt?{fetchedAt:String(v.fetchedAt)}:{}),...(Number.isFinite(v.previousClose)?{previousClose:v.previousClose}:{})});
+      for(const [s,v] of Object.entries(raw?.quotes||{}))if(Number.isFinite(v?.price)&&v.price>0)m.quotes[E.cleanSymbol(s)]={price:v.price,...meta(v)};
+      if(Number.isFinite(raw?.fx?.USDILS?.rate)&&raw.fx.USDILS.rate>0)m.fx.USDILS={rate:raw.fx.USDILS.rate,...meta(raw.fx.USDILS)};
+      for(const [s,v] of Object.entries(raw?.status||{}))if(v&&typeof v==='object')m.status[s]={error:String(v.error||''),at:String(v.at||'')};
+      if(raw?.lastRefresh)m.lastRefresh=String(raw.lastRefresh);
+      if(raw?.stockProvider&&typeof raw.stockProvider==='object')m.stockProvider={available:!!raw.stockProvider.available,provider:raw.stockProvider.provider||null};
       return m;
     }
     function persist(){
@@ -141,16 +145,17 @@
         kpi('שווי תיק (₪)',c.totalIls===null?DASH:money(c.totalIls,'ILS'),c.totalIls===null?(c.missingPrices.length?'חסר מחיר: '+c.missingPrices.map(esc).join(', '):'חסר שער דולר'):'כולל מזומן')+
         kpi('מזומן',money(c.cash.USD,'USD')+' · '+money(c.cash.ILS,'ILS'),c.cash.USD<0?'<span class="inv-neg">מזומן דולרי שלילי: חסרה המרת מט״ח?</span>':'נגזר מכל הפעולות')+
         kpi('רווח שטרם מומש',unrealKnown?curTotals(unreal):DASH,unrealKnown?'לפי המחירים שהוזנו':'חסרים מחירים')+
-        '<div class="invest-kpi"><span>שער דולר (USDILS)</span><strong><input class="inv-inline" type="text" inputmode="decimal" data-act="fx" value="'+(rate?rate.rate:'')+'" placeholder="הזן שער" aria-label="שער דולר"></strong><small>'+(rate?(rate.source==='excel'?'מהאקסל, כדאי לעדכן':'הוזן ידנית · '+date(rate.asOf)):'נדרש לשווי בשקלים')+'</small></div>'+
+        '<div class="invest-kpi"><span>שער דולר (USDILS)</span><strong><input class="inv-inline" type="text" inputmode="decimal" data-act="fx" value="'+(rate?rate.rate:'')+'" placeholder="הזן שער" aria-label="שער דולר"></strong><small>'+(rate?srcLabel(rate,'fx'):'נדרש לשווי בשקלים')+'</small></div>'+
         '</div>';
-      if(!c.holdings.length){box.innerHTML=h+empty(ICON.pie,'אין כרגע אחזקות','אחזקות מחושבות אוטומטית מהקניות והמכירות בלוג.');return;}
+      if(!c.holdings.length){box.innerHTML=h+priceBar()+empty(ICON.pie,'אין כרגע אחזקות','אחזקות מחושבות אוטומטית מהקניות והמכירות בלוג.');return;}
+      h+=priceBar();
       h+='<div class="inv-split">'+donut()+'<div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>נייר</th><th>כמות</th><th>עלות ממוצעת</th><th>עלות</th><th>מחיר נוכחי</th><th>שווי</th><th>רווח / הפסד</th><th>משקל</th></tr></thead><tbody>';
       for(const x of c.holdings){
         h+='<tr><td>'+sym(x.symbol)+' <small class="inv-tag">'+E.MARKETS[x.market].label+'</small></td><td>'+num(x.qty)+'</td><td>'+money(x.avgCost===null?null:E.cents(x.avgCost),x.currency)+'</td><td>'+money(x.cost,x.currency)+'</td>'+
-          '<td><input class="inv-inline" type="text" inputmode="decimal" data-act="price" data-symbol="'+esc(x.symbol)+'" value="'+(x.price??'')+'" placeholder="מחיר" aria-label="מחיר נוכחי של '+esc(x.symbol)+'"><small class="inv-muted inv-src">'+(x.price===null?'חסר':x.priceSource==='excel'?'מהאקסל':'ידני · '+date(x.priceAsOf))+'</small></td>'+
+          '<td><input class="inv-inline" type="text" inputmode="decimal" data-act="price" data-symbol="'+esc(x.symbol)+'" value="'+(x.price??'')+'" placeholder="מחיר" aria-label="מחיר נוכחי של '+esc(x.symbol)+'"><small class="inv-muted inv-src">'+(x.price===null?'חסר':srcLabel(mk.quotes[x.symbol],MarketData.kindOf(x.symbol,x.market)))+'</small></td>'+
           '<td>'+money(x.value,x.currency)+'</td><td>'+money(x.unrealized,x.currency,{signed:true})+' <small>'+pct(x.unrealizedPct,{signed:true})+'</small></td><td>'+pct(x.weight,{d:1})+'</td></tr>';
       }
-      h+='</tbody></table></div></div><p class="inv-foot">משקל = שווי הנייר בשקלים מתוך כלל התיק <b>כולל מזומן</b>. המחירים הוזנו ידנית, וחיבור לספק מחירים יתווסף בהמשך. עלות כוללת עמלות קנייה (שיטת עלות ממוצעת).</p>';
+      h+='</tbody></table></div></div><p class="inv-foot">משקל = שווי הנייר בשקלים מתוך כלל התיק <b>כולל מזומן</b>. עלות כוללת עמלות קנייה (שיטת עלות ממוצעת). ליד כל מחיר מוצגים המקור וזמן המחיר. מחיר שהוקלד ידנית משמש עד שמתקבל מחיר מספק. קריפטו: מחיר ספוט חי מ־Coinbase. דולר: שער הייחוס היומי של הבנק המרכזי האירופי (ECB), שאינו השער היציג של בנק ישראל.</p>';
       box.innerHTML=h;
     }
     function donut(){
@@ -411,6 +416,7 @@
       else if(act==='backup')downloadBackup();
       else if(act==='restore')q('invRestoreFile').click();
       else if(act==='settings')openSettings();
+      else if(act==='prices')refreshPrices(true);
       if(el.closest('#invMenu'))setMenu(false);
     });
     root.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr[data-act="toggle"]')){e.preventDefault();e.target.click();}});
@@ -444,7 +450,48 @@
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){setMenu(false);menuBtn.focus();}});
     function activateView(v){q('investTab-'+v)?.click();}
     // Charts measure their container; redraw when a view becomes visible or the window size changes.
-    window.addEventListener('anav:invest-view',()=>{if(calc)refresh();});
+    window.addEventListener('anav:invest-view',e=>{if(calc)refresh();if(e.detail?.area==='invest')autoPrices();});
+
+    // ---------- market prices ----------
+    const ago=iso=>{const t=Date.parse(iso);if(!Number.isFinite(t))return '';const m=Math.round((Date.now()-t)/6e4);
+      return m<1?'עכשיו':m<60?'לפני '+m+' דק׳':m<24*60?'לפני '+Math.round(m/60)+' שע׳':date(new Date(t).toISOString().slice(0,10));};
+    // "Coinbase · לפני 3 דק׳", "ECB · 24/11/26", "ידני · 20/11/26", with a stale mark when a provider price is too old.
+    function srcLabel(qt,kind){
+      if(!qt)return 'חסר';
+      const s=MarketData.SOURCES[qt.source]||{label:qt.source};
+      const when=qt.source==='ecb'||/^\d{4}-\d{2}-\d{2}$/.test(qt.asOf||'')?date(qt.asOf):qt.asOf?ago(qt.asOf):'תאריך לא ידוע';
+      const stale=MarketData.isStale(qt,kind,Date.now());
+      return '<span'+(stale?' class="inv-stale" title="המחיר ישן. כדאי לרענן או לבדוק את המקור."':' title="'+esc(s.note||'')+'"')+'>'+esc(s.label)+' · '+when+(stale?' · ישן':'')+'</span>';
+    }
+    let priceJob=null,priceMsg='',lastAuto=0;
+    function priceBar(){
+      const sp=mk.stockProvider,hasStocks=calc.holdings.some(h=>MarketData.kindOf(h.symbol,h.market)==='stock');
+      const stockLine=!hasStocks?'':sp?.available?'מניות: '+esc((MarketData.SOURCES[sp.provider]||{label:sp.provider}).label):'מניות: עדיין אין ספק מחירים מחובר, ולכן המחירים ידניים';
+      return '<div class="inv-pricebar" role="status"><span>'+(priceJob?'מעדכן מחירים…':mk.lastRefresh?'רענון אחרון '+ago(mk.lastRefresh):'המחירים עוד לא רועננו')+'</span>'+
+        '<span class="inv-muted">קריפטו: Coinbase · דולר: ECB'+(stockLine?' · '+stockLine:'')+'</span>'+(priceMsg?'<span class="inv-neg">'+esc(priceMsg)+'</span>':'')+
+        '<button type="button" class="invest-btn" data-act="prices"'+(priceJob?' disabled':'')+'>רענון מחירים</button></div>';
+    }
+    async function refreshPrices(force){
+      if(priceJob)return priceJob;
+      const symbols=calc.holdings.map(h=>h.symbol);
+      priceMsg='';
+      priceJob=(async()=>{
+        renderHoldings();
+        try{
+          const r=await MarketData.refresh(pf,mk,{symbols,force});
+          mk=normalizeMarket(r.market);persist();
+          const f=r.report.failed;
+          if(f.length)priceMsg='לא התקבל מחיר עבור: '+f.join(', ')+'. מוצג המחיר האחרון שנשמר.';
+        }catch(e){priceMsg='עדכון המחירים נכשל. מוצגים המחירים האחרונים שנשמרו.';}
+        finally{priceJob=null;refresh();}
+      })();
+      return priceJob;
+    }
+    // Automatic refresh when the investments area is open, at most once a minute; prices that are still fresh are skipped.
+    function autoPrices(){
+      if(root.hidden||Date.now()-lastAuto<6e4||!calc||(!calc.holdings.length&&mk.fx.USDILS))return;
+      lastAuto=Date.now();refreshPrices(false);
+    }
     let rz=null;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(!root.hidden&&calc)refresh();},150);});
 
     // ---------- backup / restore ----------
@@ -609,4 +656,5 @@
     }
 
     refresh();
+    if(!root.hidden)setTimeout(autoPrices,600);
   })();
