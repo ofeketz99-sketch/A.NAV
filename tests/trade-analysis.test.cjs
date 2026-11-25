@@ -110,3 +110,16 @@ test('summary counts patterns and averages after-exit changes over closed trades
   const s=T.summarize([T.analyze(one.t,one.txs,B,{today:'2026-12-31'}),T.analyze(two.t,two.txs,B,{today:'2026-12-31'})]);
   assert.equal(s.closed,1);assert.equal(s.counts.noPlan,2);assert.ok(s.after.d1.n===1);
 });
+
+test('split adjustment: a 4:1 split after the trade, and an irregular ratio, are detected from the trade prices',()=>{
+  const four=T.scaleFor([{type:'buy',date:'2026-03-02',price:400},{type:'sell',date:'2026-03-04',price:440}],bars('2026-03-02',[101,105,110]));
+  assert.equal(four.factor,4);assert.equal(four.exact,true);
+  const odd=T.scaleFor([{type:'buy',date:'2026-03-02',price:1}],bars('2026-03-02',[2700]));
+  assert.equal(odd.adjusted,true);assert.equal(odd.exact,false);
+  const none=T.scaleFor([{type:'buy',date:'2026-03-02',price:10.4}],bars('2026-03-02',[10]));
+  assert.equal(none.factor,1);
+  const {t,txs}=trade([{type:'buy',date:'2026-03-02',symbol:'ALFA',qty:10,price:400},{type:'sell',date:'2026-03-04',symbol:'ALFA',qty:10,price:440}]);
+  const a=T.analyze(t,txs,bars('2026-03-02',[100,105,110]),{today:'2026-12-31'});
+  assert.equal(a.scale.factor,4);
+  assert.ok(a.mfe.pct<20,'max rise measured on scaled prices, not 300%+');
+});

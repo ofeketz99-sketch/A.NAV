@@ -50,7 +50,7 @@
         if(t.type==='buy'||t.type==='sell'){
           tx.symbol=cleanSymbol(t.symbol);if(!tx.symbol)continue;
           tx.qty=q8(t.qty);tx.price=Number(t.price)||0;tx.fee=Math.max(0,Number(t.fee)||0);
-          if(Number.isFinite(t.fxRate)&&t.fxRate>0)tx.fxRate=t.fxRate;
+          if(Number.isFinite(t.fxRate)&&t.fxRate>0){tx.fxRate=t.fxRate;if(t.fxSource==='ecb')tx.fxSource='ecb';}
           const plan=normalizePlan(t.tradePlan);if(plan)tx.tradePlan=plan;
           if(t.type==='buy'&&t.opening===true)tx.opening=true;
         }else if(t.type==='fx'){

@@ -3548,3 +3548,10 @@ html.splash-run .splash-word .splash-dot{
 .inv-fix>div{flex:1 1 280px}
 .inv-link{border:0;background:transparent;padding:0;font:inherit;color:inherit;cursor:pointer;text-decoration:underline dotted color-mix(in srgb,var(--accent) 50%,transparent);text-underline-offset:3px}
 .inv-link:hover{color:var(--accent)}
+
+/* Computed performance and trade-date rates (v053) */
+.inv-dot-broker{fill:#d9822b;stroke:#fff;stroke-width:1}
+.inv-key-broker{height:8px;width:8px;border-radius:50%;background:#d9822b}
+.inv-mini{margin-top:4px;align-self:flex-start;border:1px solid #ddd2c4;background:#fffaf4;border-radius:7px;padding:3px 9px;font:inherit;font-size:11px;font-weight:650;color:#5b5146;cursor:pointer}
+.inv-mini:hover{border-color:var(--accent);color:var(--accent)}
+.inv-mini:disabled{opacity:.6;cursor:progress}

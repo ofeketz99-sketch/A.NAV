@@ -17,9 +17,29 @@
     const firstOnOrAfter=(bars,date)=>{let lo=0,hi=bars.length;while(lo<hi){const m=(lo+hi)>>1;if(bars[m][0]>=date)hi=m;else lo=m+1;}return lo;};
     const pct=(a,b)=>b?(a/b-1)*100:null;
 
+    // Split adjustment. Providers return history adjusted for later splits, while trades are recorded at the real price.
+    // Compare each trade price with that day's close; if they clearly differ, scale the history to the trade prices.
+    // The factor snaps to a common split ratio when one is close (e.g. 1:20, 4:1), otherwise the median ratio is used.
+    const RATIOS=[2,3,4,5,6,8,10,12,15,20,25,30,40,50,100].flatMap(r=>[r,1/r]);
+    function scaleFor(txs,bars){
+      const B=Array.isArray(bars)?bars:[],rs=[];
+      for(const t of txs||[]){
+        if(!(t&&(t.type==='buy'||t.type==='sell')&&t.price>0))continue;
+        let i=firstOnOrAfter(B,t.date);const b=B[i]&&B[i][0]===t.date?B[i]:B[i-1]&&Math.abs(Date.parse(t.date)-Date.parse(B[i-1][0]))<=3*864e5?B[i-1]:null;
+        if(b&&b[4]>0)rs.push(t.price/b[4]);
+      }
+      if(!rs.length)return {factor:1,adjusted:false,samples:0};
+      rs.sort((a,b)=>a-b);const m=rs[Math.floor(rs.length/2)];
+      if(m>=0.8&&m<=1.25)return {factor:1,adjusted:false,samples:rs.length};
+      const snap=RATIOS.find(r=>Math.abs(m/r-1)<0.15);
+      return {factor:snap||m,adjusted:true,exact:!!snap,samples:rs.length};
+    }
+    const scaleBars=(bars,f)=>f===1?bars:bars.map(b=>[b[0],b[1]*f,b[2]*f,b[3]*f,b[4]*f]);
     function analyze(trade,txs,bars,opts){
       const today=opts?.today,customDays=opts?.customDays||63;
       const list=(txs||[]).filter(t=>t&&(t.type==='buy'||t.type==='sell')).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+      const scale=scaleFor(list,bars);
+      bars=scaleBars(Array.isArray(bars)?bars:[],scale.factor);
       const buys=list.filter(t=>t.type==='buy'),sells=list.filter(t=>t.type==='sell');
       const bq=buys.reduce((s,t)=>s+t.qty,0);
       const avgEntry=bq?buys.reduce((s,t)=>s+t.qty*t.price,0)/bq:null;
@@ -30,7 +50,7 @@
       const hold=B.filter(b=>b[0]>=trade.startDate&&b[0]<=end);
       const res={tradeId:trade.id,symbol:trade.symbol,currency:trade.currency,status:trade.status,startDate:trade.startDate,endDate:trade.endDate,days:trade.days,
         net:trade.net,returnPct:trade.returnPct,avgEntry,avgExit,coverage:hold.length?'ok':B.length?'partial':'none',bars:B.length,
-        mfe:null,mae:null,exits:[],after:{},hypothetical:{},plan:null,adherence:{},patterns:[]};
+        mfe:null,mae:null,exits:[],after:{},hypothetical:{},plan:null,adherence:{},patterns:[],scale};
       if(hold.length&&avgEntry){
         let hi=hold[0],lo=hold[0];for(const b of hold){if(b[2]>hi[2])hi=b;if(b[3]<lo[3])lo=b;}
         res.mfe={pct:pct(hi[2],avgEntry),price:hi[2],date:hi[0]};
@@ -97,5 +117,5 @@
         avgMfe:withMfe.length?withMfe.reduce((s,a)=>s+a.mfe.pct,0)/withMfe.length:null,
         avgMae:withMfe.length?withMfe.reduce((s,a)=>s+a.mae.pct,0)/withMfe.length:null};
     }
-    return {analyze,summarize,windowFor,PATTERNS,HORIZONS,TH,addDays};
+    return {analyze,summarize,windowFor,scaleFor,scaleBars,PATTERNS,HORIZONS,TH,addDays};
   })();
