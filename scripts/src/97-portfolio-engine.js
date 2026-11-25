@@ -52,6 +52,7 @@
           tx.qty=q8(t.qty);tx.price=Number(t.price)||0;tx.fee=Math.max(0,Number(t.fee)||0);
           if(Number.isFinite(t.fxRate)&&t.fxRate>0)tx.fxRate=t.fxRate;
           const plan=normalizePlan(t.tradePlan);if(plan)tx.tradePlan=plan;
+          if(t.type==='buy'&&t.opening===true)tx.opening=true;
         }else if(t.type==='fx'){
           tx.from=CURRENCIES.includes(t.from)?t.from:'ILS';tx.amount=Number(t.amount)||0;tx.rate=Number(t.rate)||0;
         }else{
@@ -78,6 +79,8 @@
     // so a deposit is never also typed as a cash movement for a purchase (no double counting).
     function cashFlows(tx,state){
       if(tx.type==='buy'||tx.type==='sell'){
+        // A holding from before tracking began: its cost was paid outside the tracked cash.
+        if(tx.opening)return [];
         const cur=instrumentOf(state,tx.symbol).currency,gross=cents(tx.qty*tx.price),fee=cents(tx.fee);
         return [[cur,tx.type==='buy'?-(gross+fee):gross-fee]];
       }
@@ -94,7 +97,7 @@
       const state=raw&&raw.schema===SCHEMA?raw:normalize(raw);
       const today=opts?.today||todayIso();
       const quotes=market?.quotes||{},usdIls=market?.fx?.USDILS?.rate;
-      const cash={USD:0,ILS:0},netDeposits={USD:0,ILS:0},depositEvents=[];
+      const cash={USD:0,ILS:0},netDeposits={USD:0,ILS:0},openingCapital={USD:0,ILS:0},depositEvents=[];
       const pos={},trades=[],issues=[],txInfo={};
       for(const tx of ordered(state.transactions)){
         const flows=cashFlows(tx,state);
@@ -104,6 +107,13 @@
           const c=flows[0][1];netDeposits[tx.currency]+=c;depositEvents.push({date:tx.date,currency:tx.currency,cents:c});
         }
         if(tx.type!=='buy'&&tx.type!=='sell')continue;
+        // Opening holdings count as capital brought in (at cost), so profit is not inflated by their value.
+        if(tx.opening){
+          const cur=instrumentOf(state,tx.symbol).currency,c=cents(tx.qty*tx.price)+cents(tx.fee);
+          openingCapital[cur]+=c;
+          if(cur==='ILS')depositEvents.push({date:tx.date,currency:'ILS',cents:c,opening:true});
+          else if(tx.fxRate)depositEvents.push({date:tx.date,currency:'ILS',cents:Math.round(c*tx.fxRate),opening:true});
+        }
         const ins=instrumentOf(state,tx.symbol);
         const p=pos[tx.symbol]||(pos[tx.symbol]={symbol:tx.symbol,currency:ins.currency,qty:0,cost:0,costIls:0,ilsKnown:true,realized:0,realizedIls:0,realizedIlsKnown:true,fees:0,trade:null});
         const gross=cents(tx.qty*tx.price),fee=cents(tx.fee);
@@ -178,6 +188,7 @@
         byCurrency:{USD:byCur('USD'),ILS:byCur('ILS')}
       };
       return {state,today,cash,cashIls,netDeposits,holdings,trades,issues,txInfo,summary,totalIls,missingPrices:missing,usdIls:Number.isFinite(usdIls)?usdIls:null,
+        openingCapital,openingIlsMissing:state.transactions.some(t=>t.opening&&instrumentOf(state,t.symbol).currency==='USD'&&!t.fxRate),
         performance:performance(state.snapshots,depositEvents)};
     }
 

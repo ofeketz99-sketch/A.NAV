@@ -3540,3 +3540,11 @@ html.splash-run .splash-word .splash-dot{
 @media (max-width:1050px){.invest-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}.invest-tabs button{font-size:10.5px;padding:6px 2px}}
 
 .inv-chart svg{direction:ltr;unicode-bidi:isolate}
+
+/* Opening holdings, cash fix, instrument details (v052) */
+.inv-check{display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border:1px solid #e4dacd;border-radius:10px;background:#fbf8f3;font-size:12px;line-height:1.5;color:#4f463c;cursor:pointer}
+.inv-check input{width:16px;height:16px;margin-top:1px;accent-color:var(--accent);flex:none}
+.inv-fix{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.inv-fix>div{flex:1 1 280px}
+.inv-link{border:0;background:transparent;padding:0;font:inherit;color:inherit;cursor:pointer;text-decoration:underline dotted color-mix(in srgb,var(--accent) 50%,transparent);text-underline-offset:3px}
+.inv-link:hover{color:var(--accent)}

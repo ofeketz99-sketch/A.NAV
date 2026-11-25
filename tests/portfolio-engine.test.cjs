@@ -160,3 +160,23 @@ test('normalize drops broken records instead of guessing',()=>{
  assert.equal(s.transactions.length,1);assert.equal(s.transactions[0].symbol,'ABCD');
  assert.equal(s.settings.fees.US,7.5);assert.equal(s.settings.fees.TASE,9);
 });
+
+test('opening holding: builds the position without touching tracked cash, and counts as capital brought in',()=>{
+ const s=state([buy('2025-12-01','OPEN1',10,50,0,{opening:true}),sell('2026-02-01','OPEN1',10,60,0)],{instruments:{OPEN1:{market:'TASE'}}});
+ const r=run(s);
+ assert.equal(r.txInfo[s.transactions[0].id].cash.length,0);
+ assert.equal(r.cash.ILS,60000);                 // only the sale reached the tracked cash
+ assert.equal(r.trades[0].net,10000);            // the trade itself still made ₪100
+ assert.equal(r.openingCapital.ILS,50000);
+ assert.equal(r.netDeposits.ILS,0);              // not a deposit…
+ const p=run({...s,snapshots:[{id:'a',date:'2025-12-01',value:500},{id:'b',date:'2026-02-02',value:600}]}).performance;
+ assert.equal(p.rows[1].profit,10000);           // …but profit is measured against it
+});
+
+test('opening holding in dollars needs the dollar rate to enter the shekel capital',()=>{
+ const without=run(state([buy('2025-12-01','OPEN2',1,100,0,{opening:true})]));
+ assert.equal(without.openingIlsMissing,true);
+ const withRate=run(state([buy('2025-12-01','OPEN2',1,100,0,{opening:true,fxRate:3.5})]));
+ assert.equal(withRate.openingIlsMissing,false);
+ assert.equal(withRate.openingCapital.USD,10000);
+});

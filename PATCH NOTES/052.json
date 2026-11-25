@@ -1,0 +1,14 @@
+{
+  "version": 52,
+  "date": "2026-11-25",
+  "branch": "feature/investments",
+  "title": "Opening holdings, negative-dollar fix, breakdowns by sector, asset type, currency and market",
+  "changes": [
+    "Buy form: 'holding from before tracking began' — builds the position without touching tracked cash; its cost counts as capital brought in, so profit is not inflated by its value",
+    "Cash screen: opening capital card; when dollar cash is negative, an explanation and a one-click balancing currency conversion, filled with the ECB rate of the first dollar trade's date for the user to check",
+    "Holdings: breakdown by symbol, sector, asset type, currency or market (weights in ₪ including cash)",
+    "Instrument details (name, sector, asset type) editable from the holdings table; used only for breakdowns",
+    "Holdings card wording: unrealized profit 'by the latest prices'"
+  ],
+  "backup": "backups/2026-11-25T07-29-00Z-opening-breakdowns/"
+}

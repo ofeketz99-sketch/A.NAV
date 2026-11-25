@@ -2936,6 +2936,7 @@
           tx.qty=q8(t.qty);tx.price=Number(t.price)||0;tx.fee=Math.max(0,Number(t.fee)||0);
           if(Number.isFinite(t.fxRate)&&t.fxRate>0)tx.fxRate=t.fxRate;
           const plan=normalizePlan(t.tradePlan);if(plan)tx.tradePlan=plan;
+          if(t.type==='buy'&&t.opening===true)tx.opening=true;
         }else if(t.type==='fx'){
           tx.from=CURRENCIES.includes(t.from)?t.from:'ILS';tx.amount=Number(t.amount)||0;tx.rate=Number(t.rate)||0;
         }else{
@@ -2962,6 +2963,8 @@
     // so a deposit is never also typed as a cash movement for a purchase (no double counting).
     function cashFlows(tx,state){
       if(tx.type==='buy'||tx.type==='sell'){
+        // A holding from before tracking began: its cost was paid outside the tracked cash.
+        if(tx.opening)return [];
         const cur=instrumentOf(state,tx.symbol).currency,gross=cents(tx.qty*tx.price),fee=cents(tx.fee);
         return [[cur,tx.type==='buy'?-(gross+fee):gross-fee]];
       }
@@ -2978,7 +2981,7 @@
       const state=raw&&raw.schema===SCHEMA?raw:normalize(raw);
       const today=opts?.today||todayIso();
       const quotes=market?.quotes||{},usdIls=market?.fx?.USDILS?.rate;
-      const cash={USD:0,ILS:0},netDeposits={USD:0,ILS:0},depositEvents=[];
+      const cash={USD:0,ILS:0},netDeposits={USD:0,ILS:0},openingCapital={USD:0,ILS:0},depositEvents=[];
       const pos={},trades=[],issues=[],txInfo={};
       for(const tx of ordered(state.transactions)){
         const flows=cashFlows(tx,state);
@@ -2988,6 +2991,13 @@
           const c=flows[0][1];netDeposits[tx.currency]+=c;depositEvents.push({date:tx.date,currency:tx.currency,cents:c});
         }
         if(tx.type!=='buy'&&tx.type!=='sell')continue;
+        // Opening holdings count as capital brought in (at cost), so profit is not inflated by their value.
+        if(tx.opening){
+          const cur=instrumentOf(state,tx.symbol).currency,c=cents(tx.qty*tx.price)+cents(tx.fee);
+          openingCapital[cur]+=c;
+          if(cur==='ILS')depositEvents.push({date:tx.date,currency:'ILS',cents:c,opening:true});
+          else if(tx.fxRate)depositEvents.push({date:tx.date,currency:'ILS',cents:Math.round(c*tx.fxRate),opening:true});
+        }
         const ins=instrumentOf(state,tx.symbol);
         const p=pos[tx.symbol]||(pos[tx.symbol]={symbol:tx.symbol,currency:ins.currency,qty:0,cost:0,costIls:0,ilsKnown:true,realized:0,realizedIls:0,realizedIlsKnown:true,fees:0,trade:null});
         const gross=cents(tx.qty*tx.price),fee=cents(tx.fee);
@@ -3062,6 +3072,7 @@
         byCurrency:{USD:byCur('USD'),ILS:byCur('ILS')}
       };
       return {state,today,cash,cashIls,netDeposits,holdings,trades,issues,txInfo,summary,totalIls,missingPrices:missing,usdIls:Number.isFinite(usdIls)?usdIls:null,
+        openingCapital,openingIlsMissing:state.transactions.some(t=>t.opening&&instrumentOf(state,t.symbol).currency==='USD'&&!t.fxRate),
         performance:performance(state.snapshots,depositEvents)};
     }
 
@@ -3843,21 +3854,35 @@
         '</div>';
       if(!c.holdings.length){box.innerHTML=h+priceBar()+empty(ICON.pie,'אין כרגע אחזקות','אחזקות מחושבות אוטומטית מהקניות והמכירות בלוג.');return;}
       h+=priceBar();
+      const by=[['symbol','נייר'],['sector','סקטור'],['kind','סוג נכס'],['currency','מטבע'],['market','שוק']];
+      h+='<div class="inv-toolbar"><span class="inv-muted">פילוח לפי</span><div class="inv-chips" role="group" aria-label="פילוח לפי">'+by.map(([k,l])=>'<button type="button" class="inv-chip" data-act="holdby" data-val="'+k+'" aria-pressed="'+(ui.holdBy===k)+'">'+l+'</button>').join('')+'</div></div>';
       h+='<div class="inv-split">'+donut()+'<div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>נייר</th><th>כמות</th><th>עלות ממוצעת</th><th>עלות</th><th>מחיר נוכחי</th><th>שווי</th><th>רווח / הפסד</th><th>משקל</th></tr></thead><tbody>';
       for(const x of c.holdings){
-        h+='<tr><td>'+sym(x.symbol)+' <small class="inv-tag">'+E.MARKETS[x.market].label+'</small></td><td>'+num(x.qty)+'</td><td>'+money(x.avgCost===null?null:E.cents(x.avgCost),x.currency)+'</td><td>'+money(x.cost,x.currency)+'</td>'+
+        const ins=E.instrumentOf(pf,x.symbol);
+        h+='<tr><td><button type="button" class="inv-link" data-act="instrument" data-symbol="'+esc(x.symbol)+'" title="פרטי הנייר: שם, סקטור, סוג">'+sym(x.symbol)+'</button> <small class="inv-tag">'+E.MARKETS[x.market].label+(ins.sector?' · '+esc(ins.sector):'')+'</small></td><td>'+num(x.qty)+'</td><td>'+money(x.avgCost===null?null:E.cents(x.avgCost),x.currency)+'</td><td>'+money(x.cost,x.currency)+'</td>'+
           '<td><input class="inv-inline" type="text" inputmode="decimal" data-act="price" data-symbol="'+esc(x.symbol)+'" value="'+(x.price??'')+'" placeholder="מחיר" aria-label="מחיר נוכחי של '+esc(x.symbol)+'"><small class="inv-muted inv-src">'+(x.price===null?'חסר':srcLabel(mk.quotes[x.symbol],MarketData.kindOf(x.symbol,x.market)))+'</small></td>'+
           '<td>'+money(x.value,x.currency)+'</td><td>'+money(x.unrealized,x.currency,{signed:true})+' <small>'+pct(x.unrealizedPct,{signed:true})+'</small></td><td>'+pct(x.weight,{d:1})+'</td></tr>';
       }
       h+='</tbody></table></div></div><p class="inv-foot">משקל = שווי הנייר בשקלים מתוך כלל התיק <b>כולל מזומן</b>. עלות כוללת עמלות קנייה (שיטת עלות ממוצעת). ליד כל מחיר מוצגים המקור וזמן המחיר. מחיר שהוקלד ידנית משמש עד שמתקבל מחיר מספק. קריפטו: מחיר ספוט חי מ־Coinbase. דולר: שער הייחוס היומי של הבנק המרכזי האירופי (ECB), שאינו השער היציג של בנק ישראל.</p>';
       box.innerHTML=h;
     }
+    const KIND_LABEL={stock:'מניה',etf:'קרן סל (ETF)',crypto:'קריפטו',bond:'אג"ח',fund:'קרן',other:'אחר'};
+    function groupKey(by){
+      return h=>{const ins=E.instrumentOf(pf,h.symbol);
+        if(by==='sector')return ins.sector||'לא מוגדר';
+        if(by==='kind')return KIND_LABEL[ins.kind]||(h.market==='CRYPTO'?'קריפטו':'לא מוגדר');
+        if(by==='currency')return h.currency==='USD'?'דולר':'שקל';
+        if(by==='market')return E.MARKETS[h.market].label;
+        return h.symbol;};
+    }
     function donut(){
       const c=calc;let parts,title;
       if(c.totalIls){
-        parts=c.holdings.map(h=>({label:h.symbol,v:h.valueIls}));
+        const key=groupKey(ui.holdBy),g=new Map();
+        for(const h of c.holdings){const k=key(h);g.set(k,(g.get(k)||0)+h.valueIls);}
+        parts=[...g].map(([label,v])=>({label,v})).sort((a,b)=>b.v-a.v);
         const cashIls=c.cashIls;if(cashIls>0)parts.push({label:'מזומן',v:cashIls,cash:true});
-        title='חלוקה לפי שווי (₪, כולל מזומן)';
+        title='חלוקה לפי '+({symbol:'נייר',sector:'סקטור',kind:'סוג נכס',currency:'מטבע',market:'שוק'}[ui.holdBy]||'נייר')+' (שווי ב־₪, כולל מזומן)';
       }else{
         const usd=c.holdings.filter(h=>h.currency==='USD');if(!usd.length)return '';
         parts=usd.map(h=>({label:h.symbol,v:h.cost}));title='חלוקה לפי עלות ($) · יוצג לפי שווי כשיוזנו מחירים ושער';
@@ -3917,6 +3942,23 @@
         '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+bmid+'" y2="'+bmid+'" class="inv-axis"/>'+bars+'</svg></figure>';
     }
 
+    // Negative dollar cash almost always means currency conversions were not recorded (the Excel has none).
+    // Offer one conversion that brings it back to zero; the user checks the date, amount and rate before saving.
+    function cashFix(){
+      const c=calc;if(!(c.cash.USD<0))return '';
+      const need=-c.cash.USD/100,rate=mk.fx.USDILS?.rate||null;
+      const first=E.ordered(pf.transactions).find(t=>(t.type==='buy'||t.type==='sell')&&!t.opening&&E.instrumentOf(pf,t.symbol).currency==='USD');
+      return '<div class="inv-alert inv-fix" role="note"><div><b>המזומן הדולרי שלילי ('+money(c.cash.USD,'USD')+').</b> כנראה לא נרשמו המרות משקלים לדולרים. אפשר להוסיף המרה אחת שתאזן אותו, ואפשר במקומה לרשום את ההמרות האמיתיות מהברוקר.</div>'+
+        '<button type="button" class="invest-btn" data-act="fix-usd" data-usd="'+need.toFixed(2)+'" data-rate="'+(rate||'')+'" data-date="'+(first?.date||E.todayIso())+'">הוספת המרה מאזנת</button></div>';
+    }
+    // Rate on the date of the first dollar trade (ECB); today's rate only if that day is unavailable.
+    async function fixUsd(el){
+      const usd=Number(el.dataset.usd),d=el.dataset.date;let rate=Number(el.dataset.rate)||undefined,src='שער היום';
+      try{const from=new Date(Date.parse(d+'T00:00:00Z')-7*864e5).toISOString().slice(0,10);
+        const h=await MarketData.providers.fxHistory(from,d,fetch.bind(window));const days=Object.keys(h).sort();
+        if(days.length){rate=h[days[days.length-1]];src='שער ECB ל־'+days[days.length-1].split('-').reverse().join('/');}}catch(_){}
+      openTx('fx',null,{from:'ILS',date:d,rate,amount:rate?(Math.ceil(usd*rate*100)/100).toFixed(2):'',note:'המרה מאזנת: הדולרים שחסרו בתיעוד ('+src+')'});
+    }
     function renderCash(){
       const box=q('investBody-cash'),c=calc;
       const moves=pf.transactions.filter(t=>['deposit','withdrawal','fx','dividend','fee'].includes(t.type));
@@ -3924,7 +3966,8 @@
         kpi('מזומן בשקלים',money(c.cash.ILS,'ILS'),'אחרי כל הפעולות')+
         kpi('מזומן בדולרים',money(c.cash.USD,'USD'),c.cash.USD<0?'<span class="inv-neg">שלילי: נרשמו קניות בלי המרת מט״ח</span>':'אחרי קניות, מכירות והמרות')+
         kpi('הפקדות נטו',money(c.netDeposits.ILS,'ILS'),'הפקדות פחות משיכות')+
-        '</div><div class="inv-quick">'+
+        (c.openingCapital.ILS||c.openingCapital.USD?kpi('הון פתיחה',['USD','ILS'].filter(k=>c.openingCapital[k]).map(k=>money(c.openingCapital[k],k)).join(' · '),'עלות אחזקות מלפני תחילת התיעוד'+(c.openingIlsMissing?' · <span class="inv-neg">חסר שער דולר בחלק מהן</span>':'')):'')+
+        '</div>'+cashFix()+'<div class="inv-quick">'+
         '<button type="button" class="invest-btn" data-act="add" data-type="deposit">+ הפקדה</button><button type="button" class="invest-btn" data-act="add" data-type="withdrawal">+ משיכה</button><button type="button" class="invest-btn" data-act="add" data-type="fx">+ המרת מט״ח</button></div>';
       h+=moves.length?actionsTable(moves,false):empty(ICON.cash,'אין עדיין תנועות','רשום הפקדות ומשיכות מהבנק, והמרות משקלים לדולרים. קניות ומכירות כבר משנות את המזומן לבד, אין צורך לרשום אותן כאן.');
       box.innerHTML=h;
@@ -3966,7 +4009,8 @@
         h+=field('qty','כמות',inp('qty',draft.qty));
         h+=field('price','מחיר ליחידה ('+c+')',inp('price',draft.price));
         h+=field('fee','עמלה ('+c+')',inp('fee',draft.fee),'ברירת מחדל ל'+E.MARKETS[market].label+': '+pf.settings.fees[market]+' '+c);
-        if(cur==='USD')h+=field('fxRate','שער דולר ביום העסקה',inp('fxRate',draft.fxRate),'לא חובה. מאפשר לחשב רווח בשקלים ולהפריד את השפעת הדולר.');
+        if(cur==='USD')h+=field('fxRate','שער דולר ביום העסקה',inp('fxRate',draft.fxRate),draft.opening?'מומלץ באחזקת פתיחה בדולרים: כך העלות נכנסת להון הפתיחה בשקלים.':'לא חובה. מאפשר לחשב רווח בשקלים ולהפריד את השפעת הדולר.');
+        if(t==='buy')h+='<label class="inv-check inv-wide"><input type="checkbox" name="opening"'+(draft.opening?' checked':'')+'><span><b>אחזקה מלפני תחילת התיעוד</b> · לא יורדת מהמזומן, והעלות שלה נספרת כהון שהבאת (לא כרווח)</span></label>';
         h+=marketField;
       }else if(t==='fx'){
         h+=dateField;
@@ -3988,6 +4032,7 @@
         tx.symbol=E.cleanSymbol(draft.symbol);tx.qty=parseNum(draft.qty);tx.price=parseNum(draft.price);tx.fee=parseNum(draft.fee)??0;
         const fx=parseNum(draft.fxRate);if(fx!==undefined)tx.fxRate=fx;
         const old=editing&&pf.transactions.find(x=>x.id===editing);if(old?.tradePlan)tx.tradePlan=old.tradePlan;
+        if(t==='buy'&&draft.opening)tx.opening=true;
       }else if(t==='fx'){tx.from=draft.from==='USD'?'USD':'ILS';tx.amount=parseNum(draft.amount);tx.rate=parseNum(draft.rate);}
       else{tx.currency=draft.currency==='USD'?'USD':'ILS';tx.amount=parseNum(draft.amount);}
       return tx;
@@ -4004,16 +4049,16 @@
       if(!ok){box.innerHTML='';return;}
       const st=candidateState(tx),r=E.compute(st,mk),info=r.txInfo[tx.id]||{};
       const flows=(info.cash||[]).map(([c,v])=>money(v,c,{signed:true})).join(' ו־');
-      let h='<span>השפעה על המזומן: '+(flows||DASH)+'</span>';
+      let h='<span>השפעה על המזומן: '+(tx.opening?'אין (אחזקת פתיחה)':flows||DASH)+'</span>';
       if(tx.type==='sell'&&info.realized!==undefined)h+='<span>רווח ממומש (עלות ממוצעת): '+money(info.realized,E.instrumentOf(st,tx.symbol).currency,{signed:true})+'</span>';
       if(tx.type==='sell'){const tr=r.trades.find(x=>x.id===info.tradeId);if(tr&&tr.status==='closed'&&tr.endDate===tx.date)h+='<span>העסקה נסגרת: נטו '+money(tr.net,tr.currency,{signed:true})+' ב־'+tr.days+' ימים</span>';}
       box.innerHTML=h;
     }
-    function openTx(type,id){
+    function openTx(type,id,prefill){
       opener=document.activeElement;editing=id||null;feeTouched=!!id;
       const t=id&&pf.transactions.find(x=>x.id===id);
       if(t){draft={...t,market:t.symbol?E.instrumentOf(pf,t.symbol).market:undefined,qty:t.qty,price:t.price,fee:t.fee,fxRate:t.fxRate,amount:t.amount,rate:t.rate};}
-      else{draft={type:type||'buy',date:E.todayIso(),note:'',currency:'ILS',from:'ILS'};draft.market='US';draft.fee=pf.settings.fees.US;}
+      else{draft={type:type||'buy',date:E.todayIso(),note:'',currency:'ILS',from:'ILS'};draft.market='US';draft.fee=pf.settings.fees.US;if(prefill)Object.assign(draft,prefill);}
       q('invTxTitle').textContent=t?'עריכת '+TYPE_LABEL[t.type]:'פעולה חדשה';
       q('invTxDelete').hidden=!t;
       form.querySelectorAll('.inv-seg button').forEach(b=>b.disabled=!!t&&((t.type==='buy'||t.type==='sell')!==(b.dataset.type==='buy'||b.dataset.type==='sell')));
@@ -4029,8 +4074,9 @@
     });
     form.addEventListener('input',e=>{
       const n=e.target.name;if(!n)return;
-      draft[n]=e.target.value;
+      draft[n]=e.target.type==='checkbox'?e.target.checked:e.target.value;
       if(n==='fee')feeTouched=true;
+      if(n==='opening'){renderFields();return;}
       if(n==='symbol'||n==='market'){
         if(n==='symbol')draft.symbol=e.target.value.toUpperCase();
         const m=n==='market'?e.target.value:marketFor(draft.symbol);draft.market=m;
@@ -4111,6 +4157,9 @@
       else if(act==='restore')q('invRestoreFile').click();
       else if(act==='settings')openSettings();
       else if(act==='prices')refreshPrices(true);
+      else if(act==='fix-usd')fixUsd(el);
+      else if(act==='holdby'){ui.holdBy=el.dataset.val;renderHoldings();}
+      else if(act==='instrument')openInstrument(el.dataset.symbol);
       else if(act==='analyze')openTrade(el.dataset.id);
       else if(act==='hist-load')loadHistory();
       else if(act==='pattern'){ui.pattern=el.dataset.val;renderAnalysis();}
@@ -4208,6 +4257,32 @@
         pf=next;mk=normalizeMarket(data.market);persist();refresh();toast('הגיבוי שוחזר');
       }catch(err){toast('השחזור נכשל: '+(err.message||'קובץ לא תקין'));}
     });
+
+    // ---------- instrument details: name, sector, asset type (used for breakdowns) ----------
+    document.body.insertAdjacentHTML('beforeend','<datalist id="invSectors"></datalist><div class="tool-overlay inv-overlay" id="invInsOverlay" hidden><section class="tool-dialog inv-dialog" role="dialog" aria-modal="true" aria-labelledby="invInsTitle">'+
+      '<header class="tool-head"><div><h2 id="invInsTitle">פרטי נייר</h2><p>משמשים לפילוח התיק. לא משנים חישובים.</p></div><button type="button" class="tool-close" data-ins-close aria-label="סגירה">×</button></header>'+
+      '<form class="tool-content inv-form" id="invInsForm"><div class="inv-grid"></div><div class="inv-form-actions"><button type="submit" class="tool-primary">שמירה</button><button type="button" class="inv-ghost" data-ins-close>ביטול</button></div></form></section></div>');
+    let insSymbol=null;
+    function openInstrument(symbol){
+      insSymbol=symbol;opener=document.activeElement;
+      const i=E.instrumentOf(pf,symbol);
+      q('invInsTitle').textContent='פרטי '+symbol;
+      q('invSectors').innerHTML=[...new Set(Object.values(pf.instruments).map(x=>x.sector).filter(Boolean))].sort().map(x=>'<option value="'+esc(x)+'">').join('');
+      q('invInsForm').querySelector('.inv-grid').innerHTML=field('name','שם',inp('name',i.name,'type="text" maxlength="80"'))+
+        field('sector','סקטור',inp('sector',i.sector,'type="text" list="invSectors" maxlength="40" placeholder="טכנולוגיה"'))+
+        field('kind','סוג נכס','<select name="kind"><option value="">לא מוגדר</option>'+Object.entries(KIND_LABEL).map(([k,l])=>'<option value="'+k+'"'+(i.kind===k?' selected':'')+'>'+l+'</option>').join('')+'</select>');
+      q('invInsOverlay').hidden=false;document.body.classList.add('schedule-open');q('invInsForm').querySelector('input')?.focus();
+    }
+    function closeInstrument(){q('invInsOverlay').hidden=true;document.body.classList.remove('schedule-open');insSymbol=null;opener?.focus?.();}
+    q('invInsOverlay').addEventListener('click',e=>{if(e.target.closest('[data-ins-close]'))closeInstrument();});
+    q('invInsOverlay').addEventListener('pointerdown',e=>{if(e.target===q('invInsOverlay'))closeInstrument();});
+    q('invInsForm').addEventListener('submit',e=>{
+      e.preventDefault();if(!insSymbol)return;
+      const f=e.currentTarget,cur=E.instrumentOf(pf,insSymbol);
+      const next={...cur,symbol:insSymbol,name:f.elements.name.value.trim().slice(0,80),sector:f.elements.sector.value.trim().slice(0,40),kind:f.elements.kind.value};
+      pf={...pf,instruments:{...pf.instruments,[insSymbol]:next}};persist();closeInstrument();refresh();toast('פרטי '+next.symbol+' נשמרו');
+    });
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!q('invInsOverlay').hidden){e.preventDefault();closeInstrument();}});
 
     // ---------- Excel import: preview first, then one confirmed write with undo ----------
     document.body.insertAdjacentHTML('beforeend','<div class="tool-overlay inv-overlay" id="invImpOverlay" hidden><section class="tool-dialog inv-dialog inv-import" role="dialog" aria-modal="true" aria-labelledby="invImpTitle">'+

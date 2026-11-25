@@ -293,3 +293,11 @@
   - יש רק נרות יומיים.
   - התאמת המחירים לפיצולים ולדיבידנדים לפי ברירת המחדל של הספק, ולא אומתה.
   - אין היסטוריה לבורסת ת"א בתוכנית החינמית.
+
+## אחזקות פתיחה ופילוחים — 2026-11-25 (v052, ענף `feature/investments`)
+- **אחזקת פתיחה:** `opening:true` על קנייה. `cashFlows` מחזיר רשימה ריקה, והעלות (כולל עמלה) נצברת ב-`openingCapital[currency]`.
+  - בשקלים, וגם בדולרים כשיש `fxRate`, העלות נכנסת כאירוע הון לחישוב `performance`, כך שהרווח נמדד מולה.
+  - `openingIlsMissing` מסמן אחזקת פתיחה דולרית בלי שער.
+- **מזומן דולרי שלילי:** `cashFix()` מציע המרה מאזנת. השער נלקח מ-`MarketData.providers.fxHistory` (ECB) לתאריך הקנייה הדולרית הראשונה, והמשתמש מאשר את הטופס.
+- **פילוח:** `ui.holdBy` יכול להיות `symbol`, `sector`, `kind`, `currency` או `market`, דרך `groupKey()`.
+- **פרטי נייר:** `#invInsOverlay` לעריכת `instruments[symbol].name`, `sector` ו-`kind`. ערכים אפשריים ל-`kind`: stock, etf, crypto, bond, fund, other.
