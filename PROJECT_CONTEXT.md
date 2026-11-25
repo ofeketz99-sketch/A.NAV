@@ -204,3 +204,144 @@
 
 ## התאמת המד ורוחב אחיד — 2026-11-10 (v046)
 - המד ב-`#mkDial` קטן יותר וללא כיתובי 0 ו-100 (נחתכו בתחתית האריח); שלושת האריחים ב-`flex:1 1 0` ו-`min-width:200px`.
+
+## שני אזורים: מחשבונים והשקעות — 2026-11-24 (v047, ענף `feature/investments`)
+- `index.html`: מתג `#areaSwitch` (כפתורים עם `data-area-target="calc|invest"`) בתוך `.frame-identity`, אחרי הלוגו; מבנה ה-`<strong>` של הלוגו לא השתנה. אזור `#investApp` נוסף אחרי `#contentLayout`, עם ארבע לשוניות (`data-invest-view`: log, holdings, performance, cash) וארבעה `tabpanel`.
+- `scripts/src/98-area-shell.js` (לפני `99-startup` ב-manifest): מציב `data-area` על `#financeApp`, מסתיר את `#investApp` או מגדיר `inert` ל-`#contentLayout`/`#screenViews`, שומר את המצב ב-`anav.shell.v1` ({area, view}), משתמש ב-`playNavMotion` למעבר הצבע ומריץ `applyViewportLayout()` ו-`renderResults()` בחזרה למחשבונים. Ctrl+Z נחסם ב-capture על `window` רק כשאזור ההשקעות פתוח.
+- `styles/src/99-area-shell.css` (אחרון ב-manifest): אקסנט ההשקעות `#2f6461` מוגדר ב-CSS עם `!important`, כך שהוא גובר על ה-`--accent` שנכתב inline על ידי `applyTabAccent` בלי לשנות אותה. במצב השקעות `.screen-views`, `.content-layout` ו-`.mobile-summary` מוסתרים.
+- אין עדיין נתונים באזור ההשקעות. ערכים חסרים מוצגים כ-"—", לא כאפס. התוכנית המלאה: `docs/investments/PLAN.md`.
+- בדיקות: `tests/area-shell.test.cjs` (חיווט ה-HTML וה-manifest, והתנהגות המעבר מול DOM מדומה).
+- ידוע ולא קשור לשינוי: במסך טלפון (375px) אזור המחשבונים מוצג שבור גם ב-`dev` (`cc83f16`). פס הלשוניות נמתח לגובה מלא והשדות לא נראים.
+
+## השקעות: מסלול מלא ראשון — 2026-11-25 (v048, ענף `feature/investments`)
+- **מנוע:** `scripts/src/97-portfolio-engine.js` מגדיר `PortfolioEngine` טהור, בלי DOM. `compute(state, market)` מחזיר אחזקות, עסקאות, מזומן לפי מטבע, סיכום, `txInfo` לכל פעולה ו-`performance`. כל המסכים והייצוא קוראים ממנו בלבד.
+  - סכומים בשלמים (סנטים או אגורות).
+  - עלות ממוצעת. עמלת קנייה נכנסת לעלות.
+  - עסקה = מהקנייה הראשונה עד שהכמות חוזרת ל-0.
+  - מכירה מעבר לאחזקה מדווחת ב-`issues` ולא נכללת בחישוב.
+- **ממשק:** `scripts/src/98-investments.js` ו-`styles/src/99-investments.css`. ה-HTML מכיל רק את המעטפת: `#investBody-*` ותפריט `#invMenu`. הדיאלוגים (`#invTxOverlay`, `#invSetOverlay`) וה-toast נוצרים ב-JS ומשתמשים בעיצוב `.tool-overlay` ו-`.tool-dialog`.
+- **אחסון:**
+  - `anav.portfolio.v1`: `{schema, settings.fees, instruments, transactions, snapshots}`.
+  - `anav.market.v1`: מחירים ושער `USDILS`, עם `source` ו-`asOf`.
+  - `anav.portfolio.prev`: עותק אוטומטי של הנתונים לפני כל שחזור.
+- **אירוע:** `98-area-shell.js` משגר `anav:invest-view` כשמשתנה האזור או התצוגה, כדי שהגרפים יימדדו מחדש.
+- **מה עוד לא קיים:** ייבוא מהאקסל, ספק מחירים, תוכנית מסחר (`tradePlan` נשמר אם קיים), בונה גרפים ולוחות בקרה.
+- **מה נבדק בדפדפן ב-1440×900 וב-375×812:**
+  - הוספה, עריכה, מחיקה וביטול מחיקה.
+  - חסימת מכירה ללא אחזקה.
+  - שווי עם מחירים חסרים ואחריהם.
+  - ייצוא XLSX: XML תקין, תאריכים ומספרים.
+  - גיבוי ושחזור הלוך-חזור.
+  - הקובץ שיוצא לא נפתח בפועל ב-Excel.
+
+## ייבוא מאקסל — 2026-11-25 (v049, ענף `feature/investments`)
+- **מודול:** `scripts/src/97-excel-import.js` מגדיר את `ExcelImport`, בלי DOM ובלי ספריות. הוא כולל:
+  - `unzip`: פענוח zip עם `DecompressionStream('deflate-raw')`.
+  - `readWorkbook`: קריאת ה-XML של הגיליונות.
+  - `plan(state, workbook, market)`: קובע לכל שורה סטטוס `new`, `dup`, `conflict`, `error` או `skip`, עם הסבר.
+  - `revalidate`: מריץ מחדש את בדיקת המכירות אחרי החרגת גיליון.
+  - `merge`: ממזג את השורות החדשות לנתונים.
+- **זיהוי גיליונות:** לפי כותרות העמודות (`KINDS`), לא לפי שם הגיליון.
+- **מניעת כפילויות:**
+  - לכל פעולה מיובאת יש `importKey` ו-`source:'excel'`. הוא בנוי משם הגיליון, הסוג והשדות, ומספור מופעים לשורות זהות.
+  - פעולה זהה שהוזנה ידנית מזוהה לפי חתימת התוכן.
+- **סדר באותו יום:** הפקדה, אחר כך קנייה, אחר כך מכירה (בגיליון 2025 המכירה מופיעה לפני הקנייה).
+- **ממשק:** `#invImpOverlay` ב-`98-investments.js` מציג תצוגה מקדימה לפי גיליון. השמירה היא כתיבה אחת, עם עותק קודם ב-`anav.portfolio.prev` וביטול מההודעה.
+- **בדיקה עם קובץ המשתמש בדפדפן (מקומית בלבד, הקובץ לא נשמר במאגר):**
+  - כל הגיליונות זוהו.
+  - האחזקות הפתוחות תואמות את גיליון "תיק השקעות".
+  - סך ההפקדות זהה לאקסל.
+  - ייבוא חוזר לא הוסיף דבר.
+  - הפערים בנטו לעסקה מוסברים בעמלות שחסרו באקסל.
+  - השינוי היומי זהה לאקסל, חוץ משורה אחת שבה האחוז באקסל לא תואם את הערכים של אותו גיליון.
+
+## נתוני שוק — 2026-11-25 (v050, ענף `feature/investments`)
+- **`scripts/src/97-market-data.js`** (`MarketData`, בלי DOM): `refresh(state, market, {symbols, force, fetch, endpoint})` מחזיר `market` חדש ודוח (`updated`, `failed`, `unsupported`, `fresh`).
+  - **מקורות:** קריפטו מ-Coinbase, ‏USDILS מ-Frankfurter (ECB), מניות דרך `/api/market`.
+  - **שני ספים נפרדים:** `isStale` (מתי מחיר נחשב ישן) ו-`needsRefresh` (מתי לבקש שוב).
+  - בקשות זהות בו-זמנית מאוחדות דרך `once()`.
+- **`netlify/functions/market.mjs`** (Netlify Functions v2, ‏`config.path='/api/market'`):
+  - קורא את `TWELVEDATA_API_KEY` ממשתני הסביבה. `?ping=1` מחזיר אם המפתח מוגדר, בלי לחשוף אותו.
+  - בודק תקינות סימולים, מטמון של 60 שניות, והמרה מ-`ILA` (אגורות) לשקלים.
+  - בכשל ספק מחזיר רק מה שבמטמון.
+  - נבדק ב-`tests/market.test.mjs` מול ספק מדומה. עוד לא נפרס.
+- **`anav.market.v1`:** לכל מחיר נשמרים `source`, ‏`asOf`, ‏`fetchedAt`, ואם קיים `previousClose`. נוספו `lastRefresh` ו-`stockProvider`. `normalizeMarket` ב-`98-investments.js` שומר את כל השדות.
+- **ממשק:** `priceBar()` ו-`srcLabel()` בתצוגת פילוח התיק. רענון אוטומטי (`autoPrices`) בפתיחת אזור ההשקעות.
+- **תיעוד:** בדיקת הספקים, הבחירה וההגדרה ב-`docs/investments/MARKET_DATA.md`.
+- **מגבלות ידועות:**
+  - ממשק בנק ישראל החזיר 404 בכתובות שבמדריך שלו.
+  - אין מקור מאומת ל-VIX.
+  - הפונקציה תפעל רק אחרי פריסה ואחרי שהמשתמש יגדיר מפתח.
+
+## ניתוח עסקאות — 2026-11-25 (v051, ענף `feature/investments`)
+- **`scripts/src/97-trade-analysis.js`** (`TradeAnalysis`, בלי DOM):
+  - `analyze(trade, txs, bars, {today, customDays})` מחשב:
+    - `mfe` ו-`mae`: הגבוה והנמוך היומיים בזמן ההחזקה, מול מחיר הכניסה הממוצע.
+    - `exits[].after`: השינוי 1, 5 ו-21 ימי מסחר אחרי כל מכירה, ואחרי מספר ימים קלנדריים לבחירה.
+    - `after` ו-`hypothetical`: ממוצע משוקלל לפי כמות, עם ספירת המכירות שיש להן נתונים.
+    - `adherence`: עמידה ביעד ובסטופ ומשך ההחזקה מול התוכנית.
+    - `patterns`: ספי הדפוסים מוגדרים ב-`TH`.
+  - `summarize`, `windowFor`, `PATTERNS`.
+- **תוכנית מסחר:** `tradePlan` על הקנייה הראשונה של העסקה. `PortfolioEngine.normalizePlan` מנקה את השדות. המנוע מעביר את התוכנית ל-`trade.plan`.
+- **היסטוריה:**
+  - `netlify/functions/market.mjs`: הנתיב `?history=SYMBOL[:TASE]&start&end`. מחזיר `bars` מהישן לחדש, ממיר אגורות לשקלים, שומר מטמון ל-6 שעות ומחזיר 429 כשנגמרת המכסה.
+  - `MarketData.fetchHistory`, `mergeBars`, `covers`.
+  - מטמון בדפדפן ב-`anav.history.v1`, לפי סימול: `from`, `to`, `fetchedAt`, `source`, `error`, `bars`.
+  - הטעינה מוגבלת לשבע בקשות בדקה (`throttle`).
+- **ממשק:** לשונית `analysis` (נוספה גם ל-`views` ב-`98-area-shell.js`), חלון `#invTaOverlay` עם גרף ותוכנית. בלוג יש כפתור "ניתוח העסקה" לכל עסקה פתוחה בטבלה.
+- **מגבלות:**
+  - יש רק נרות יומיים.
+  - התאמת המחירים לפיצולים ולדיבידנדים לפי ברירת המחדל של הספק, ולא אומתה.
+  - אין היסטוריה לבורסת ת"א בתוכנית החינמית.
+
+## אחזקות פתיחה ופילוחים — 2026-11-25 (v052, ענף `feature/investments`)
+- **אחזקת פתיחה:** `opening:true` על קנייה. `cashFlows` מחזיר רשימה ריקה, והעלות (כולל עמלה) נצברת ב-`openingCapital[currency]`.
+  - בשקלים, וגם בדולרים כשיש `fxRate`, העלות נכנסת כאירוע הון לחישוב `performance`, כך שהרווח נמדד מולה.
+  - `openingIlsMissing` מסמן אחזקת פתיחה דולרית בלי שער.
+- **מזומן דולרי שלילי:** `cashFix()` מציע המרה מאזנת. השער נלקח מ-`MarketData.providers.fxHistory` (ECB) לתאריך הקנייה הדולרית הראשונה, והמשתמש מאשר את הטופס.
+- **פילוח:** `ui.holdBy` יכול להיות `symbol`, `sector`, `kind`, `currency` או `market`, דרך `groupKey()`.
+- **פרטי נייר:** `#invInsOverlay` לעריכת `instruments[symbol].name`, `sector` ו-`kind`. ערכים אפשריים ל-`kind`: stock, etf, crypto, bond, fund, other.
+
+## ביצועים יומיים מחושבים — 2026-11-25 (v053, ענף `feature/investments`)
+- **`scripts/src/97-daily-performance.js`** (`DailyPerformance.compute(state, hist, {today, from})`): לכל תאריך מסחר, האיחוד של תאריכי הנרות של כל הניירות ושל שער הדולר, מחושבים:
+  - הכמויות והמזומן לפי הפעולות.
+  - השווי באגורות.
+  - `flow`: הפקדות, משיכות ואחזקות פתיחה, שמנוטרלות מהשינוי.
+  - `daily` מול היום המלא הקודם, ו-`twr` כשרשור השינויים היומיים.
+  - **ערכים חסרים:** מחיר נלקח מעד `CARRY_DAYS=5` ימים אחורה, ושער דולר מעד `FX_CARRY_DAYS=7`. מעבר לזה הערך נשאר `null`, ו-`missing` מונה את הימים החסרים לכל נייר.
+- **שער דולר היסטורי:** `hist.USDILS` במטמון `anav.history.v1` (מקור `ecb`, נרות `[d,r,r,r,r]`), נטען על ידי `loadFx()`.
+- **`fxSource:'ecb'`:** סימון על פעולה שהשער שלה מולא מ-ECB. מגיע מכפתור "שער ECB לתאריך" בטופס, או מ"מילוי שערי דולר חסרים" בתפריט. `normalize` שומר אותו.
+- **ממשק:** `ui.perfSource` הוא `broker` או `computed`. `renderComputed()` ו-`computedChart()` מציגים את רישומי הברוקר כנקודות. `renderHistViews()` מרענן את שני המסכים בזמן הטעינה.
+- **התאמה לפיצולים:** `TradeAnalysis.scaleFor(txs, bars)` מחשב את החציון של מחיר העסקה ÷ מחיר הסגירה באותו יום.
+  - חציון בין 0.8 ל-1.25: אין התאמה.
+  - אחרת, הגורם מעוגל ליחס פיצול מקובל כשקרוב (±15%), ואם לא, נלקח החציון עצמו.
+  - הגורם מחושב לכל תקופת החזקה (ב-`DailyPerformance` לפי `periods`), ומופעל על הנרות לפני הניתוח והשווי.
+- **גשר על פער:** `pending` מצטבר עד היום המלא הבא, ו-`since` מציין את התאריך שאליו משווים.
+- **אימות מול נתוני המשתמש (מקומית):** תשואה מחושבת לעומת רישומי הברוקר באותה תקופה, הפרש של כ-0.3 נקודות אחוז.
+
+## לוחות ובונה גרפים — 2026-11-25 (v054, ענף `feature/investments`)
+- **`scripts/src/97-chart-data.js`** (`ChartData`, בלי DOM):
+  - `build(ctx)` בונה חמישה מקורות נתונים: trades, actions, holdings, daily, broker. לכל שדה מוגדר `type` (date, cat או num) ויחידה (ILS, USD, pct, days או count). `level:true` מסמן שדה של רמה, כמו שווי.
+  - `check()` מחזיר שגיאות, סוגי גרף מותרים, וסיבה לכל סוג שנחסם.
+  - `suggest()` מציע סוג גרף מתאים.
+  - `compute(cfg, ds, {from, to})` מחזיר סדרות, ולכל נקודה את `ids` של הרשומות שמאחוריה, לצורך פירוט.
+  - `aggsFor()` קובע אילו עיבודים מותרים: אחוזים ושדות רמה לא נסכמים.
+- **`InvestAPI`:** ממשק לקריאה בלבד ש-`98-investments.js` חושף. כולל getters ל-pf, calc, hist, mk, פונקציות עיצוב, `toast`, `openTrade`, `onRefresh` ו-`daily()`.
+- **`scripts/src/98-dashboards.js`** נטען אחרי `98-investments`. כולל:
+  - לוח ברירת מחדל ושמירה ב-`anav.dashboards.v1`: `{version, active, boards:[{id, name, range, widgets:[{id, size(s|m|l), cfg}]}]}`.
+  - רינדור SVG עם צבעים בתוך הקוד, כדי שייצוא SVG ו-PNG ישמור על הצבעים.
+  - פירוט, בונה גרפים ב-`#invChOverlay` וייצוא.
+  - כל גרף מצויר ברוחב המדוד של הכרטיס שלו.
+- **לשונית `boards`:** נוספה ל-`views` ב-`98-area-shell.js` ולבדיקות.
+
+## סבב UX — 2026-11-25 (v055, ענף `feature/investments`)
+- **טופס הפעולה:**
+  - הפוקוס עובר לשדה הראשון מיד (בלי `setTimeout`).
+  - סדר השדות בעסקה: סימול, כמות, מחיר, עמלה, ואחריהם תאריך.
+  - כפתור `data-again` שומר ומשאיר את הטופס פתוח לפעולה הבאה.
+  - כפתורי מילוי מהיר (`data-date-set`, `data-fill-qty`, `data-fill-price`) עם `tabindex=-1`, כדי שלא יפריעו לניווט במקלדת.
+- **בטבלת הפעולות:** פעולת `dup` (שכפול).
+- **`anav.ui.v1`:** בחירות התצוגה שנשמרות בין ביקורים (`UI_KEEP` ב-`98-investments.js`).
+- **`styles/src/99-calc-mobile-fix.css`** (אחרון ב-manifest): ב-`max-width:1050px` ה-`.main-column` נערם אנכית, ו-`.tabs` ו-`.workspace-tools` מקבלים כל אחד שורה מלאה. ב-540px הגופן של הלשוניות 11.5px, ונקודת הצבע מוסתרת. זה מתקן באג שהיה קיים כבר ב-`dev`. הכלל לא חל על מחשב שולחני.
+
+- **v056:** ב-`#invTxForm` ה-`.inv-form-actions` וה-`.inv-preview` נשארים מוצמדים לתחתית הטופס (`position:sticky`). בטלפון השדות בגודל 16px.

@@ -1,0 +1,17 @@
+{
+  "version": 47,
+  "date": "2026-11-24",
+  "branch": "feature/investments",
+  "title": "Two top-level areas: Calculators and Investments, in one shared frame",
+  "changes": [
+    "A Calculators / Investments switch sits next to the A.NAV logo; the header, logo, market strip and footer stay in exactly the same place in both areas",
+    "The calculators are unchanged: their DOM, ids, storage key and backup format are untouched, and they are only hidden while Investments is open",
+    "Investments has four views (investment log, portfolio breakdown, performance, cash movements) with empty states; no real or demo data yet, the data model waits for the Excel file",
+    "Missing values show as a dash with 'no data', never as zero",
+    "The investments area has its own teal accent and uses the existing colour sweep when switching",
+    "The chosen area and view are remembered in the browser (anav.shell.v1)",
+    "Ctrl+Z does not undo hidden calculator edits while Investments is open",
+    "Keyboard: arrow keys, Home and End move between tabs"
+  ],
+  "backup": "backups/2026-11-24T21-44-00Z-area-shell/"
+}

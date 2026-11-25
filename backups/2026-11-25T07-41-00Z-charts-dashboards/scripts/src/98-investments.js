@@ -1,0 +1,1001 @@
+
+  // Investments workspace: the Excel workflow as screens. Every number on screen comes from PortfolioEngine.compute(),
+  // so the log, holdings, cash, charts and the Excel export always agree.
+  // Storage: anav.portfolio.v1 (user data), anav.market.v1 (prices typed by the user, later a price provider).
+  (function(){
+    const root=q('investApp');
+    if(!root||typeof PortfolioEngine==='undefined')return;
+    const E=PortfolioEngine;
+    const PF_KEY='anav.portfolio.v1',MK_KEY='anav.market.v1',PREV_KEY='anav.portfolio.prev';
+    const readJson=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(_){return null;}};
+    let pf=E.normalize(readJson(PF_KEY));
+    let mk=normalizeMarket(readJson(MK_KEY));
+    let calc=null;
+    const ui={logMode:'trades',filter:'all',search:'',sort:{key:'startDate',dir:-1},open:new Set(),range:'all',holdBy:'value',customDays:63,pattern:''};
+    function normalizeMarket(raw){
+      const m={quotes:{},fx:{},status:{}};
+      const meta=v=>({asOf:String(v.asOf||''),source:String(v.source||'manual'),...(v.fetchedAt?{fetchedAt:String(v.fetchedAt)}:{}),...(Number.isFinite(v.previousClose)?{previousClose:v.previousClose}:{})});
+      for(const [s,v] of Object.entries(raw?.quotes||{}))if(Number.isFinite(v?.price)&&v.price>0)m.quotes[E.cleanSymbol(s)]={price:v.price,...meta(v)};
+      if(Number.isFinite(raw?.fx?.USDILS?.rate)&&raw.fx.USDILS.rate>0)m.fx.USDILS={rate:raw.fx.USDILS.rate,...meta(raw.fx.USDILS)};
+      for(const [s,v] of Object.entries(raw?.status||{}))if(v&&typeof v==='object')m.status[s]={error:String(v.error||''),at:String(v.at||'')};
+      if(raw?.lastRefresh)m.lastRefresh=String(raw.lastRefresh);
+      if(raw?.stockProvider&&typeof raw.stockProvider==='object')m.stockProvider={available:!!raw.stockProvider.available,provider:raw.stockProvider.provider||null};
+      return m;
+    }
+    function persist(){
+      try{localStorage.setItem(PF_KEY,JSON.stringify(pf));localStorage.setItem(MK_KEY,JSON.stringify(mk));return true;}
+      catch(_){toast('השמירה בדפדפן נכשלה. כדאי להוריד גיבוי.');return false;}
+    }
+
+    // ---------- formatting ----------
+    const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const NF={USD:new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}),ILS:new Intl.NumberFormat('en-US',{style:'currency',currency:'ILS'})};
+    const DASH='<span class="inv-na" title="אין נתון">—</span>';
+    const tone=v=>v>0?' inv-pos':v<0?' inv-neg':'';
+    function money(c,cur,opt){
+      if(c===null||c===undefined||!Number.isFinite(c))return DASH;
+      const signed=opt?.signed,txt=NF[cur].format(Math.abs(c)/100);
+      const sign=c<0?'−':signed&&c>0?'+':'';
+      return '<bdi class="inv-num'+(signed?tone(c):'')+'">'+sign+txt+'</bdi>';
+    }
+    const compact=(c,cur)=>{const v=Math.abs(c)/100,s=(c<0?'−':'')+(cur==='USD'?'$':'₪');return s+(v>=1e6?(v/1e6).toFixed(2).replace(/.?0+$/,'')+'M':v>=1e5?Math.round(v/1e3)+'K':v>=1e3?(v/1e3).toFixed(1).replace(/.0$/,'')+'K':Math.round(v));};
+    const num=(v,d=8)=>v===null||v===undefined?DASH:'<bdi class="inv-num">'+Number(v).toLocaleString('en-US',{maximumFractionDigits:d})+'</bdi>';
+    const pct=(v,opt)=>v===null||v===undefined||!Number.isFinite(v)?DASH:'<bdi class="inv-num'+(opt?.signed?tone(v):'')+'">'+(v<0?'−':opt?.signed&&v>0?'+':'')+Math.abs(v).toFixed(opt?.d??2)+'%</bdi>';
+    const date=d=>d?'<bdi class="inv-num">'+d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(2,4)+'</bdi>':DASH;
+    const sym=s=>'<bdi class="inv-sym" dir="ltr">'+esc(s)+'</bdi>';
+    const TYPE_LABEL={buy:'קנייה',sell:'מכירה',deposit:'הפקדה',withdrawal:'משיכה',fx:'המרת מט״ח',dividend:'דיבידנד',fee:'עמלה'};
+    const CUR_LABEL={USD:'$',ILS:'₪'};
+    const parseNum=v=>{const s=String(v??'').replace(/[,\s₪$]/g,'');if(s==='')return undefined;const n=Number(s);return Number.isFinite(n)?n:NaN;};
+    const kpi=(label,value,note,cls)=>'<div class="invest-kpi'+(cls?' '+cls:'')+'"><span>'+label+'</span><strong>'+value+'</strong><small>'+(note||'&nbsp;')+'</small></div>';
+    const empty=(icon,title,text,action)=>'<div class="invest-empty">'+icon+'<strong>'+title+'</strong><p>'+text+'</p>'+(action||'')+'</div>';
+    const ICON={
+      log:'<svg class="invest-empty-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="7" width="30" height="34" rx="5"/><path d="M16 17h16M16 24h16M16 31h9"/></svg>',
+      pie:'<svg class="invest-empty-icon" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="15"/><path d="M24 9v15l11 10"/></svg>',
+      line:'<svg class="invest-empty-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M8 38h32"/><path d="M11 31l8-9 7 5 11-14"/></svg>',
+      cash:'<svg class="invest-empty-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M14 18h22l-6-6M34 30H12l6 6"/></svg>'
+    };
+    const PALETTE=['#2f6461','#c08a3e','#5b6fa8','#9a5b7a','#6b8f4e','#b4654a','#4f8a9a','#7d6b9e','#a08f4a','#5f7f6a'];
+
+    // ---------- rendering ----------
+    function refresh(){
+      calc=E.compute(pf,mk);
+      renderLog();renderHoldings();renderPerformance();renderCash();renderAnalysis();
+      const list=q('invSymbols');if(list)list.innerHTML=Object.keys(pf.instruments).sort().map(s=>'<option value="'+esc(s)+'">').join('');
+    }
+    function curTotals(map,signed=true){return ['USD','ILS'].filter(c=>map[c]).map(c=>money(map[c],c,{signed})).join(' · ')||money(0,'USD');}
+
+    function renderLog(){
+      const box=q('investBody-log'),s=calc.summary;
+      if(!pf.transactions.length){box.innerHTML=empty(ICON.log,'עדיין אין פעולות','כל קנייה ומכירה שתרשום כאן הופכת אוטומטית לעסקה, לאחזקה ולתנועת מזומן. אין צורך בנוסחאות.','<div class="inv-quick"><button type="button" class="invest-btn invest-primary" data-act="add" data-type="buy">+ רישום קנייה ראשונה</button><button type="button" class="invest-btn" data-act="import">ייבוא מהאקסל שלי</button></div>');return;}
+      const u=s.byCurrency.USD,i=s.byCurrency.ILS;
+      const net={USD:u.net,ILS:i.net},fees={USD:u.fees,ILS:i.fees};
+      let h='<div class="invest-kpis">'+
+        kpi('רווח נטו בעסקאות סגורות',curTotals(net),'אחרי כל העמלות')+
+        kpi('אחוז הצלחה',pct(s.winRate,{d:0}),s.closed?(s.closed-(u.closed-u.wins)-(i.closed-i.wins))+' מתוך '+s.closed+' עסקאות סגורות ברווח':'אין עדיין עסקאות סגורות')+
+        kpi('עמלות ששולמו',curTotals(fees,false),s.trades+' עסקאות · '+s.symbols+' ניירות')+
+        kpi('ממוצע ימי החזקה',s.avgDaysClosed===null?DASH:'<bdi class="inv-num">'+s.avgDaysClosed.toFixed(1)+'</bdi>',s.open?s.open+' עסקאות פתוחות לא נכללות':'עסקאות סגורות')+
+        '</div>';
+      h+=tradeBars();
+      h+='<div class="inv-toolbar"><div class="inv-chips" role="group" aria-label="תצוגה">'+
+        chip('logMode','trades','לפי עסקאות')+chip('logMode','actions','כל הפעולות')+'</div>'+
+        (ui.logMode==='trades'?'<div class="inv-chips" role="group" aria-label="סינון">'+chip('filter','all','הכול')+chip('filter','open','פתוחות')+chip('filter','closed','סגורות')+chip('filter','win','ברווח')+chip('filter','loss','בהפסד')+'</div>':'')+
+        '<input type="search" class="inv-search" id="invSearch" placeholder="חיפוש סימול או הערה" value="'+esc(ui.search)+'" aria-label="חיפוש"></div>';
+      h+=ui.logMode==='trades'?tradesTable():actionsTable(pf.transactions);
+      if(calc.issues.length)h='<div class="inv-alert" role="alert">'+calc.issues.map(x=>esc(x.message)).join('<br>')+' · הפעולה לא נכללה בחישוב. כדאי לתקן אותה.</div>'+h;
+      box.innerHTML=h;
+    }
+    function chip(key,val,label){return '<button type="button" class="inv-chip" data-act="ui" data-key="'+key+'" data-val="'+val+'" aria-pressed="'+(ui[key]===val)+'">'+label+'</button>';}
+    function matches(text){const s=ui.search.trim().toLowerCase();return !s||text.toLowerCase().includes(s);}
+    function tradesTable(){
+      const byId=Object.fromEntries(pf.transactions.map(t=>[t.id,t]));
+      let rows=calc.trades.filter(t=>{
+        if(ui.filter==='open'&&t.status!=='open')return false;
+        if(ui.filter==='closed'&&t.status!=='closed')return false;
+        if(ui.filter==='win'&&!(t.net>0))return false;
+        if(ui.filter==='loss'&&!(t.net<0))return false;
+        return matches(t.symbol+' '+t.txIds.map(id=>byId[id]?.note||'').join(' '));
+      });
+      const {key,dir}=ui.sort;
+      rows=rows.slice().sort((a,b)=>{const x=a[key],y=b[key];if(x===y)return 0;if(x===null||x===undefined)return 1;if(y===null||y===undefined)return -1;return (x<y?-1:1)*dir;});
+      if(!rows.length)return '<p class="inv-none">אין עסקאות שמתאימות לסינון.</p>';
+      const th=(k,l)=>'<th scope="col"><button type="button" data-act="sort" data-key="'+k+'" aria-sort="'+(key===k?(dir>0?'ascending':'descending'):'none')+'">'+l+(key===k?(dir>0?' ▲':' ▼'):'')+'</button></th>';
+      let h='<div class="inv-table-wrap"><table class="inv-table"><thead><tr>'+th('symbol','נייר')+th('status','מצב')+th('startDate','פתיחה')+th('endDate','סגירה')+th('days','ימים')+
+        th('buyCost','השקעה')+th('sellProceeds','תמורה')+th('fees','עמלות')+th('net','נטו')+th('returnPct','תשואה')+'</tr></thead><tbody>';
+      for(const t of rows){
+        const isOpen=ui.open.has(t.id);
+        h+='<tr class="inv-trade'+(isOpen?' is-open':'')+'" data-act="toggle" data-id="'+t.id+'" tabindex="0" aria-expanded="'+isOpen+'"><td><span class="inv-caret" aria-hidden="true"></span>'+sym(t.symbol)+' <small class="inv-tag">'+E.MARKETS[t.market].label+'</small></td>'+
+          '<td><span class="inv-status inv-'+t.status+'">'+(t.status==='open'?'פתוחה':'סגורה')+'</span></td><td>'+date(t.startDate)+'</td><td>'+date(t.endDate)+'</td>'+
+          '<td>'+num(t.days)+(t.status==='open'?' <small class="inv-muted">עד היום</small>':'')+'</td><td>'+money(t.buyCost,t.currency)+'</td><td>'+money(t.sells?t.sellProceeds:null,t.currency)+'</td>'+
+          '<td>'+money(t.fees,t.currency)+'</td><td>'+(t.status==='closed'?money(t.net,t.currency,{signed:true}):'<small class="inv-muted" title="רווח ממומש עד עכשיו לפי עלות ממוצעת">ממומש '+money(t.realized,t.currency,{signed:true})+'</small>')+'</td><td>'+pct(t.returnPct,{signed:true})+'</td></tr>';
+        if(isOpen)h+='<tr class="inv-sub"><td colspan="10"><button type="button" class="invest-btn inv-sub-btn" data-act="analyze" data-id="'+t.id+'">ניתוח העסקה ותוכנית המסחר</button>'+actionsTable(t.txIds.map(id=>byId[id]).filter(Boolean),true)+'</td></tr>';
+      }
+      return h+'</tbody></table></div>';
+    }
+    function actionsTable(list,nested){
+      const rows=E.ordered(list).reverse().filter(t=>nested||matches((t.symbol||'')+' '+t.note+' '+TYPE_LABEL[t.type]));
+      if(!rows.length)return '<p class="inv-none">אין פעולות שמתאימות לחיפוש.</p>';
+      let h='<div class="inv-table-wrap"><table class="inv-table inv-actions"><thead><tr><th>תאריך</th><th>פעולה</th>'+(nested?'':'<th>נייר</th>')+'<th>כמות</th><th>מחיר</th><th>עמלה</th><th>השפעה על המזומן</th><th>רווח ממומש</th><th>הערה</th><th><span class="inv-sr">פעולות</span></th></tr></thead><tbody>';
+      for(const t of rows){
+        const info=calc.txInfo[t.id]||{},trade=t.type==='buy'||t.type==='sell',cur=trade?E.instrumentOf(pf,t.symbol).currency:null;
+        const flows=(info.cash||[]).map(([c,v])=>money(v,c,{signed:true})).join(' ');
+        h+='<tr'+(info.ignored?' class="inv-bad" title="לא נכלל בחישוב"':'')+'><td>'+date(t.date)+'</td><td><span class="inv-type inv-type-'+t.type+'">'+TYPE_LABEL[t.type]+'</span></td>'+(nested?'':'<td>'+(t.symbol?sym(t.symbol):DASH)+'</td>')+
+          '<td>'+(trade?num(t.qty):DASH)+'</td><td>'+(trade?money(E.cents(t.price),cur):t.type==='fx'?'<small>שער</small> '+num(t.rate,4):DASH)+'</td><td>'+(trade?money(E.cents(t.fee),cur):DASH)+'</td>'+
+          '<td>'+(flows||DASH)+'</td><td>'+(info.realized!==undefined?money(info.realized,cur,{signed:true})+(info.realizedIls!==undefined?'<small class="inv-muted"> · ₪ '+money(info.realizedIls,'ILS',{signed:true})+(info.fxEffect?' (מזה דולר '+money(info.fxEffect,'ILS',{signed:true})+')':'')+'</small>':''):DASH)+'</td>'+
+          '<td class="inv-note">'+esc(t.note)+'</td><td class="inv-row-tools"><button type="button" data-act="edit" data-id="'+t.id+'" aria-label="עריכה">עריכה</button><button type="button" data-act="delete" data-id="'+t.id+'" aria-label="מחיקה">מחיקה</button></td></tr>';
+      }
+      return h+'</tbody></table></div>';
+    }
+    // Net result of each closed trade as a bar, oldest to newest (the Excel "שינוי נטו" column at a glance).
+    function tradeBars(){
+      const closed=calc.trades.filter(t=>t.status==='closed'&&t.currency==='USD').sort((a,b)=>a.endDate<b.endDate?-1:1);
+      if(closed.length<2)return '';
+      const W=Math.max(320,(q('investBody-log').clientWidth||800)-2),H=120,pad=6,max=Math.max(...closed.map(t=>Math.abs(t.net)))||1;
+      const bw=Math.min(28,(W-pad*2)/closed.length*0.7),gap=(W-pad*2)/closed.length,mid=H/2;
+      const bars=closed.map((t,i)=>{const hgt=Math.max(1.5,Math.abs(t.net)/max*(mid-10));const x=pad+gap*(i+.5)-bw/2;
+        return '<rect x="'+x.toFixed(1)+'" y="'+(t.net>=0?mid-hgt:mid).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hgt.toFixed(1)+'" rx="2" class="'+(t.net>=0?'inv-bar-pos':'inv-bar-neg')+'" data-act="toggle" data-id="'+t.id+'"><title>'+esc(t.symbol)+' · '+NF.USD.format(t.net/100)+' · '+t.endDate+'</title></rect>';}).join('');
+      return '<figure class="inv-chart inv-bars"><figcaption>רווח נטו לכל עסקה סגורה ($), מהישנה (משמאל) לחדשה · לחיצה על עמודה פותחת את העסקה</figcaption><svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="רווח נטו לפי עסקה" dir="ltr"><line x1="0" x2="'+W+'" y1="'+mid+'" y2="'+mid+'" class="inv-axis"/>'+bars+'</svg></figure>';
+    }
+
+    function renderHoldings(){
+      const box=q('investBody-holdings'),c=calc;
+      const rate=mk.fx.USDILS;
+      const unreal={USD:0,ILS:0};let unrealKnown=true;
+      for(const h of c.holdings){if(h.unrealized===null)unrealKnown=false;else unreal[h.currency]+=h.unrealized;}
+      let h='<div class="invest-kpis">'+
+        kpi('שווי תיק (₪)',c.totalIls===null?DASH:money(c.totalIls,'ILS'),c.totalIls===null?(c.missingPrices.length?'חסר מחיר: '+c.missingPrices.map(esc).join(', '):'חסר שער דולר'):'כולל מזומן')+
+        kpi('מזומן',money(c.cash.USD,'USD')+' · '+money(c.cash.ILS,'ILS'),c.cash.USD<0?'<span class="inv-neg">מזומן דולרי שלילי: חסרה המרת מט״ח?</span>':'נגזר מכל הפעולות')+
+        kpi('רווח שטרם מומש',unrealKnown?curTotals(unreal):DASH,unrealKnown?'לפי המחירים האחרונים':'חסרים מחירים')+
+        '<div class="invest-kpi"><span>שער דולר (USDILS)</span><strong><input class="inv-inline" type="text" inputmode="decimal" data-act="fx" value="'+(rate?rate.rate:'')+'" placeholder="הזן שער" aria-label="שער דולר"></strong><small>'+(rate?srcLabel(rate,'fx'):'נדרש לשווי בשקלים')+'</small></div>'+
+        '</div>';
+      if(!c.holdings.length){box.innerHTML=h+priceBar()+empty(ICON.pie,'אין כרגע אחזקות','אחזקות מחושבות אוטומטית מהקניות והמכירות בלוג.');return;}
+      h+=priceBar();
+      const by=[['symbol','נייר'],['sector','סקטור'],['kind','סוג נכס'],['currency','מטבע'],['market','שוק']];
+      h+='<div class="inv-toolbar"><span class="inv-muted">פילוח לפי</span><div class="inv-chips" role="group" aria-label="פילוח לפי">'+by.map(([k,l])=>'<button type="button" class="inv-chip" data-act="holdby" data-val="'+k+'" aria-pressed="'+(ui.holdBy===k)+'">'+l+'</button>').join('')+'</div></div>';
+      h+='<div class="inv-split">'+donut()+'<div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>נייר</th><th>כמות</th><th>עלות ממוצעת</th><th>עלות</th><th>מחיר נוכחי</th><th>שווי</th><th>רווח / הפסד</th><th>משקל</th></tr></thead><tbody>';
+      for(const x of c.holdings){
+        const ins=E.instrumentOf(pf,x.symbol);
+        h+='<tr><td><button type="button" class="inv-link" data-act="instrument" data-symbol="'+esc(x.symbol)+'" title="פרטי הנייר: שם, סקטור, סוג">'+sym(x.symbol)+'</button> <small class="inv-tag">'+E.MARKETS[x.market].label+(ins.sector?' · '+esc(ins.sector):'')+'</small></td><td>'+num(x.qty)+'</td><td>'+money(x.avgCost===null?null:E.cents(x.avgCost),x.currency)+'</td><td>'+money(x.cost,x.currency)+'</td>'+
+          '<td><input class="inv-inline" type="text" inputmode="decimal" data-act="price" data-symbol="'+esc(x.symbol)+'" value="'+(x.price??'')+'" placeholder="מחיר" aria-label="מחיר נוכחי של '+esc(x.symbol)+'"><small class="inv-muted inv-src">'+(x.price===null?'חסר':srcLabel(mk.quotes[x.symbol],MarketData.kindOf(x.symbol,x.market)))+'</small></td>'+
+          '<td>'+money(x.value,x.currency)+'</td><td>'+money(x.unrealized,x.currency,{signed:true})+' <small>'+pct(x.unrealizedPct,{signed:true})+'</small></td><td>'+pct(x.weight,{d:1})+'</td></tr>';
+      }
+      h+='</tbody></table></div></div><p class="inv-foot">משקל = שווי הנייר בשקלים מתוך כלל התיק <b>כולל מזומן</b>. עלות כוללת עמלות קנייה (שיטת עלות ממוצעת). ליד כל מחיר מוצגים המקור וזמן המחיר. מחיר שהוקלד ידנית משמש עד שמתקבל מחיר מספק. קריפטו: מחיר ספוט חי מ־Coinbase. דולר: שער הייחוס היומי של הבנק המרכזי האירופי (ECB), שאינו השער היציג של בנק ישראל.</p>';
+      box.innerHTML=h;
+    }
+    const KIND_LABEL={stock:'מניה',etf:'קרן סל (ETF)',crypto:'קריפטו',bond:'אג"ח',fund:'קרן',other:'אחר'};
+    function groupKey(by){
+      return h=>{const ins=E.instrumentOf(pf,h.symbol);
+        if(by==='sector')return ins.sector||'לא מוגדר';
+        if(by==='kind')return KIND_LABEL[ins.kind]||(h.market==='CRYPTO'?'קריפטו':'לא מוגדר');
+        if(by==='currency')return h.currency==='USD'?'דולר':'שקל';
+        if(by==='market')return E.MARKETS[h.market].label;
+        return h.symbol;};
+    }
+    function donut(){
+      const c=calc;let parts,title;
+      if(c.totalIls){
+        const key=groupKey(ui.holdBy),g=new Map();
+        for(const h of c.holdings){const k=key(h);g.set(k,(g.get(k)||0)+h.valueIls);}
+        parts=[...g].map(([label,v])=>({label,v})).sort((a,b)=>b.v-a.v);
+        const cashIls=c.cashIls;if(cashIls>0)parts.push({label:'מזומן',v:cashIls,cash:true});
+        title='חלוקה לפי '+({symbol:'נייר',sector:'סקטור',kind:'סוג נכס',currency:'מטבע',market:'שוק'}[ui.holdBy]||'נייר')+' (שווי ב־₪, כולל מזומן)';
+      }else{
+        const usd=c.holdings.filter(h=>h.currency==='USD');if(!usd.length)return '';
+        parts=usd.map(h=>({label:h.symbol,v:h.cost}));title='חלוקה לפי עלות ($) · יוצג לפי שווי כשיוזנו מחירים ושער';
+      }
+      const total=parts.reduce((s,p)=>s+Math.max(0,p.v),0);if(!total)return '';
+      let a=-Math.PI/2;const R=62,r=40,cx=70,cy=70;
+      const arcs=parts.map((p,i)=>{
+        const frac=Math.max(0,p.v)/total,a2=a+frac*Math.PI*2,large=frac>.5?1:0,col=p.cash?'#cfc6b8':PALETTE[i%PALETTE.length];
+        const pt=(rad,ang)=>(cx+rad*Math.cos(ang)).toFixed(2)+' '+(cy+rad*Math.sin(ang)).toFixed(2);
+        const d=frac>=.9999?'M'+pt(R,0)+' A'+R+' '+R+' 0 1 1 '+pt(R,Math.PI)+' A'+R+' '+R+' 0 1 1 '+pt(R,0)+' M'+pt(r,0)+' A'+r+' '+r+' 0 1 0 '+pt(r,Math.PI)+' A'+r+' '+r+' 0 1 0 '+pt(r,0)+'Z'
+          :'M'+pt(R,a)+' A'+R+' '+R+' 0 '+large+' 1 '+pt(R,a2)+' L'+pt(r,a2)+' A'+r+' '+r+' 0 '+large+' 0 '+pt(r,a)+'Z';
+        a=a2;return {d,col,label:p.label,frac};
+      });
+      return '<figure class="inv-chart inv-donut"><figcaption>'+title+'</figcaption><div class="inv-donut-row"><svg viewBox="0 0 140 140" role="img" aria-label="'+title+'">'+arcs.map(x=>'<path d="'+x.d+'" fill="'+x.col+'" fill-rule="evenodd"><title>'+esc(x.label)+' '+(x.frac*100).toFixed(1)+'%</title></path>').join('')+'</svg>'+
+        '<ul class="inv-legend">'+arcs.map(x=>'<li><i style="background:'+x.col+'"></i><bdi dir="ltr">'+esc(x.label)+'</bdi><b>'+(x.frac*100).toFixed(1)+'%</b></li>').join('')+'</ul></div></figure>';
+    }
+
+    function renderPerformance(){
+      const box=q('investBody-performance'),p=calc.performance,rows=p.rows;
+      if(!ui.perfSource)ui.perfSource=rows.length>=2?'broker':'computed';
+      const toggle='<div class="inv-toolbar"><div class="inv-chips" role="group" aria-label="מקור הביצועים">'+chip('perfSource','broker','לפי רישומי הברוקר')+chip('perfSource','computed','מחושב מהיסטוריית מחירים')+'</div></div>';
+      if(ui.perfSource==='computed'){renderComputed(box,toggle);return;}
+      const last=rows[rows.length-1];
+      const form='<form class="inv-snap" data-form="snapshot"><label>שווי החשבון לפי הברוקר<input name="value" type="text" inputmode="decimal" placeholder="₪" required></label><label>תאריך<input name="date" type="date" value="'+E.todayIso()+'" max="'+E.todayIso()+'" required></label><button type="submit" class="invest-btn invest-primary">רישום שווי</button><span class="inv-form-msg" aria-live="polite"></span></form>';
+      let h=toggle+'<div class="invest-kpis">'+
+        kpi('שווי אחרון',last?money(last.value,'ILS'):DASH,last?'לפי הברוקר · '+date(last.date):'עדיין לא נרשם')+
+        kpi('הפקדות נטו',money(calc.netDeposits.ILS,'ILS'),'הפקדות פחות משיכות (₪)')+
+        kpi('רווח / הפסד כספי',last?money(last.profit,'ILS',{signed:true}):DASH,'שווי פחות הפקדות נטו')+
+        kpi('תשואה מצטברת',pct(p.twr,{signed:true}),last&&last.daily!==null?'מהרישום הקודם: '+pct(last.daily,{signed:true}):'שרשור התשואות בין הרישומים, בלי הפקדות')+
+        '</div>'+form;
+      if(rows.length<2){box.innerHTML=h+empty(ICON.line,'אין עדיין מספיק נקודות לגרף','רשום את שווי החשבון מהברוקר (כמו בגיליון סה״כ באקסל). מספיקות שתי נקודות כדי לראות קו. ימים שלא נרשמו לא ממולאים ולא מוצגים כאפס.');return;}
+      const cut={'1m':30,'3m':91,'1y':365}[ui.range];
+      const from=cut?new Date(Date.now()-cut*864e5).toISOString().slice(0,10):'';
+      const view=rows.filter(r=>r.date>=from);
+      h+='<div class="inv-toolbar"><div class="inv-chips" role="group" aria-label="טווח">'+chip('range','1m','חודש')+chip('range','3m','3 חודשים')+chip('range','1y','שנה')+chip('range','all','הכול')+'</div></div>';
+      h+=view.length<2?'<p class="inv-none">אין מספיק נקודות בטווח הזה.</p>':equityChart(view);
+      h+='<details class="inv-details"><summary>כל הרישומים ('+rows.length+')</summary><div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>תאריך</th><th>שווי</th><th>הפקדה / משיכה</th><th>הפקדות נטו</th><th>רווח / הפסד</th><th>שינוי מהרישום הקודם</th><th></th></tr></thead><tbody>'+
+        rows.slice().reverse().map(r=>'<tr><td>'+date(r.date)+'</td><td>'+money(r.value,'ILS')+'</td><td>'+(r.flow?money(r.flow,'ILS',{signed:true}):DASH)+'</td><td>'+money(r.netDeposits,'ILS')+'</td><td>'+money(r.profit,'ILS',{signed:true})+'</td><td>'+pct(r.daily,{signed:true})+'</td><td class="inv-row-tools"><button type="button" data-act="del-snap" data-id="'+r.id+'">מחיקה</button></td></tr>').join('')+
+        '</tbody></table></div></details><p class="inv-foot">שינוי = (שווי − הפקדות ומשיכות מאז הרישום הקודם) ÷ שווי ברישום הקודם − 1, כמו "תנועה אחוזית" באקסל. ברישום יומי זה השינוי היומי. התשואה המצטברת משרשרת את השינויים, כך שהפקדות לא נספרות כרווח.</p>';
+      box.innerHTML=h;
+    }
+    // Account value vs net deposits (the Excel line chart), with daily % bars underneath.
+    function equityChart(rows){
+      const W=Math.max(320,(q('investBody-performance').clientWidth||800)-2),H=230,B=64,L=56,R=10,T=12;
+      const vals=rows.flatMap(r=>[r.value,r.netDeposits]),min=Math.min(...vals),max=Math.max(...vals),span=max-min||1;
+      const t0=Date.parse(rows[0].date),t1=Date.parse(rows[rows.length-1].date),ts=t1-t0||1;
+      // Time runs left → right, the usual convention for financial charts (also on Hebrew sites).
+      const X=d=>L+(Date.parse(d)-t0)/ts*(W-L-R),Y=v=>T+(1-(v-min)/span)*(H-T-22);
+      const path=k=>rows.map((r,i)=>(i?'L':'M')+X(r.date).toFixed(1)+' '+Y(r[k]).toFixed(1)).join(' ');
+      const ticks=[0,1,2,3].map(i=>min+span*i/3);
+      const dates=[rows[0],rows[Math.floor(rows.length/2)],rows[rows.length-1]];
+      const dmax=Math.max(.5,...rows.map(r=>Math.abs(r.daily||0)));
+      const bw=Math.max(1,Math.min(10,(W-L-R)/rows.length*.7)),bmid=H+B/2;
+      const bars=rows.filter(r=>r.daily!==null).map(r=>{const hh=Math.abs(r.daily)/dmax*(B/2-6);return '<rect x="'+(X(r.date)-bw/2).toFixed(1)+'" y="'+(r.daily>=0?bmid-hh:bmid).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(.8,hh).toFixed(1)+'" class="'+(r.daily>=0?'inv-bar-pos':'inv-bar-neg')+'"><title>'+r.date+' · '+r.daily.toFixed(2)+'%</title></rect>';}).join('');
+      return '<figure class="inv-chart inv-equity"><figcaption><span><i class="inv-key inv-key-value"></i>שווי החשבון</span><span><i class="inv-key inv-key-dep"></i>הפקדות נטו</span><span><i class="inv-key inv-key-bar"></i>שינוי מהרישום הקודם %</span></figcaption>'+
+        '<svg viewBox="0 0 '+W+' '+(H+B)+'" role="img" aria-label="שווי החשבון מול הפקדות נטו" dir="ltr">'+
+        ticks.map(v=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" class="inv-grid"/><text x="'+(L-6)+'" y="'+(Y(v)+3).toFixed(1)+'" class="inv-tick" text-anchor="end">'+compact(v,'ILS')+'</text>').join('')+
+        dates.map((r,i)=>'<text x="'+X(r.date).toFixed(1)+'" y="'+(H-6)+'" class="inv-tick" text-anchor="'+['start','middle','end'][i]+'">'+r.date.slice(8,10)+'/'+r.date.slice(5,7)+'/'+r.date.slice(2,4)+'</text>').join('')+
+        '<path d="'+path('netDeposits')+'" class="inv-line-dep"/><path d="'+path('value')+'" class="inv-line-value"/>'+
+        '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+bmid+'" y2="'+bmid+'" class="inv-axis"/>'+bars+'</svg></figure>';
+    }
+
+    // Negative dollar cash almost always means currency conversions were not recorded (the Excel has none).
+    // Offer one conversion that brings it back to zero; the user checks the date, amount and rate before saving.
+    function cashFix(){
+      const c=calc;if(!(c.cash.USD<0))return '';
+      const need=-c.cash.USD/100,rate=mk.fx.USDILS?.rate||null;
+      const first=E.ordered(pf.transactions).find(t=>(t.type==='buy'||t.type==='sell')&&!t.opening&&E.instrumentOf(pf,t.symbol).currency==='USD');
+      return '<div class="inv-alert inv-fix" role="note"><div><b>המזומן הדולרי שלילי ('+money(c.cash.USD,'USD')+').</b> כנראה לא נרשמו המרות משקלים לדולרים. אפשר להוסיף המרה אחת שתאזן אותו, ואפשר במקומה לרשום את ההמרות האמיתיות מהברוקר.</div>'+
+        '<button type="button" class="invest-btn" data-act="fix-usd" data-usd="'+need.toFixed(2)+'" data-rate="'+(rate||'')+'" data-date="'+(first?.date||E.todayIso())+'">הוספת המרה מאזנת</button></div>';
+    }
+    // Rate on the date of the first dollar trade (ECB); today's rate only if that day is unavailable.
+    async function fixUsd(el){
+      const usd=Number(el.dataset.usd),d=el.dataset.date;let rate=Number(el.dataset.rate)||undefined,src='שער היום';
+      try{const from=new Date(Date.parse(d+'T00:00:00Z')-7*864e5).toISOString().slice(0,10);
+        const h=await MarketData.providers.fxHistory(from,d,fetch.bind(window));const days=Object.keys(h).sort();
+        if(days.length){rate=h[days[days.length-1]];src='שער ECB ל־'+days[days.length-1].split('-').reverse().join('/');}}catch(_){}
+      openTx('fx',null,{from:'ILS',date:d,rate,amount:rate?(Math.ceil(usd*rate*100)/100).toFixed(2):'',note:'המרה מאזנת: הדולרים שחסרו בתיעוד ('+src+')'});
+    }
+    function renderCash(){
+      const box=q('investBody-cash'),c=calc;
+      const moves=pf.transactions.filter(t=>['deposit','withdrawal','fx','dividend','fee'].includes(t.type));
+      let h='<div class="invest-kpis">'+
+        kpi('מזומן בשקלים',money(c.cash.ILS,'ILS'),'אחרי כל הפעולות')+
+        kpi('מזומן בדולרים',money(c.cash.USD,'USD'),c.cash.USD<0?'<span class="inv-neg">שלילי: נרשמו קניות בלי המרת מט״ח</span>':'אחרי קניות, מכירות והמרות')+
+        kpi('הפקדות נטו',money(c.netDeposits.ILS,'ILS'),'הפקדות פחות משיכות')+
+        (c.openingCapital.ILS||c.openingCapital.USD?kpi('הון פתיחה',['USD','ILS'].filter(k=>c.openingCapital[k]).map(k=>money(c.openingCapital[k],k)).join(' · '),'עלות אחזקות מלפני תחילת התיעוד'+(c.openingIlsMissing?' · <span class="inv-neg">חסר שער דולר בחלק מהן</span>':'')):'')+
+        '</div>'+cashFix()+'<div class="inv-quick">'+
+        '<button type="button" class="invest-btn" data-act="add" data-type="deposit">+ הפקדה</button><button type="button" class="invest-btn" data-act="add" data-type="withdrawal">+ משיכה</button><button type="button" class="invest-btn" data-act="add" data-type="fx">+ המרת מט״ח</button></div>';
+      h+=moves.length?actionsTable(moves,false):empty(ICON.cash,'אין עדיין תנועות','רשום הפקדות ומשיכות מהבנק, והמרות משקלים לדולרים. קניות ומכירות כבר משנות את המזומן לבד, אין צורך לרשום אותן כאן.');
+      box.innerHTML=h;
+    }
+
+    // ---------- transaction dialog ----------
+    document.body.insertAdjacentHTML('beforeend',
+      '<datalist id="invSymbols"></datalist>'+
+      '<div class="tool-overlay inv-overlay" id="invTxOverlay" hidden><section class="tool-dialog inv-dialog" role="dialog" aria-modal="true" aria-labelledby="invTxTitle">'+
+      '<header class="tool-head"><div><h2 id="invTxTitle">פעולה חדשה</h2><p>הסכום, העמלה וההשפעה על המזומן מחושבים אוטומטית.</p></div><button type="button" class="tool-close" data-inv-close aria-label="סגירה">×</button></header>'+
+      '<form class="tool-content inv-form" id="invTxForm" novalidate><div class="inv-seg" role="radiogroup" aria-label="סוג פעולה">'+
+      ['buy','sell','deposit','withdrawal','fx'].map(t=>'<button type="button" role="radio" data-type="'+t+'" aria-checked="false">'+TYPE_LABEL[t]+'</button>').join('')+
+      '</div><div class="inv-grid" id="invTxFields"></div><div class="inv-preview" id="invTxPreview" aria-live="polite"></div>'+
+      '<div class="inv-form-actions"><button type="submit" class="tool-primary">שמירה</button><button type="button" class="inv-ghost" data-inv-close>ביטול</button><button type="button" class="inv-danger" id="invTxDelete" hidden>מחיקה</button></div></form></section></div>'+
+      '<div class="tool-overlay inv-overlay" id="invSetOverlay" hidden><section class="tool-dialog inv-dialog" role="dialog" aria-modal="true" aria-labelledby="invSetTitle">'+
+      '<header class="tool-head"><div><h2 id="invSetTitle">עמלות ברירת מחדל</h2><p>ממולאות אוטומטית בכל פעולה חדשה, ואפשר לשנות בכל פעולה. שינוי כאן לא משנה פעולות קיימות.</p></div><button type="button" class="tool-close" data-inv-close aria-label="סגירה">×</button></header>'+
+      '<form class="tool-content inv-form" id="invSetForm"><div class="inv-grid"></div><div class="inv-form-actions"><button type="submit" class="tool-primary">שמירה</button><button type="button" class="inv-ghost" data-inv-close>ביטול</button></div></form></section></div>'+
+      '<div class="inv-toast" id="invToast" role="status" hidden><span></span><button type="button">ביטול</button></div>');
+    const overlay=q('invTxOverlay'),form=q('invTxForm');
+    let draft=null,editing=null,feeTouched=false,opener=null;
+    const field=(name,label,input,hint)=>'<label class="inv-field'+(name==='note'?' inv-wide':'')+'" data-field="'+name+'"><span>'+label+'</span>'+input+'<em class="inv-err" data-err="'+name+'"></em>'+(hint?'<small>'+hint+'</small>':'')+'</label>';
+    const inp=(name,val,attrs)=>'<input name="'+name+'" value="'+esc(val??'')+'" '+(attrs||'type="text" inputmode="decimal"')+'>';
+    function marketFor(symbol){
+      const s=E.cleanSymbol(symbol);
+      if(pf.instruments[s])return pf.instruments[s].market;
+      return /^(BTC|ETH|SOL|XRP|ADA|DOGE)(USD|USDT)?$/.test(s)?'CRYPTO':'US';
+    }
+    function renderFields(){
+      const t=draft.type,trade=t==='buy'||t==='sell';
+      form.querySelectorAll('[data-type]').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.type===t)));
+      const dateField=field('date','תאריך',inp('date',draft.date,'type="date" max="'+E.todayIso()+'"'));
+      let h='';
+      if(trade){
+        const market=draft.market||marketFor(draft.symbol),cur=E.MARKETS[market].currency,c=CUR_LABEL[cur];
+        const held=draft.symbol?E.heldOn(pf,E.cleanSymbol(draft.symbol),draft.date||E.todayIso(),editing):null;
+        h+=field('symbol','נייר',inp('symbol',draft.symbol,'type="text" list="invSymbols" autocomplete="off" dir="ltr" placeholder="AAPL" autocapitalize="characters"'),t==='sell'&&draft.symbol?'מוחזקות בתאריך: '+held:'');
+        h+=dateField;
+        const marketField=field('market','שוק','<select name="market"'+(t==='sell'||pf.instruments[E.cleanSymbol(draft.symbol)]?' disabled':'')+'>'+Object.entries(E.MARKETS).map(([k,m])=>'<option value="'+k+'"'+(k===market?' selected':'')+'>'+m.label+' ('+CUR_LABEL[m.currency]+')</option>').join('')+'</select>');
+        h+=field('qty','כמות',inp('qty',draft.qty));
+        h+=field('price','מחיר ליחידה ('+c+')',inp('price',draft.price));
+        h+=field('fee','עמלה ('+c+')',inp('fee',draft.fee),'ברירת מחדל ל'+E.MARKETS[market].label+': '+pf.settings.fees[market]+' '+c);
+        if(cur==='USD')h+=field('fxRate','שער דולר ביום העסקה'+(draft.fxSource==='ecb'?' (ECB)':''),inp('fxRate',draft.fxRate)+'<button type="button" class="inv-mini" data-fx-fill>שער ECB לתאריך</button>',draft.opening?'מומלץ באחזקת פתיחה בדולרים: כך העלות נכנסת להון הפתיחה בשקלים.':'לא חובה. מאפשר לחשב רווח בשקלים ולהפריד את השפעת הדולר.');
+        if(t==='buy')h+='<label class="inv-check inv-wide"><input type="checkbox" name="opening"'+(draft.opening?' checked':'')+'><span><b>אחזקה מלפני תחילת התיעוד</b> · לא יורדת מהמזומן, והעלות שלה נספרת כהון שהבאת (לא כרווח)</span></label>';
+        h+=marketField;
+      }else if(t==='fx'){
+        h+=dateField;
+        h+=field('from','כיוון','<select name="from"><option value="ILS"'+(draft.from!=='USD'?' selected':'')+'>משקלים לדולרים</option><option value="USD"'+(draft.from==='USD'?' selected':'')+'>מדולרים לשקלים</option></select>');
+        h+=field('amount','סכום ('+(draft.from==='USD'?'$':'₪')+')',inp('amount',draft.amount));
+        h+=field('rate','שער (₪ לדולר)',inp('rate',draft.rate));
+      }else{
+        h+=dateField;
+        h+=field('amount','סכום',inp('amount',draft.amount));
+        h+=field('currency','מטבע','<select name="currency"><option value="ILS"'+(draft.currency!=='USD'?' selected':'')+'>₪ שקל</option><option value="USD"'+(draft.currency==='USD'?' selected':'')+'>$ דולר</option></select>');
+      }
+      h+=field('note',t==='buy'?'הערה / סיבת הכניסה':t==='sell'?'הערה / סיבת היציאה':'הערה','<textarea name="note" rows="2" maxlength="2000">'+esc(draft.note)+'</textarea>');
+      q('invTxFields').innerHTML=h;
+      preview();
+    }
+    function buildTx(){
+      const t=draft.type,tx={id:editing||E.uid(),type:t,date:draft.date,note:String(draft.note||'').trim()};
+      if(t==='buy'||t==='sell'){
+        tx.symbol=E.cleanSymbol(draft.symbol);tx.qty=parseNum(draft.qty);tx.price=parseNum(draft.price);tx.fee=parseNum(draft.fee)??0;
+        const fx=parseNum(draft.fxRate);if(fx!==undefined){tx.fxRate=fx;if(draft.fxSource==='ecb')tx.fxSource='ecb';}
+        const old=editing&&pf.transactions.find(x=>x.id===editing);if(old?.tradePlan)tx.tradePlan=old.tradePlan;
+        if(t==='buy'&&draft.opening)tx.opening=true;
+      }else if(t==='fx'){tx.from=draft.from==='USD'?'USD':'ILS';tx.amount=parseNum(draft.amount);tx.rate=parseNum(draft.rate);}
+      else{tx.currency=draft.currency==='USD'?'USD':'ILS';tx.amount=parseNum(draft.amount);}
+      return tx;
+    }
+    function candidateState(tx){
+      const instruments={...pf.instruments};
+      if(tx.symbol&&!instruments[tx.symbol]){const m=draft.market||marketFor(tx.symbol);instruments[tx.symbol]={symbol:tx.symbol,market:m,currency:E.MARKETS[m].currency,name:'',sector:'',kind:''};}
+      const list=editing?pf.transactions.map(x=>x.id===editing?tx:x):[...pf.transactions,tx];
+      return {...pf,instruments,transactions:list};
+    }
+    function preview(){
+      const tx=buildTx(),box=q('invTxPreview');
+      const ok=(tx.type==='buy'||tx.type==='sell')?tx.qty>0&&tx.price>0&&tx.symbol:tx.amount>0&&(tx.type!=='fx'||tx.rate>0);
+      if(!ok){box.innerHTML='';return;}
+      const st=candidateState(tx),r=E.compute(st,mk),info=r.txInfo[tx.id]||{};
+      const flows=(info.cash||[]).map(([c,v])=>money(v,c,{signed:true})).join(' ו־');
+      let h='<span>השפעה על המזומן: '+(tx.opening?'אין (אחזקת פתיחה)':flows||DASH)+'</span>';
+      if(tx.type==='sell'&&info.realized!==undefined)h+='<span>רווח ממומש (עלות ממוצעת): '+money(info.realized,E.instrumentOf(st,tx.symbol).currency,{signed:true})+'</span>';
+      if(tx.type==='sell'){const tr=r.trades.find(x=>x.id===info.tradeId);if(tr&&tr.status==='closed'&&tr.endDate===tx.date)h+='<span>העסקה נסגרת: נטו '+money(tr.net,tr.currency,{signed:true})+' ב־'+tr.days+' ימים</span>';}
+      box.innerHTML=h;
+    }
+    function openTx(type,id,prefill){
+      opener=document.activeElement;editing=id||null;feeTouched=!!id;
+      const t=id&&pf.transactions.find(x=>x.id===id);
+      if(t){draft={...t,market:t.symbol?E.instrumentOf(pf,t.symbol).market:undefined,qty:t.qty,price:t.price,fee:t.fee,fxRate:t.fxRate,amount:t.amount,rate:t.rate};}
+      else{draft={type:type||'buy',date:E.todayIso(),note:'',currency:'ILS',from:'ILS'};draft.market='US';draft.fee=pf.settings.fees.US;if(prefill)Object.assign(draft,prefill);}
+      q('invTxTitle').textContent=t?'עריכת '+TYPE_LABEL[t.type]:'פעולה חדשה';
+      q('invTxDelete').hidden=!t;
+      form.querySelectorAll('.inv-seg button').forEach(b=>b.disabled=!!t&&((t.type==='buy'||t.type==='sell')!==(b.dataset.type==='buy'||b.dataset.type==='sell')));
+      renderFields();overlay.hidden=false;document.body.classList.add('schedule-open');
+      setTimeout(()=>form.querySelector(t?'[name="qty"],[name="amount"]':'[name="symbol"],[name="amount"]')?.focus(),30);
+    }
+    function closeOverlays(){overlay.hidden=true;q('invSetOverlay').hidden=true;document.body.classList.remove('schedule-open');opener?.focus?.();}
+    form.addEventListener('click',async e=>{
+      if(e.target.closest('[data-fx-fill]')){const btn=e.target.closest('[data-fx-fill]');btn.disabled=true;
+        try{const r=await ecbRates([draft.date]);if(r[draft.date]){draft.fxRate=r[draft.date];draft.fxSource='ecb';renderFields();}else{btn.textContent='אין שער לתאריך';}}catch(_){btn.textContent='הטעינה נכשלה';}return;}
+      const b=e.target.closest('.inv-seg [data-type]');if(!b||b.disabled)return;
+      const prevTrade=draft.type==='buy'||draft.type==='sell';draft.type=b.dataset.type;
+      if(!editing&&(draft.type==='buy'||draft.type==='sell')&&!prevTrade){draft.market=marketFor(draft.symbol);if(!feeTouched)draft.fee=pf.settings.fees[draft.market];}
+      renderFields();
+    });
+    form.addEventListener('input',e=>{
+      const n=e.target.name;if(!n)return;
+      draft[n]=e.target.type==='checkbox'?e.target.checked:e.target.value;
+      if(n==='fee')feeTouched=true;
+      if(n==='fxRate')delete draft.fxSource;
+      if(n==='opening'){renderFields();return;}
+      if(n==='symbol'||n==='market'){
+        if(n==='symbol')draft.symbol=e.target.value.toUpperCase();
+        const m=n==='market'?e.target.value:marketFor(draft.symbol);draft.market=m;
+        if(!feeTouched&&!editing)draft.fee=pf.settings.fees[m];
+        const pos=e.target.selectionStart;renderFields();const el=form.querySelector('[name="'+n+'"]');el?.focus();if(n==='symbol')try{el.setSelectionRange(pos,pos);}catch(_){}
+        return;
+      }
+      if(n==='date'||n==='from'||n==='currency'){renderFields();form.querySelector('[name="'+n+'"]')?.focus();return;}
+      form.querySelector('[data-err="'+n+'"]').textContent='';
+      preview();
+    });
+    form.addEventListener('submit',e=>{
+      e.preventDefault();
+      const tx=buildTx(),st=candidateState(tx);
+      const errors=E.validate(st,tx,mk);
+      if(!Object.keys(errors).length){
+        const issue=E.compute(st,mk).issues.find(i=>!calc.issues.some(o=>o.txId===i.txId));
+        if(issue)errors[(tx.type==='buy'||tx.type==='sell')?'qty':'date']='השינוי יוצר מכירה ללא אחזקה: '+issue.message;
+      }
+      form.querySelectorAll('[data-err]').forEach(x=>x.textContent=errors[x.dataset.err]||'');
+      if(Object.keys(errors).length){form.querySelector('[data-field="'+Object.keys(errors)[0]+'"] input,[data-field="'+Object.keys(errors)[0]+'"] select')?.focus();return;}
+      pf=E.normalize(st);persist();closeOverlays();refresh();
+      if(tx.type==='buy'||tx.type==='sell'){const tr=calc.txInfo[tx.id]?.tradeId;if(tr)ui.open.add(tr);renderLog();}
+      toast(editing?'הפעולה עודכנה':'הפעולה נשמרה');
+    });
+    q('invTxDelete').addEventListener('click',()=>{const id=editing;closeOverlays();removeTx(id);});
+    document.querySelectorAll('[data-inv-close]').forEach(b=>b.addEventListener('click',closeOverlays));
+    ['invTxOverlay','invSetOverlay'].forEach(id=>q(id).addEventListener('pointerdown',e=>{if(e.target===q(id))closeOverlays();}));
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(!overlay.hidden||!q('invSetOverlay').hidden)){e.preventDefault();closeOverlays();}});
+
+    // Deleting keeps a one-step undo; nothing is lost silently.
+    function removeTx(id){
+      const idx=pf.transactions.findIndex(t=>t.id===id);if(idx<0)return;
+      const removed=pf.transactions[idx],next={...pf,transactions:pf.transactions.filter(t=>t.id!==id)};
+      const broken=E.compute(next,mk).issues.filter(i=>!calc.issues.some(o=>o.txId===i.txId));
+      if(broken.length&&!confirm('מחיקת הפעולה תשאיר מכירה בלי אחזקה ('+broken[0].message+'). למחוק בכל זאת?'))return;
+      pf=next;persist();refresh();
+      toast(TYPE_LABEL[removed.type]+(removed.symbol?' '+removed.symbol:'')+' נמחקה',()=>{pf={...pf,transactions:[...pf.transactions.slice(0,idx),removed,...pf.transactions.slice(idx)]};persist();refresh();toast('המחיקה בוטלה');});
+    }
+    let toastTimer=null;
+    function toast(text,undo){
+      const t=q('invToast');t.querySelector('span').textContent=text;const b=t.querySelector('button');
+      b.hidden=!undo;b.onclick=()=>{t.hidden=true;undo&&undo();};t.hidden=false;
+      clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.hidden=true;},undo?7000:2600);
+    }
+
+    // ---------- settings ----------
+    function openSettings(){
+      opener=document.activeElement;
+      const f=q('invSetForm');
+      f.querySelector('.inv-grid').innerHTML=Object.entries(E.MARKETS).map(([k,m])=>field(k,'עמלה לפעולה ב'+m.label+' ('+CUR_LABEL[m.currency]+')',inp(k,pf.settings.fees[k]))).join('');
+      q('invSetOverlay').hidden=false;document.body.classList.add('schedule-open');f.querySelector('input')?.focus();
+    }
+    q('invSetForm').addEventListener('submit',e=>{
+      e.preventDefault();const f=e.currentTarget,fees={...pf.settings.fees};let bad=false;
+      for(const k of Object.keys(E.MARKETS)){const v=parseNum(f.querySelector('[name="'+k+'"]').value);const err=f.querySelector('[data-err="'+k+'"]');
+        if(!(v>=0)){err.textContent='0 או יותר';bad=true;}else{err.textContent='';fees[k]=v;}}
+      if(bad)return;
+      pf={...pf,settings:{...pf.settings,fees}};persist();closeOverlays();refresh();toast('ברירות המחדל עודכנו. פעולות קיימות לא השתנו.');
+    });
+
+    // ---------- page events ----------
+    root.addEventListener('click',e=>{
+      const el=e.target.closest('[data-act]');if(!el)return;
+      const act=el.dataset.act;
+      if(act==='add')openTx(el.dataset.type);
+      else if(act==='edit')openTx(null,el.dataset.id);
+      else if(act==='delete')removeTx(el.dataset.id);
+      else if(act==='toggle'){const id=el.dataset.id;ui.open.has(id)?ui.open.delete(id):ui.open.add(id);if(ui.logMode!=='trades')ui.logMode='trades';renderLog();
+        if(el.tagName==='rect'){activateView('log');q('investBody-log').querySelector('[data-id="'+id+'"].inv-trade')?.scrollIntoView({block:'center'});}}
+      else if(act==='ui'){ui[el.dataset.key]=el.dataset.val;refresh();}
+      else if(act==='sort'){const k=el.dataset.key;ui.sort=ui.sort.key===k?{key:k,dir:-ui.sort.dir}:{key:k,dir:k==='symbol'?1:-1};renderLog();}
+      else if(act==='del-snap'){const id=el.dataset.id,i=pf.snapshots.findIndex(s=>s.id===id),rem=pf.snapshots[i];if(i<0)return;pf={...pf,snapshots:pf.snapshots.filter(s=>s.id!==id)};persist();refresh();
+        toast('רישום השווי נמחק',()=>{pf={...pf,snapshots:[...pf.snapshots,rem]};persist();refresh();});}
+      else if(act==='import')q('invImportFile').click();
+      else if(act==='export-xlsx')exportXlsx();
+      else if(act==='backup')downloadBackup();
+      else if(act==='restore')q('invRestoreFile').click();
+      else if(act==='settings')openSettings();
+      else if(act==='prices')refreshPrices(true);
+      else if(act==='perf-load')loadPerformanceData();
+      else if(act==='fill-fx')fillFx();
+      else if(act==='fix-usd')fixUsd(el);
+      else if(act==='holdby'){ui.holdBy=el.dataset.val;renderHoldings();}
+      else if(act==='instrument')openInstrument(el.dataset.symbol);
+      else if(act==='analyze')openTrade(el.dataset.id);
+      else if(act==='hist-load')loadHistory();
+      else if(act==='pattern'){ui.pattern=el.dataset.val;renderAnalysis();}
+      if(el.closest('#invMenu'))setMenu(false);
+    });
+    root.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr[data-act="toggle"],tr[data-act="analyze"]')){e.preventDefault();e.target.click();}});
+    root.addEventListener('input',e=>{if(e.target.id==='invSearch'){ui.search=e.target.value;const pos=e.target.selectionStart;renderLog();const s=q('invSearch');s.focus();s.setSelectionRange(pos,pos);}});
+    root.addEventListener('change',e=>{
+      const el=e.target;
+      if(el.dataset.act==='price'||el.dataset.act==='fx'){
+        const v=parseNum(el.value),now=E.todayIso();
+        if(el.value.trim()===''){if(el.dataset.act==='price')delete mk.quotes[el.dataset.symbol];else delete mk.fx.USDILS;}
+        else if(!(v>0)){el.setCustomValidity('ערך חיובי');el.reportValidity();return;}
+        else if(el.dataset.act==='price')mk.quotes[el.dataset.symbol]={price:v,asOf:now,source:'manual'};
+        else mk.fx.USDILS={rate:v,asOf:now,source:'manual'};
+        persist();refresh();
+      }
+    });
+    root.addEventListener('submit',e=>{
+      const f=e.target;if(f.dataset.form!=='snapshot')return;e.preventDefault();
+      const value=parseNum(f.elements.value.value),d=f.elements.date.value,msg=f.querySelector('.inv-form-msg');
+      if(!(value>=0)){msg.textContent='שווי לא תקין';return;}
+      if(!E.isDate(d)||d>E.todayIso()){msg.textContent='תאריך לא תקין';return;}
+      const existing=pf.snapshots.find(s=>s.date===d);
+      if(existing&&!confirm('כבר נרשם שווי ל־'+d+'. להחליף אותו?'))return;
+      pf={...pf,snapshots:[...pf.snapshots.filter(s=>s.date!==d),{id:E.uid('s'),date:d,value,currency:'ILS',note:''}]};
+      persist();refresh();toast('השווי נרשם');
+    });
+    q('invAdd').addEventListener('click',()=>openTx('buy'));
+    const menuBtn=q('invMenuBtn'),menu=q('invMenu');
+    function setMenu(open){menu.hidden=!open;menuBtn.setAttribute('aria-expanded',String(open));}
+    menuBtn.addEventListener('click',()=>setMenu(menu.hidden));
+    document.addEventListener('pointerdown',e=>{if(!menu.hidden&&!e.target.closest('.invest-menu'))setMenu(false);});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){setMenu(false);menuBtn.focus();}});
+    function activateView(v){q('investTab-'+v)?.click();}
+    // Charts measure their container; redraw when a view becomes visible or the window size changes.
+    window.addEventListener('anav:invest-view',e=>{if(calc)refresh();if(e.detail?.area==='invest')autoPrices();});
+
+    // ---------- market prices ----------
+    const ago=iso=>{const t=Date.parse(iso);if(!Number.isFinite(t))return '';const m=Math.round((Date.now()-t)/6e4);
+      return m<1?'עכשיו':m<60?'לפני '+m+' דק׳':m<24*60?'לפני '+Math.round(m/60)+' שע׳':date(new Date(t).toISOString().slice(0,10));};
+    // "Coinbase · לפני 3 דק׳", "ECB · 24/11/26", "ידני · 20/11/26", with a stale mark when a provider price is too old.
+    function srcLabel(qt,kind){
+      if(!qt)return 'חסר';
+      const s=MarketData.SOURCES[qt.source]||{label:qt.source};
+      const when=qt.source==='ecb'||/^\d{4}-\d{2}-\d{2}$/.test(qt.asOf||'')?date(qt.asOf):qt.asOf?ago(qt.asOf):'תאריך לא ידוע';
+      const stale=MarketData.isStale(qt,kind,Date.now());
+      return '<span'+(stale?' class="inv-stale" title="המחיר ישן. כדאי לרענן או לבדוק את המקור."':' title="'+esc(s.note||'')+'"')+'>'+esc(s.label)+' · '+when+(stale?' · ישן':'')+'</span>';
+    }
+    let priceJob=null,priceMsg='',lastAuto=0;
+    function priceBar(){
+      const sp=mk.stockProvider,hasStocks=calc.holdings.some(h=>MarketData.kindOf(h.symbol,h.market)==='stock');
+      const stockLine=!hasStocks?'':sp?.available?'מניות: '+esc((MarketData.SOURCES[sp.provider]||{label:sp.provider}).label):'מניות: עדיין אין ספק מחירים מחובר, ולכן המחירים ידניים';
+      return '<div class="inv-pricebar" role="status"><span>'+(priceJob?'מעדכן מחירים…':mk.lastRefresh?'רענון אחרון '+ago(mk.lastRefresh):'המחירים עוד לא רועננו')+'</span>'+
+        '<span class="inv-muted">קריפטו: Coinbase · דולר: ECB'+(stockLine?' · '+stockLine:'')+'</span>'+(priceMsg?'<span class="inv-neg">'+esc(priceMsg)+'</span>':'')+
+        '<button type="button" class="invest-btn" data-act="prices"'+(priceJob?' disabled':'')+'>רענון מחירים</button></div>';
+    }
+    async function refreshPrices(force){
+      if(priceJob)return priceJob;
+      const symbols=calc.holdings.map(h=>h.symbol);
+      priceMsg='';
+      priceJob=(async()=>{
+        renderHoldings();
+        try{
+          const r=await MarketData.refresh(pf,mk,{symbols,force});
+          mk=normalizeMarket(r.market);persist();
+          const f=r.report.failed;
+          if(f.length)priceMsg='לא התקבל מחיר עבור: '+f.join(', ')+'. מוצג המחיר האחרון שנשמר.';
+        }catch(e){priceMsg='עדכון המחירים נכשל. מוצגים המחירים האחרונים שנשמרו.';}
+        finally{priceJob=null;refresh();}
+      })();
+      return priceJob;
+    }
+    // Automatic refresh when the investments area is open, at most once a minute; prices that are still fresh are skipped.
+    function autoPrices(){
+      if(root.hidden||Date.now()-lastAuto<6e4||!calc||(!calc.holdings.length&&mk.fx.USDILS))return;
+      lastAuto=Date.now();refreshPrices(false);
+    }
+    let rz=null;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(!root.hidden&&calc)refresh();},150);});
+
+    // ---------- backup / restore ----------
+    function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+    function downloadBackup(){
+      const data={format:'anav-portfolio-backup',version:1,exportedAt:new Date().toISOString(),portfolio:pf,market:mk};
+      download('anav-portfolio-'+E.todayIso()+'.json',new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));
+    }
+    q('invRestoreFile').addEventListener('change',async e=>{
+      const file=e.target.files[0];e.target.value='';if(!file)return;
+      try{
+        const data=JSON.parse(await file.text());
+        if(data?.format!=='anav-portfolio-backup')throw Error('זה לא קובץ גיבוי של תיק ההשקעות');
+        const next=E.normalize(data.portfolio);
+        if(!confirm('לשחזר '+next.transactions.length+' פעולות ו־'+next.snapshots.length+' רישומי שווי? הנתונים הנוכחיים יוחלפו (עותק שלהם נשמר בדפדפן).'))return;
+        try{localStorage.setItem(PREV_KEY,JSON.stringify({savedAt:new Date().toISOString(),portfolio:pf,market:mk}));}catch(_){}
+        pf=next;mk=normalizeMarket(data.market);persist();refresh();toast('הגיבוי שוחזר');
+      }catch(err){toast('השחזור נכשל: '+(err.message||'קובץ לא תקין'));}
+    });
+
+    // ---------- performance computed from daily history (v053) ----------
+    function fxRange(){const t=E.ordered(pf.transactions);if(!t.length)return null;return {from:TradeAnalysis.addDays(t[0].date,-10),to:E.todayIso()};}
+    async function loadFx(){
+      const w=fxRange();if(!w)return;const e=hist.USDILS;
+      if(MarketData.covers(e,w.from,w.to,w.to,Date.now()))return;
+      try{
+        const h=await MarketData.providers.fxHistory(w.from,w.to,fetch.bind(window));
+        hist.USDILS={from:w.from,to:w.to,fetchedAt:new Date().toISOString(),source:'ecb',error:null,bars:MarketData.mergeBars(e?.bars,Object.entries(h).map(([d,r])=>[d,r,r,r,r]))};
+        saveHist();
+      }catch(_){hs.msg='טעינת שערי הדולר ההיסטוריים נכשלה.';}
+    }
+    async function loadPerformanceData(){await loadFx();renderPerformance();await loadHistory();renderPerformance();}
+    function renderComputed(box,toggle){
+      const r=DailyPerformance.compute(pf,hist,{today:E.todayIso()});
+      const want=needs(),syms=Object.keys(want),noHist=syms.filter(s=>!hasHist(s,want[s])),w=fxRange();
+      const fxOk=w&&MarketData.covers(hist.USDILS,w.from,w.to,w.to,Date.now());
+      const missingNames=Object.entries(r.missing).sort((a,b)=>b[1]-a[1]).map(([s,n])=>(s==='USDILS'?'שער דולר':s)+' ('+n+')');
+      let h=toggle+'<div class="inv-pricebar" role="status"><span>ימים מחושבים: '+r.complete+' מתוך '+r.days+'</span>'+
+        (hs.running?'<span>טוען היסטוריה '+hs.done+'/'+hs.total+'</span>':'')+
+        (missingNames.length?'<span class="inv-muted" title="ימים שבהם חסר מחיר לנייר מוחזק או שער דולר">חסר: '+esc(missingNames.slice(0,6).join(', '))+(missingNames.length>6?'…':'')+'</span>':'')+
+        (hs.msg?'<span class="inv-neg">'+esc(hs.msg)+'</span>':'')+
+        '<button type="button" class="invest-btn" data-act="perf-load"'+(hs.running||(!noHist.length&&fxOk)?' disabled':'')+'>'+(!noHist.length&&fxOk?'הנתונים עדכניים':'טעינת מחירים ושערים')+'</button></div>';
+      const cut={'1m':30,'3m':91,'1y':365}[ui.range],from=cut?TradeAnalysis.addDays(E.todayIso(),-cut):'';
+      const view=r.rows.filter(x=>x.date>=from);
+      const full=view.filter(x=>x.value!==null),last=full[full.length-1];
+      const lastD=[...view].reverse().find(x=>x.daily!==null);
+      let twr=null;for(const x of view.slice(1))if(x.daily!==null)twr=((twr===null?1:1+twr/100)*(1+x.daily/100)-1)*100;
+      const prevOf=d=>{const i=r.rows.findIndex(x=>x.date===d);for(let j=i-1;j>=0;j--)if(r.rows[j].value!==null)return r.rows[j].date;return null;};
+      h+='<div class="invest-kpis">'+
+        kpi('שווי מחושב',last?money(last.value,'ILS'):DASH,last?'לסגירת '+date(last.date):'אין עדיין נתונים')+
+        kpi('שינוי יומי אחרון',lastD?pct(lastD.daily,{signed:true}):DASH,lastD?date(lastD.date)+' מול '+date(prevOf(lastD.date)):'')+
+        kpi('תשואה לתקופה',pct(twr,{signed:true}),view.length>full.length?'<span class="inv-stale">רק מימים מלאים: '+full.length+' מתוך '+view.length+'</span>':'שרשור השינויים היומיים, בלי הפקדות')+
+        kpi('ימים חסרים',num(view.length-full.length),'לא מחושבים ולא מוצגים כאפס')+'</div>';
+      h+='<div class="inv-toolbar"><div class="inv-chips" role="group" aria-label="טווח">'+chip('range','1m','חודש')+chip('range','3m','3 חודשים')+chip('range','1y','שנה')+chip('range','all','הכול')+'</div></div>';
+      h+=full.length>=2?computedChart(view,calc.performance.rows.filter(x=>x.date>=from)):empty(ICON.line,r.days?'אין מספיק ימים מלאים בטווח':'אין עדיין היסטוריה','לחץ "טעינת מחירים ושערים". הערך היומי נבנה מהפעולות, ממחירי הסגירה ומשער הדולר היומי.');
+      h+='<p class="inv-foot">שווי יומי = כמות × מחיר סגירה (× שער דולר לנכס דולרי) + מזומן בשקלים + מזומן בדולרים × שער. <b>שינוי יומי</b> = סגירת יום המסחר מול יום המסחר הקודם שיש לו ערך מלא, אחרי ניטרול הפקדות ומשיכות. מניות ארה״ב לפי סגירת המסחר בניו יורק, קריפטו לפי יום UTC, דולר לפי שער ECB היומי (עד '+DailyPerformance.FX_CARRY_DAYS+' ימים אחורה). מחיר חסר ממולא ממחיר קודם של עד '+DailyPerformance.CARRY_DAYS+' ימים; מעבר לזה היום לא מחושב. נקודות כתומות: רישומי השווי מהברוקר, להשוואה.</p>';
+      box.innerHTML=h;
+    }
+    function computedChart(rows,snaps){
+      const W=Math.max(320,(q('investBody-performance').clientWidth||800)-2),H=230,B=64,L=56,R=10,T=12;
+      const full=rows.filter(r=>r.value!==null);
+      const vals=[...full.map(r=>r.value),...snaps.map(s=>s.value)],min=Math.min(...vals),max=Math.max(...vals),span=max-min||1;
+      const t0=Date.parse(rows[0].date),t1=Date.parse(rows[rows.length-1].date),ts=t1-t0||1;
+      const X=d=>L+(Date.parse(d)-t0)/ts*(W-L-R),Y=v=>T+(1-(v-min)/span)*(H-T-22);
+      let path='',pen=false;for(const r of rows){if(r.value===null){pen=false;continue;}path+=(pen?'L':'M')+X(r.date).toFixed(1)+' '+Y(r.value).toFixed(1)+' ';pen=true;}
+      const ticks=[0,1,2,3].map(i=>min+span*i/3);
+      const dates=[rows[0],rows[Math.floor(rows.length/2)],rows[rows.length-1]];
+      const dmax=Math.max(.5,...rows.map(r=>Math.abs(r.daily||0)));
+      const bw=Math.max(1,Math.min(8,(W-L-R)/rows.length*.7)),bmid=H+B/2;
+      const bars=rows.filter(r=>r.daily!==null).map(r=>{const hh=Math.abs(r.daily)/dmax*(B/2-6);return '<rect x="'+(X(r.date)-bw/2).toFixed(1)+'" y="'+(r.daily>=0?bmid-hh:bmid).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(.8,hh).toFixed(1)+'" class="'+(r.daily>=0?'inv-bar-pos':'inv-bar-neg')+'"><title>'+r.date+' · '+r.daily.toFixed(2)+'%</title></rect>';}).join('');
+      const dots=snaps.filter(s=>Date.parse(s.date)>=t0&&Date.parse(s.date)<=t1).map(s=>'<circle cx="'+X(s.date).toFixed(1)+'" cy="'+Y(s.value).toFixed(1)+'" r="2.6" class="inv-dot-broker"><title>ברוקר '+s.date+' · '+NF.ILS.format(s.value/100)+'</title></circle>').join('');
+      return '<figure class="inv-chart inv-equity"><figcaption><span><i class="inv-key inv-key-value"></i>שווי מחושב</span><span><i class="inv-key inv-key-broker"></i>רישום ברוקר</span><span><i class="inv-key inv-key-bar"></i>שינוי יומי %</span></figcaption>'+
+        '<svg viewBox="0 0 '+W+' '+(H+B)+'" role="img" aria-label="שווי התיק המחושב לאורך זמן" dir="ltr">'+
+        ticks.map(v=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" class="inv-grid"/><text x="'+(L-6)+'" y="'+(Y(v)+3).toFixed(1)+'" class="inv-tick" text-anchor="end">'+compact(v,'ILS')+'</text>').join('')+
+        dates.map((r,i)=>'<text x="'+X(r.date).toFixed(1)+'" y="'+(H-6)+'" class="inv-tick" text-anchor="'+['start','middle','end'][i]+'">'+r.date.slice(8,10)+'/'+r.date.slice(5,7)+'/'+r.date.slice(2,4)+'</text>').join('')+
+        '<path d="'+path+'" class="inv-line-value"/>'+dots+'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+bmid+'" y2="'+bmid+'" class="inv-axis"/>'+bars+'</svg></figure>';
+    }
+    // Dollar rate on each trade date (ECB), for shekel profit with the split between stock and dollar.
+    async function ecbRates(dates){
+      const ds=[...new Set(dates)].sort();if(!ds.length)return {};
+      const h=await MarketData.providers.fxHistory(TradeAnalysis.addDays(ds[0],-7),ds[ds.length-1],fetch.bind(window));
+      const days=Object.keys(h).sort(),out={};
+      for(const d of ds){let best=null;for(const x of days){if(x<=d)best=x;else break;}if(best)out[d]=h[best];}
+      return out;
+    }
+    async function fillFx(){
+      const list=pf.transactions.filter(t=>(t.type==='buy'||t.type==='sell')&&!t.fxRate&&E.instrumentOf(pf,t.symbol).currency==='USD');
+      if(!list.length){toast('לכל פעולות הדולר כבר יש שער');return;}
+      let rates;try{rates=await ecbRates(list.map(t=>t.date));}catch(_){toast('טעינת השערים נכשלה');return;}
+      const ok=list.filter(t=>rates[t.date]);
+      if(!ok.length){toast('לא נמצאו שערים לתאריכים האלה');return;}
+      if(!confirm('למלא שער דולר של ECB ב־'+ok.length+' פעולות דולריות שאין להן שער? הרווח בשקלים יחושב לפיו, ויסומן כשער ECB. אפשר לבטל מיד אחר כך.'))return;
+      const before=pf,ids=new Map(ok.map(t=>[t.id,rates[t.date]]));
+      pf={...pf,transactions:pf.transactions.map(t=>ids.has(t.id)?{...t,fxRate:ids.get(t.id),fxSource:'ecb'}:t)};
+      persist();refresh();toast('מולאו שערים ל־'+ok.length+' פעולות',()=>{pf=before;persist();refresh();toast('המילוי בוטל');});
+    }
+
+    // ---------- instrument details: name, sector, asset type (used for breakdowns) ----------
+    document.body.insertAdjacentHTML('beforeend','<datalist id="invSectors"></datalist><div class="tool-overlay inv-overlay" id="invInsOverlay" hidden><section class="tool-dialog inv-dialog" role="dialog" aria-modal="true" aria-labelledby="invInsTitle">'+
+      '<header class="tool-head"><div><h2 id="invInsTitle">פרטי נייר</h2><p>משמשים לפילוח התיק. לא משנים חישובים.</p></div><button type="button" class="tool-close" data-ins-close aria-label="סגירה">×</button></header>'+
+      '<form class="tool-content inv-form" id="invInsForm"><div class="inv-grid"></div><div class="inv-form-actions"><button type="submit" class="tool-primary">שמירה</button><button type="button" class="inv-ghost" data-ins-close>ביטול</button></div></form></section></div>');
+    let insSymbol=null;
+    function openInstrument(symbol){
+      insSymbol=symbol;opener=document.activeElement;
+      const i=E.instrumentOf(pf,symbol);
+      q('invInsTitle').textContent='פרטי '+symbol;
+      q('invSectors').innerHTML=[...new Set(Object.values(pf.instruments).map(x=>x.sector).filter(Boolean))].sort().map(x=>'<option value="'+esc(x)+'">').join('');
+      q('invInsForm').querySelector('.inv-grid').innerHTML=field('name','שם',inp('name',i.name,'type="text" maxlength="80"'))+
+        field('sector','סקטור',inp('sector',i.sector,'type="text" list="invSectors" maxlength="40" placeholder="טכנולוגיה"'))+
+        field('kind','סוג נכס','<select name="kind"><option value="">לא מוגדר</option>'+Object.entries(KIND_LABEL).map(([k,l])=>'<option value="'+k+'"'+(i.kind===k?' selected':'')+'>'+l+'</option>').join('')+'</select>');
+      q('invInsOverlay').hidden=false;document.body.classList.add('schedule-open');q('invInsForm').querySelector('input')?.focus();
+    }
+    function closeInstrument(){q('invInsOverlay').hidden=true;document.body.classList.remove('schedule-open');insSymbol=null;opener?.focus?.();}
+    q('invInsOverlay').addEventListener('click',e=>{if(e.target.closest('[data-ins-close]'))closeInstrument();});
+    q('invInsOverlay').addEventListener('pointerdown',e=>{if(e.target===q('invInsOverlay'))closeInstrument();});
+    q('invInsForm').addEventListener('submit',e=>{
+      e.preventDefault();if(!insSymbol)return;
+      const f=e.currentTarget,cur=E.instrumentOf(pf,insSymbol);
+      const next={...cur,symbol:insSymbol,name:f.elements.name.value.trim().slice(0,80),sector:f.elements.sector.value.trim().slice(0,40),kind:f.elements.kind.value};
+      pf={...pf,instruments:{...pf.instruments,[insSymbol]:next}};persist();closeInstrument();refresh();toast('פרטי '+next.symbol+' נשמרו');
+    });
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!q('invInsOverlay').hidden){e.preventDefault();closeInstrument();}});
+
+    // ---------- Excel import: preview first, then one confirmed write with undo ----------
+    document.body.insertAdjacentHTML('beforeend','<div class="tool-overlay inv-overlay" id="invImpOverlay" hidden><section class="tool-dialog inv-dialog inv-import" role="dialog" aria-modal="true" aria-labelledby="invImpTitle">'+
+      '<header class="tool-head"><div><h2 id="invImpTitle">ייבוא מאקסל</h2><p id="invImpSub"></p></div><button type="button" class="tool-close" data-imp-close aria-label="סגירה">×</button></header>'+
+      '<div class="tool-content inv-imp-body" id="invImpBody"></div>'+
+      '<footer class="inv-imp-foot"><span id="invImpSum" aria-live="polite"></span><button type="button" class="inv-ghost" data-imp-close>ביטול</button><button type="button" class="tool-primary" id="invImpGo">ייבוא</button></footer></section></div>');
+    const STATUS={new:['חדש','inv-st-new'],dup:['קיים','inv-st-dup'],error:['שגיאה','inv-st-err'],conflict:['התנגשות','inv-st-warn'],skip:['דילוג','inv-st-dup']};
+    let imp=null;
+    q('invImportFile').addEventListener('change',async e=>{
+      const file=e.target.files[0];e.target.value='';if(!file)return;
+      try{await openImport(file.name,await file.arrayBuffer());}
+      catch(err){toast('לא הצלחתי לקרוא את הקובץ: '+(err.message||err));}
+    });
+    async function openImport(name,buffer){
+      opener=document.activeElement;
+      const wb=ExcelImport.readWorkbook(await ExcelImport.unzip(buffer));
+      imp={file:name,plan:ExcelImport.plan(pf,wb,mk),active:0,filter:'all'};
+      imp.active=Math.max(0,imp.plan.sheets.findIndex(s=>s.kind));
+      renderImport();q('invImpOverlay').hidden=false;document.body.classList.add('schedule-open');q('invImpGo').focus();
+    }
+    function impCell(sh,r){
+      const x=r.excel||{},rec=r.record||{};
+      if(sh.kind==='trades')return [rec.date?date(rec.date):esc(x.date),esc(x.type),rec.symbol?sym(rec.symbol):esc(x.symbol),num(x.qty),num(x.price),rec.fee!==undefined?num(rec.fee):DASH];
+      if(sh.kind==='cashflows')return [rec.date?date(rec.date):esc(x.date),esc(x.type),'',num(x.amount),'',''];
+      if(sh.kind==='equity')return [rec.date?date(rec.date):esc(x.date),'','',num(x.value,2),'',''];
+      return ['',rec.fx?'שער דולר':'מחיר',esc(x.symbol),num(x.price,4),'',''];
+    }
+    function renderImport(){
+      const P=imp.plan,sheets=P.sheets;
+      q('invImpSub').textContent=imp.file+' · שום דבר לא נשמר עד שלוחצים "ייבוא", ואפשר לבטל גם אחרי.';
+      let h='<div class="inv-imp-sheets" role="list">';
+      sheets.forEach((sh,i)=>{
+        const c=ExcelImport.counts(sh),on=sh.include!==false;
+        const chips=sh.kind?'<span class="inv-imp-counts">'+(c.new?'<i class="inv-st-new">'+c.new+' חדשות</i>':'')+(c.dup?'<i class="inv-st-dup">'+c.dup+' קיימות</i>':'')+(c.conflict?'<i class="inv-st-warn">'+c.conflict+' התנגשויות</i>':'')+(c.error?'<i class="inv-st-err">'+c.error+' שגיאות</i>':'')+(c.skip?'<i class="inv-st-dup">'+c.skip+' דילוג</i>':'')+'</span>':'';
+        h+='<div class="inv-imp-sheet'+(i===imp.active?' is-active':'')+(sh.kind?'':' is-off')+(on?'':' is-excluded')+'" role="listitem">'+
+          (sh.kind?'<label class="inv-imp-check" title="לכלול בייבוא"><input type="checkbox" data-imp-include="'+i+'"'+(on?' checked':'')+'><span class="inv-sr">לייבא את '+esc(sh.name)+'</span></label>':'')+
+          '<button type="button" class="inv-imp-sheet-btn" data-imp-sheet="'+i+'"'+(sh.kind?'':' disabled')+'><strong>'+esc(sh.name)+'</strong><small>'+(sh.kind?sh.label:'לא זוהה, לא ייובא')+'</small>'+chips+'</button></div>';
+      });
+      h+='</div>';
+      const sh=sheets[imp.active];
+      if(sh&&sh.kind){
+        if(sh.notes.length)h+='<ul class="inv-imp-notes">'+sh.notes.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul>';
+        const c=ExcelImport.counts(sh);
+        h+='<div class="inv-toolbar"><div class="inv-chips" role="group" aria-label="סינון שורות">'+
+          [['all','הכול ('+sh.rows.length+')'],['new','חדשות ('+c.new+')'],['problem','לבדיקה ('+(c.error+c.conflict)+')'],['dup','קיימות ('+(c.dup+c.skip)+')']].map(([k,l])=>'<button type="button" class="inv-chip" data-imp-filter="'+k+'" aria-pressed="'+(imp.filter===k)+'">'+l+'</button>').join('')+'</div></div>';
+        const rows=sh.rows.filter(r=>imp.filter==='all'||(imp.filter==='new'&&r.status==='new')||(imp.filter==='problem'&&(r.status==='error'||r.status==='conflict'))||(imp.filter==='dup'&&(r.status==='dup'||r.status==='skip')));
+        const heads=sh.kind==='trades'?['תאריך','סוג','נייר','כמות','מחיר','עמלה']:sh.kind==='cashflows'?['תאריך','סוג','','סכום','','']:sh.kind==='equity'?['תאריך','','','שווי','','']:['','','נייר','מחיר','',''];
+        h+=rows.length?'<div class="inv-table-wrap inv-imp-table"><table class="inv-table"><thead><tr><th>שורה</th>'+heads.map(x=>'<th>'+x+'</th>').join('')+'<th>מצב</th><th>הערה</th></tr></thead><tbody>'+
+          rows.slice(0,400).map(r=>{const st=STATUS[r.status]||STATUS.skip;return '<tr><td>'+num(r.row)+'</td>'+impCell(sh,r).map(x=>'<td>'+(x||'')+'</td>').join('')+'<td><span class="inv-st '+st[1]+'">'+st[0]+'</span></td><td class="inv-note">'+esc([r.message,r.note].filter(Boolean).join(' · '))+'</td></tr>';}).join('')+
+          '</tbody></table></div>'+(rows.length>400?'<p class="inv-none">מוצגות 400 השורות הראשונות מתוך '+rows.length+'.</p>':''):'<p class="inv-none">אין שורות בסינון הזה.</p>';
+      }
+      q('invImpBody').innerHTML=h;
+      const c=ExcelImport.merge(pf,P).counts;
+      const parts=[c.transactions&&c.transactions+' פעולות',c.snapshots&&c.snapshots+' רישומי שווי',c.prices&&c.prices+' מחירים'].filter(Boolean);
+      q('invImpSum').textContent=parts.length?'ייובאו: '+parts.join(', '):'אין שורות חדשות לייבוא';
+      q('invImpGo').disabled=!parts.length;
+    }
+    q('invImpOverlay').addEventListener('click',e=>{
+      const s=e.target.closest('[data-imp-sheet]');if(s){imp.active=+s.dataset.impSheet;imp.filter='all';renderImport();return;}
+      const f=e.target.closest('[data-imp-filter]');if(f){imp.filter=f.dataset.impFilter;renderImport();return;}
+      if(e.target.closest('[data-imp-close]'))closeImport();
+    });
+    q('invImpOverlay').addEventListener('change',e=>{
+      const i=e.target.dataset.impInclude;if(i===undefined)return;
+      imp.plan.sheets[+i].include=e.target.checked;ExcelImport.revalidate(pf,imp.plan);renderImport();
+    });
+    q('invImpOverlay').addEventListener('pointerdown',e=>{if(e.target===q('invImpOverlay'))closeImport();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!q('invImpOverlay').hidden){e.preventDefault();closeImport();}});
+    function closeImport(){q('invImpOverlay').hidden=true;document.body.classList.remove('schedule-open');imp=null;opener?.focus?.();}
+    q('invImpGo').addEventListener('click',()=>{
+      if(!imp)return;
+      const m=ExcelImport.merge(pf,imp.plan),before={pf,mk:JSON.parse(JSON.stringify(mk))};
+      try{localStorage.setItem(PREV_KEY,JSON.stringify({savedAt:new Date().toISOString(),reason:'import',portfolio:pf,market:mk}));}catch(_){}
+      pf=E.normalize(m.state);
+      // Prices from the sheet never replace a price already entered on the site.
+      for(const [sy,price] of Object.entries(m.quotes))if(!mk.quotes[sy])mk.quotes[sy]={price,asOf:'',source:'excel'};
+      if(m.fx&&!mk.fx.USDILS)mk.fx.USDILS={rate:m.fx,asOf:'',source:'excel'};
+      persist();closeImport();refresh();
+      const c=m.counts;
+      toast('יובאו '+c.transactions+' פעולות ו־'+c.snapshots+' רישומי שווי',()=>{pf=before.pf;mk=before.mk;persist();refresh();toast('הייבוא בוטל');});
+    });
+
+    // ---------- trade analysis (v051): history, patterns, per-trade detail and trade plan ----------
+    const HIST_KEY='anav.history.v1';
+    let hist=(()=>{const h=readJson(HIST_KEY);return h&&typeof h==='object'?h:{};})();
+    const hs={running:false,done:0,total:0,waitUntil:0,msg:''};
+    const stockCalls=[];
+    const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+    // Wait for the provider limit with a live countdown in the status bar.
+    async function waitLimit(until){
+      hs.waitUntil=until;renderAnalysis();
+      const tick=setInterval(()=>{const el=q('invHistWait');if(el)el.textContent=Math.max(0,Math.ceil((hs.waitUntil-Date.now())/1000));},1000);
+      try{await sleep(Math.max(0,until-Date.now()));}finally{clearInterval(tick);hs.waitUntil=0;}
+    }
+    function saveHist(){try{localStorage.setItem(HIST_KEY,JSON.stringify(hist));}catch(_){hs.msg='אין מקום בדפדפן לשמירת ההיסטוריה. חלק מהניתוח יחושב מחדש בכל טעינה.';}}
+    // The free provider plan allows 8 requests a minute; stay under it and show the wait instead of failing.
+    async function throttle(){
+      for(;;){
+        const now=Date.now();while(stockCalls.length&&now-stockCalls[0]>60000)stockCalls.shift();
+        if(stockCalls.length<7){stockCalls.push(now);hs.waitUntil=0;return;}
+        await waitLimit(stockCalls[0]+60500);
+      }
+    }
+    // One request per symbol, covering every trade in that symbol.
+    function needs(){
+      const today=E.todayIso(),by={};
+      for(const t of calc.trades){const w=TradeAnalysis.windowFor(t,today,ui.customDays);const x=by[t.symbol];by[t.symbol]=x?{from:x.from<w.from?x.from:w.from,to:x.to>w.to?x.to:w.to}:w;}
+      return by;
+    }
+    const hasHist=(s,w)=>MarketData.covers(hist[s],w.from,w.to,E.todayIso(),Date.now());
+    async function loadHistory(symbols){
+      if(hs.running)return;
+      const want=needs(),list=(symbols||Object.keys(want)).filter(s=>want[s]&&!hasHist(s,want[s]));
+      hs.running=true;hs.done=0;hs.total=list.length;hs.msg='';renderHistViews();
+      for(const s of list){
+        const w=want[s],ins=E.instrumentOf(pf,s),e=hist[s];
+        const from=e&&e.from&&e.from<w.from&&e.bars?.length?e.from:w.from,to=w.to;
+        try{
+          if(MarketData.kindOf(s,ins.market)==='stock')await throttle();
+          let r;
+          try{r=await MarketData.fetchHistory(s,ins.market,from,to,{});}
+          catch(err){if(!err.rateLimit)throw err;stockCalls.length=0;for(let i=0;i<7;i++)stockCalls.push(Date.now());await waitLimit(Date.now()+61000);r=await MarketData.fetchHistory(s,ins.market,from,to,{});}
+          hist[s]={from,to,fetchedAt:new Date().toISOString(),source:r.source,error:r.error||null,bars:MarketData.mergeBars(e?.bars,r.bars)};
+        }catch(err){
+          if(err.notConfigured){hs.msg='ספק מחירי המניות לא מחובר, ולכן אין היסטוריה למניות.';break;}
+          // A network failure is temporary: keep what we had and try again next time.
+          if(err instanceof TypeError||/fetch|network/i.test(String(err.message))){hs.msg='חלק מהבקשות נכשלו בגלל תקלת רשת. אפשר לנסות שוב.';hs.done++;continue;}
+          hist[s]={...(e||{}),from:e?.from||from,to:e?.to||to,fetchedAt:new Date().toISOString(),error:String(err.message||err),bars:e?.bars||[]};
+        }
+        hs.done++;saveHist();renderHistViews();
+      }
+      hs.running=false;hs.waitUntil=0;saveHist();renderHistViews();
+    }
+    // Both screens that depend on history show the progress.
+    function renderHistViews(){renderAnalysis();if(ui.perfSource==='computed')renderPerformance();}
+    function analyses(){
+      const byId=Object.fromEntries(pf.transactions.map(t=>[t.id,t])),today=E.todayIso();
+      return calc.trades.map(t=>TradeAnalysis.analyze(t,t.txIds.map(id=>byId[id]).filter(Boolean),hist[t.symbol]?.bars||[],{today,customDays:ui.customDays}));
+    }
+    const EXIT_LABEL={target:'יצאה ביעד',stop:'יצאה בסטופ','below-stop':'יצאה מתחת לסטופ','before-target':'יצאה לפני היעד','above-stop':'יצאה מעל הסטופ','no-levels':'בלי יעד וסטופ'};
+    const HOLD_LABEL={shorter:'קצרה מהמתוכנן',longer:'ארוכה מהמתוכנן','as-planned':'לפי התכנון','over-plan':'פתוחה מעבר לתכנון','within-plan':'פתוחה, בתוך התכנון'};
+    const P=TradeAnalysis.PATTERNS;
+    function renderAnalysis(){
+      const box=q('investBody-analysis');if(!box||!calc)return;
+      if(!calc.trades.length){box.innerHTML=empty(ICON.line,'אין עדיין עסקאות לניתוח','הניתוח נבנה מהעסקאות בלוג ומנרות מחיר יומיים.');return;}
+      const list=analyses(),sum=TradeAnalysis.summarize(list),want=needs();
+      const syms=Object.keys(want),have=syms.filter(s=>hasHist(s,want[s])&&hist[s]?.bars?.length),errs=syms.filter(s=>hist[s]?.error);
+      const wait=hs.waitUntil>Date.now()?Math.ceil((hs.waitUntil-Date.now())/1000):0;
+      let h='<div class="inv-pricebar" role="status"><span>היסטוריה יומית: '+have.length+' מתוך '+syms.length+' ניירות</span>'+
+        (hs.running?'<span>טוען '+hs.done+'/'+hs.total+(wait?' · ממתין <b id="invHistWait">'+wait+'</b> שנ׳ למגבלת הספק (8 בקשות לדקה בתוכנית החינמית)':'')+'</span>':'')+
+        (errs.length?'<span class="inv-muted" title="'+esc(errs.map(s=>s+': '+hist[s].error).join('\n'))+'">ללא היסטוריה: '+errs.map(esc).join(', ')+'</span>':'')+
+        (hs.msg?'<span class="inv-neg">'+esc(hs.msg)+'</span>':'')+
+        '<button type="button" class="invest-btn" data-act="hist-load"'+(hs.running||have.length===syms.length?' disabled':'')+'>'+(have.length===syms.length?'ההיסטוריה עדכנית':'טעינת היסטוריה')+'</button></div>';
+      const avgAfter=k=>sum.after[k]?pct(sum.after[k].pct,{signed:true}):DASH;
+      h+='<div class="invest-kpis">'+
+        kpi('עלייה מרבית בזמן ההחזקה',pct(sum.avgMfe,{signed:true,d:1}),'ממוצע לעסקאות סגורות, לפי הגבוה היומי')+
+        kpi('ירידה מרבית בזמן ההחזקה',pct(sum.avgMae,{signed:true,d:1}),'ממוצע, לפי הנמוך היומי')+
+        kpi('אחרי היציאה',avgAfter('d1')+' · '+avgAfter('w1')+' · '+avgAfter('m1'),'יום · שבוע · חודש (ממוצע)')+
+        kpi('עסקאות עם היסטוריה',num(sum.withHistory)+' / '+num(sum.closed),'עסקאות סגורות')+'</div>';
+      h+='<div class="inv-toolbar"><div class="inv-chips inv-patterns" role="group" aria-label="דפוסים">'+
+        '<button type="button" class="inv-chip" data-act="pattern" data-val="" aria-pressed="'+(!ui.pattern)+'">הכול ('+list.length+')</button>'+
+        Object.entries(P).map(([k,p])=>'<button type="button" class="inv-chip" data-act="pattern" data-val="'+k+'" aria-pressed="'+(ui.pattern===k)+'" title="'+esc(p.def)+'">'+p.label+' ('+sum.counts[k]+')</button>').join('')+'</div></div>';
+      h+='<details class="inv-details inv-defs"><summary>איך זה מחושב</summary><ul>'+Object.values(P).map(p=>'<li><b>'+p.label+':</b> '+esc(p.def)+'</li>').join('')+
+        '<li><b>עלייה/ירידה מרבית:</b> הגבוה/הנמוך היומי בתקופת ההחזקה ביחס למחיר הכניסה הממוצע. בימי הכניסה והיציאה הקיצון עשוי להיות לפני הקנייה או אחרי המכירה; אין נתונים תוך־יומיים.</li>'+
+        '<li><b>אחרי היציאה:</b> מחיר הסגירה 1, 5 ו־21 ימי מסחר אחרי כל מכירה, ביחס למחיר המכירה. במכירות חלקיות: ממוצע משוקלל לפי הכמות שנמכרה.</li>'+
+        '<li><b>השוואה להמשך החזקה:</b> היפותטית בלבד: הכמות שנמכרה הייתה נמכרת במחיר הסגירה באותו יום, בלי עמלות נוספות ובלי דיבידנדים.</li></ul></details>';
+      const rows=list.filter(a=>!ui.pattern||a.patterns.includes(ui.pattern)).sort((a,b)=>(b.endDate||'9')>(a.endDate||'9')?1:-1);
+      const af=(a,k)=>a.after[k]?pct(a.after[k].pct,{signed:true,d:1}):DASH;
+      h+=rows.length?'<div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>נייר</th><th>תקופה</th><th>ימים</th><th>נטו</th><th>עלייה מרבית</th><th>ירידה מרבית</th><th>אחרי יום</th><th>אחרי שבוע</th><th>אחרי חודש</th><th>תוכנית</th><th></th></tr></thead><tbody>'+
+        rows.map(a=>'<tr class="inv-trade" data-act="analyze" data-id="'+a.tradeId+'" tabindex="0"><td>'+sym(a.symbol)+(a.status==='open'?' <span class="inv-status inv-open">פתוחה</span>':'')+'</td><td>'+date(a.startDate)+' – '+(a.endDate?date(a.endDate):'היום')+'</td><td>'+num(a.days)+'</td>'+
+          '<td>'+(a.status==='closed'?money(a.net,a.currency,{signed:true}):DASH)+'</td><td>'+(a.mfe?pct(a.mfe.pct,{signed:true,d:1}):a.coverage==='none'?'<small class="inv-muted">אין היסטוריה</small>':DASH)+'</td><td>'+(a.mae?pct(a.mae.pct,{signed:true,d:1}):DASH)+'</td>'+
+          '<td>'+af(a,'d1')+'</td><td>'+af(a,'w1')+'</td><td>'+af(a,'m1')+'</td><td>'+(a.plan?'<span class="inv-type">'+(EXIT_LABEL[a.adherence.exit]||'נקבעה')+'</span>':'<small class="inv-muted">אין</small>')+'</td>'+
+          '<td class="inv-row-tools"><button type="button" data-act="analyze" data-id="'+a.tradeId+'">פירוט</button></td></tr>').join('')+'</tbody></table></div>':'<p class="inv-none">אין עסקאות בדפוס הזה.</p>';
+      box.innerHTML=h;
+      if(taOpen)renderTrade();
+    }
+    // ---------- one trade ----------
+    document.body.insertAdjacentHTML('beforeend','<div class="tool-overlay inv-overlay" id="invTaOverlay" hidden><section class="tool-dialog inv-dialog inv-ta" role="dialog" aria-modal="true" aria-labelledby="invTaTitle">'+
+      '<header class="tool-head"><div><h2 id="invTaTitle"></h2><p id="invTaSub"></p></div><button type="button" class="tool-close" data-ta-close aria-label="סגירה">×</button></header>'+
+      '<div class="tool-content inv-ta-body" id="invTaBody"></div></section></div>');
+    let taOpen=null;
+    async function openTrade(id){
+      taOpen=id;opener=document.activeElement;
+      q('invTaOverlay').hidden=false;document.body.classList.add('schedule-open');renderTrade();
+      const t=calc.trades.find(x=>x.id===id),w=t&&needs()[t.symbol];
+      if(t&&w&&!hasHist(t.symbol,w)&&!hs.running)await loadHistory([t.symbol]);
+    }
+    function closeTrade(){q('invTaOverlay').hidden=true;document.body.classList.remove('schedule-open');taOpen=null;opener?.focus?.();}
+    function renderTrade(){
+      const t=calc.trades.find(x=>x.id===taOpen);if(!t){closeTrade();return;}
+      const a=analyses().find(x=>x.tradeId===t.id),cur=t.currency,H=hist[t.symbol];
+      q('invTaTitle').innerHTML=sym(t.symbol)+' · '+(t.status==='open'?'עסקה פתוחה':'עסקה סגורה');
+      q('invTaSub').textContent=t.startDate.split('-').reverse().join('/')+' – '+(t.endDate?t.endDate.split('-').reverse().join('/'):'היום')+' · '+t.buys+' קניות · '+t.sells+' מכירות';
+      const af=k=>a.after[k]?pct(a.after[k].pct,{signed:true})+(a.after[k].exits<a.after[k].of?' <small class="inv-muted">('+a.after[k].exits+'/'+a.after[k].of+' מכירות)</small>':''):(t.sells?'<small class="inv-muted">עוד לא עבר זמן / אין נתונים</small>':DASH);
+      let h='<div class="invest-kpis">'+
+        kpi('תוצאה בפועל',t.status==='closed'?money(t.net,cur,{signed:true}):'<small>ממומש </small>'+money(t.realized,cur,{signed:true}),t.status==='closed'?'אחרי עמלות · '+(t.returnPct===null?'':pct(t.returnPct,{signed:true})):'העסקה פתוחה')+
+        kpi('משך ההחזקה',num(t.days)+' ימים',a.plan?.horizonDays?'מתוכנן: '+a.plan.horizonDays+' ימים':'')+
+        kpi('עלייה מרבית',a.mfe?pct(a.mfe.pct,{signed:true}):DASH,a.mfe?'גבוה יומי '+date(a.mfe.date):'אין היסטוריה')+
+        kpi('ירידה מרבית',a.mae?pct(a.mae.pct,{signed:true}):DASH,a.mae?'נמוך יומי '+date(a.mae.date):'')+'</div>';
+      h+=taChart(t,a,H?.bars||[]);
+      if(t.sells){
+        h+='<div class="inv-ta-after"><h3>מה קרה אחרי היציאה</h3><div class="invest-kpis">'+kpi('יום מסחר',af('d1'))+kpi('שבוע',af('w1'))+kpi('חודש',af('m1'))+
+          '<div class="invest-kpi"><span>אחרי <input class="inv-inline inv-days" type="number" min="1" max="365" value="'+ui.customDays+'" data-act="custom-days" aria-label="מספר ימים"> ימים</span><strong>'+af('custom')+'</strong><small>ימים קלנדריים</small></div></div>';
+        h+='<div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>מכירה</th><th>כמות</th><th>מחיר</th><th>אחרי יום</th><th>אחרי שבוע</th><th>אחרי חודש</th><th>אחרי '+ui.customDays+' ימים</th></tr></thead><tbody>'+
+          a.exits.map(e=>'<tr><td>'+date(e.date)+'</td><td>'+num(e.qty)+'</td><td>'+money(E.cents(e.price),cur)+'</td>'+['d1','w1','m1','custom'].map(k=>'<td>'+(e.after[k]?pct(e.after[k].pct,{signed:true,d:1})+' <small class="inv-muted">'+money(E.cents(e.after[k].close),cur)+'</small>':DASH)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+        const hy=k=>a.hypothetical[k]?money(a.hypothetical[k].diff,cur,{signed:true}):DASH;
+        h+='<div class="inv-ta-hypo"><b>השוואה היפותטית:</b> אילו הכמות שנמכרה הייתה מוחזקת עוד יום: '+hy('d1')+' · שבוע: '+hy('w1')+' · חודש: '+hy('m1')+' · '+ui.customDays+' ימים: '+hy('custom')+
+          '<br><small>הנחות: מכירה במחיר הסגירה של אותו יום, בלי עמלות נוספות, בלי דיבידנדים ובלי מס. עלייה אחרי המכירה לא מוכיחה לבדה שהמכירה הייתה טעות.</small></div></div>';
+      }
+      const p=a.plan||{};
+      const chips=[];
+      if(a.plan){
+        if(a.adherence.exit)chips.push(EXIT_LABEL[a.adherence.exit]);
+        if(a.adherence.targetReached)chips.push('היעד הושג ב־'+a.adherence.targetReached.date.split('-').reverse().join('/'));else if(a.adherence.targetReached===false)chips.push('היעד לא הושג בזמן ההחזקה');
+        if(a.adherence.stopTouched)chips.push('הסטופ נגע ב־'+a.adherence.stopTouched.date.split('-').reverse().join('/'));
+        if(a.adherence.holding)chips.push('החזקה '+HOLD_LABEL[a.adherence.holding]);
+      }
+      const c=CUR_LABEL[cur];
+      h+='<form class="inv-ta-plan" data-form="plan"><h3>תוכנית המסחר</h3>'+(chips.length?'<div class="inv-ta-chips">'+chips.map(x=>'<span class="inv-type">'+esc(x)+'</span>').join('')+'</div><p class="inv-foot">עמידה בתוכנית נבדקת מול התוכנית עצמה, לא מול מה שקרה אחר כך.</p>':'')+
+        '<div class="inv-grid">'+field('reason','סיבת הכניסה','<textarea name="reason" rows="2" maxlength="600">'+esc(p.reason||'')+'</textarea>')+
+        field('tags','אסטרטגיה / תגיות',inp('tags',(p.tags||[]).join(', '),'type="text" placeholder="מומנטום, דוחות"'),'מופרדות בפסיק')+
+        field('target','יעד רווח ('+c+')',inp('target',p.target??''))+field('stop','סטופ ('+c+')',inp('stop',p.stop??''))+
+        field('horizonDays','תקופת החזקה מתוכננת (ימים)',inp('horizonDays',p.horizonDays??'','type="number" min="1" inputmode="numeric"'))+
+        field('exitReason','סיבת היציאה','<textarea name="exitReason" rows="2" maxlength="600">'+esc(p.exitReason||'')+'</textarea>')+'</div>'+
+        '<div class="inv-form-actions"><button type="submit" class="tool-primary">שמירת התוכנית</button><span class="inv-form-msg" aria-live="polite"></span></div></form>';
+      h+='<p class="inv-foot">מקור המחירים: '+(H?.source?esc((MarketData.SOURCES[H.source]||{label:H.source}).label):'—')+' · נרות יומיים'+(H?.fetchedAt?' · נטען '+ago(H.fetchedAt):'')+(H?.error?' · <span class="inv-neg">'+esc(H.error)+'</span>':'')+'.'+(a.scale?.adjusted?' <b>התאמה לפיצול:</b> מחירי ההיסטוריה הוכפלו ב־'+(a.scale.factor>=1?a.scale.factor:'1/'+Math.round(1/a.scale.factor))+(a.scale.exact?'':' (יחס משוער)')+' כדי להתאים למחירי העסקאות, כי הספק מתקן את ההיסטוריה לפיצולים שקרו אחר כך.':' דיבידנדים לא נכללים.')+'</p>';
+      const body=q('invTaBody'),scroll=body.scrollTop;body.innerHTML=h;body.scrollTop=scroll;
+    }
+    // Price line with entries, exits, target and stop. Time runs left to right; one step per trading day.
+    function taChart(t,a,B){
+      if(!B.length)return '<div class="invest-empty inv-ta-empty"><strong>'+(hs.running?'טוען נרות יומיים…':'אין נתוני מחיר לעסקה הזו')+'</strong><p>'+(hist[t.symbol]?.error?esc(hist[t.symbol].error):'הגרף והמדדים יופיעו אחרי טעינת ההיסטוריה.')+'</p></div>';
+      const end=t.endDate||E.todayIso();
+      let i0=B.findIndex(b=>b[0]>=t.startDate);if(i0<0)i0=B.length-1;
+      let i1=B.findIndex(b=>b[0]>end);if(i1<0)i1=B.length;
+      const s=Math.max(0,i0-10),e=Math.min(B.length,i1+30),V=B.slice(s,e);
+      const byId=Object.fromEntries(pf.transactions.map(x=>[x.id,x])),txs=t.txIds.map(id=>byId[id]).filter(Boolean);
+      const p=a.plan||{};
+      const lv=[...V.flatMap(b=>[b[2],b[3]]),...txs.map(x=>x.price),p.target,p.stop].filter(x=>x>0);
+      const lo=Math.min(...lv),hi=Math.max(...lv),span=hi-lo||1;
+      const W=Math.max(320,(q('invTaBody').clientWidth||760)-30),HH=250,L=8,R=58,T=10,Bm=22;
+      const X=i=>L+(V.length<2?0:i/(V.length-1))*(W-L-R),Y=v=>T+(1-(v-lo)/span)*(HH-T-Bm);
+      const idx=d=>{let k=V.findIndex(b=>b[0]>=d);return k<0?V.length-1:k;};
+      const line=V.map((b,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(b[4]).toFixed(1)).join(' ');
+      const hs0=X(Math.max(0,i0-s)),hs1=X(Math.min(V.length-1,i1-1-s));
+      const mk=(x,kind)=>{const cx=X(idx(x.date)),cy=Y(x.price),d=kind==='buy'?'M'+cx+' '+(cy-1)+' l-6 11 h12 z':'M'+cx+' '+(cy+1)+' l-6 -11 h12 z';
+        return '<path d="'+d+'" class="inv-mk-'+kind+'"><title>'+TYPE_LABEL[kind]+' '+x.qty+' × '+x.price+' · '+x.date+'</title></path>';};
+      const lvl=(v,cls,label)=>v>0?'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" class="'+cls+'"/><text x="'+(W-R+4)+'" y="'+(Y(v)+3).toFixed(1)+'" class="inv-tick">'+label+' '+v+'</text>':'';
+      const ticks=[lo,lo+span/2,hi].map(v=>'<text x="'+(W-R+4)+'" y="'+(Y(v)+3).toFixed(1)+'" class="inv-tick">'+(+v.toFixed(v<10?2:1))+'</text>').join('');
+      const dl=[0,Math.floor((V.length-1)/2),V.length-1].map((k,j)=>'<text x="'+X(k).toFixed(1)+'" y="'+(HH-6)+'" class="inv-tick" text-anchor="'+['start','middle','end'][j]+'">'+V[k][0].slice(8,10)+'/'+V[k][0].slice(5,7)+'/'+V[k][0].slice(2,4)+'</text>').join('');
+      return '<figure class="inv-chart inv-ta-chart"><figcaption><span><i class="inv-key inv-key-value"></i>סגירה יומית</span><span><i class="inv-key inv-key-hold"></i>תקופת ההחזקה</span><span>▲ קנייה ▼ מכירה</span>'+(p.target?'<span><i class="inv-key inv-key-target"></i>יעד</span>':'')+(p.stop?'<span><i class="inv-key inv-key-stop"></i>סטופ</span>':'')+'</figcaption>'+
+        '<svg viewBox="0 0 '+W+' '+HH+'" role="img" aria-label="גרף מחיר עם כניסות ויציאות" dir="ltr"><rect x="'+hs0.toFixed(1)+'" y="'+T+'" width="'+Math.max(2,hs1-hs0).toFixed(1)+'" height="'+(HH-T-Bm)+'" class="inv-hold"/>'+
+        ticks+dl+lvl(p.target,'inv-lv-target','יעד')+lvl(p.stop,'inv-lv-stop','סטופ')+'<path d="'+line+'" class="inv-line-value"/>'+txs.map(x=>mk(x,x.type)).join('')+'</svg></figure>';
+    }
+    q('invTaOverlay').addEventListener('click',e=>{if(e.target.closest('[data-ta-close]'))closeTrade();});
+    q('invTaOverlay').addEventListener('pointerdown',e=>{if(e.target===q('invTaOverlay'))closeTrade();});
+    q('invTaOverlay').addEventListener('change',e=>{if(e.target.dataset.act==='custom-days'){const v=Math.round(Number(e.target.value));if(v>=1&&v<=365){ui.customDays=v;renderTrade();renderAnalysis();const t=calc.trades.find(x=>x.id===taOpen);if(t&&!hasHist(t.symbol,needs()[t.symbol]))loadHistory([t.symbol]);}}});
+    q('invTaOverlay').addEventListener('submit',e=>{
+      const f=e.target;if(f.dataset.form!=='plan')return;e.preventDefault();
+      const t=calc.trades.find(x=>x.id===taOpen);if(!t)return;
+      const v=n=>f.elements[n].value;
+      const raw={reason:v('reason'),tags:v('tags'),target:parseNum(v('target')),stop:parseNum(v('stop')),horizonDays:parseNum(v('horizonDays')),exitReason:v('exitReason')};
+      const bad=['target','stop','horizonDays'].filter(k=>raw[k]!==undefined&&!(raw[k]>0));
+      f.querySelectorAll('[data-err]').forEach(x=>x.textContent=bad.includes(x.dataset.err)?'מספר חיובי':'');
+      if(bad.length)return;
+      if(raw.target&&raw.stop&&raw.stop>=raw.target){f.querySelector('[data-err="stop"]').textContent='הסטופ צריך להיות מתחת ליעד';return;}
+      const plan=E.normalizePlan(raw),firstBuy=t.txIds.find(id=>pf.transactions.find(x=>x.id===id)?.type==='buy');
+      pf={...pf,transactions:pf.transactions.map(x=>x.id===firstBuy?(plan?{...x,tradePlan:plan}:(({tradePlan,...rest})=>rest)(x)):x)};
+      persist();refresh();toast(plan?'התוכנית נשמרה':'התוכנית נמחקה');
+    });
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!q('invTaOverlay').hidden){e.preventDefault();closeTrade();}});
+
+    // ---------- Excel export: real numbers and dates, one sheet per table ----------
+    function exportXlsx(){
+      const c=calc,D=d=>d?{d}:'',M=v=>v===null||v===undefined?'':{n:v/100},N=v=>v===null||v===undefined?'':{n:v},P=v=>v===null||v===undefined||!Number.isFinite(v)?'':{p:v/100};
+      const sheets=[];
+      sheets.push({name:'פעולות',rows:[['תאריך','פעולה','נייר','שוק','מטבע','כמות','מחיר','עמלה','שער דולר','השפעה על מזומן ₪','השפעה על מזומן $','רווח ממומש','רווח ממומש ₪','מזהה עסקה','הערה'],
+        ...E.ordered(pf.transactions).map(t=>{const i=c.txInfo[t.id]||{},tr=t.type==='buy'||t.type==='sell',ins=tr?E.instrumentOf(pf,t.symbol):null,f=Object.fromEntries(i.cash||[]);
+          return [D(t.date),TYPE_LABEL[t.type],t.symbol||'',ins?E.MARKETS[ins.market].label:'',ins?ins.currency:t.type==='fx'?t.from:t.currency,tr?N(t.qty):'',tr?N(t.price):t.type==='fx'?N(t.rate):'',tr?N(t.fee):'',N(t.fxRate),M(f.ILS),M(f.USD),M(i.realized),M(i.realizedIls),i.tradeId||'',t.note];})]});
+      sheets.push({name:'עסקאות',rows:[['נייר','מצב','פתיחה','סגירה','ימים','קניות','מכירות','כמות מרבית','השקעה','תמורה','עמלות','נטו','ברוטו','תשואה','מטבע'],
+        ...c.trades.map(t=>[t.symbol,t.status==='open'?'פתוחה':'סגורה',D(t.startDate),D(t.endDate),N(t.days),N(t.buys),N(t.sells),N(t.maxQty),M(t.buyCost),M(t.sellProceeds),M(t.fees),M(t.net),M(t.gross),P(t.returnPct),t.currency])]});
+      sheets.push({name:'אחזקות',rows:[['נייר','שוק','מטבע','כמות','עלות ממוצעת','עלות','מחיר','תאריך מחיר','שווי','רווח לא ממומש','רווח %','שווי ₪','משקל (כולל מזומן)'],
+        ...c.holdings.map(h=>[h.symbol,E.MARKETS[h.market].label,h.currency,N(h.qty),N(h.avgCost),M(h.cost),N(h.price),D(h.priceAsOf),M(h.value),M(h.unrealized),P(h.unrealizedPct),M(h.valueIls),P(h.weight)]),
+        [],['מזומן ₪',M(c.cash.ILS)],['מזומן $',M(c.cash.USD)],['שער דולר',N(c.usdIls)],['שווי תיק ₪',M(c.totalIls)]]});
+      sheets.push({name:'שווי חשבון',rows:[['תאריך','שווי','הפקדה / משיכה','הפקדות נטו','רווח / הפסד','שינוי מהרישום הקודם'],
+        ...c.performance.rows.map(r=>[D(r.date),M(r.value),M(r.flow||null),M(r.netDeposits),M(r.profit),P(r.daily)])]});
+      const s=c.summary,u=s.byCurrency.USD,i=s.byCurrency.ILS;
+      sheets.push({name:'סיכום',rows:[['מדד','ערך','הגדרה'],['עסקאות',N(s.trades),'מהקנייה הראשונה ועד שהכמות חוזרת לאפס'],['סגורות',N(s.closed),''],['פתוחות',N(s.open),''],['ניירות שונים',N(s.symbols),''],
+        ['אחוז הצלחה',P(s.winRate),'עסקאות סגורות עם נטו חיובי ÷ כל הסגורות'],['ממוצע ימי החזקה',N(s.avgDaysClosed),'עסקאות סגורות בלבד'],
+        ['נטו $',M(u.net),'תמורות פחות השקעות, אחרי כל העמלות'],['עמלות $',M(u.fees),''],['נפח קניות $',M(u.buyVolume),''],['נפח מכירות $',M(u.sellVolume),''],
+        ['נטו ₪',M(i.net),''],['עמלות ₪',M(i.fees),''],['תשואה מצטברת (TWR)',P(c.performance.twr),'שרשור תשואות יומיות לפי רישומי השווי'],['הופק',D(E.todayIso()),'']]});
+      download('anav-investments-'+E.todayIso()+'.xlsx',xlsx(sheets));
+    }
+    function xlsx(sheets){
+      const x=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[ch]));
+      const col=i=>{let s='';for(let n=i+1;n>0;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s;};
+      const serial=d=>(Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))-Date.UTC(1899,11,30))/864e5;
+      const cell=(v,r,c,head)=>{const a=col(c)+(r+1);if(v===''||v===null||v===undefined)return '';
+        if(head)return '<c r="'+a+'" s="1" t="inlineStr"><is><t>'+x(v)+'</t></is></c>';
+        if(typeof v==='object'&&'d' in v)return '<c r="'+a+'" s="2"><v>'+serial(v.d)+'</v></c>';
+        if(typeof v==='object'&&'n' in v)return '<c r="'+a+'" s="3"><v>'+v.n+'</v></c>';
+        if(typeof v==='object'&&'p' in v)return '<c r="'+a+'" s="4"><v>'+v.p+'</v></c>';
+        return '<c r="'+a+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';};
+      const sheetXml=rows=>'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0" rightToLeft="1"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="20" width="15" customWidth="1"/></cols><sheetData>'+
+        rows.map((row,r)=>'<row r="'+(r+1)+'">'+row.map((v,c)=>cell(v,r,c,r===0)).join('')+'</row>').join('')+'</sheetData></worksheet>';
+      const rel='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+      const files=[
+        ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((s,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>'],
+        ['_rels/.rels','<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+rel+'/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+        ['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="'+rel+'"><sheets>'+sheets.map((s,i)=>'<sheet name="'+x(s.name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets></workbook>'],
+        ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="'+rel+'/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="'+rel+'/styles" Target="styles.xml"/></Relationships>'],
+        ['xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="#,##0.00"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCEBE8"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>'],
+        ...sheets.map((s,i)=>['xl/worksheets/sheet'+(i+1)+'.xml',sheetXml(s.rows)])
+      ];
+      return new Blob([zip(files)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    }
+    // Minimal STORE-method ZIP writer (no compression, no dependencies).
+    function zip(files){
+      const enc=new TextEncoder(),table=new Uint32Array(256);
+      for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;table[n]=c>>>0;}
+      const crc=b=>{let c=0xFFFFFFFF;for(const x of b)c=table[(c^x)&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;};
+      const parts=[],central=[];let off=0;
+      const u16=v=>[v&255,(v>>>8)&255],u32=v=>[v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255];
+      for(const [name,text] of files){
+        const nb=enc.encode(name),data=enc.encode(text),c=crc(data);
+        const head=new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0),...u32(c),...u32(data.length),...u32(data.length),...u16(nb.length),...u16(0)]);
+        parts.push(head,nb,data);
+        central.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0),...u32(c),...u32(data.length),...u32(data.length),...u16(nb.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]),nb);
+        off+=head.length+nb.length+data.length;
+      }
+      const size=central.reduce((s,p)=>s+p.length,0);
+      return new Blob([...parts,...central,new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(size),...u32(off),...u16(0)])]);
+    }
+
+    refresh();
+    if(!root.hidden)setTimeout(autoPrices,600);
+  })();

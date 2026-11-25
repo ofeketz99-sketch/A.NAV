@@ -1,0 +1,18 @@
+{
+  "version": 53,
+  "date": "2026-11-25",
+  "branch": "feature/investments",
+  "title": "Daily performance computed from price history; dollar rate on the trade date",
+  "changes": [
+    "Performance: switch between broker entries and 'computed from price history'; daily value rebuilt from the trades, daily closes and the daily ECB dollar rate (DailyPerformance)",
+    "Computed view: latest value, latest daily change (trading day vs the previous complete day), period return chaining daily changes without deposits, missing days counted and never shown as zero; broker entries shown as dots for comparison",
+    "A missing close is carried for up to 5 days and a missing dollar rate for up to 7; beyond that the day is left out and the reason (symbol or dollar rate) is listed",
+    "Trade form: 'ECB rate for the date' button fills the dollar rate of the trade date, marked (ECB)",
+    "Data menu: 'Fill missing dollar rates (ECB)' for all dollar trades without a rate, with confirmation and undo, so shekel profit and the dollar effect can be computed",
+    "Loading progress shown on both history screens",
+    "Split adjustment: providers return history adjusted for later splits while trades are recorded at real prices; each holding period's history is scaled by the ratio between trade prices and that day's close (snapped to a common split ratio when close), in both trade analysis and daily value",
+    "A gap in the computed series no longer drops the change across it: the next complete day is measured from the last complete day, with deposits in between removed. Checked against the broker entries over the same period: the computed return differs by about 0.3 percentage points",
+    "A temporary network failure is not saved as a permanent 'no history'"
+  ],
+  "backup": "backups/2026-11-25T07-33-00Z-daily-performance/"
+}
