@@ -277,3 +277,11 @@
 .inv-ch-preview h3{margin:0 0 6px;font-size:12px;color:#776c60;font-weight:700}
 @media (max-width:1050px){.inv-board{grid-template-columns:1fr}.inv-widget,.inv-w-s,.inv-w-l{grid-column:auto}.inv-w-tools{opacity:1}.inv-ch-grid{grid-template-columns:1fr 1fr}.invest-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:540px){.inv-ch-grid{grid-template-columns:1fr}}
+
+/* UX pass (v055) */
+.inv-field small .inv-mini{margin-top:2px}
+.inv-form-actions .inv-ghost[data-again]{border-color:color-mix(in srgb,var(--accent) 45%,#ddd2c4);color:var(--accent)}
+.inv-widget>header{flex-wrap:wrap}
+.inv-widget h3{flex:1 1 auto;min-width:45%}
+.inv-w-tools{flex-wrap:wrap;justify-content:flex-end}
+@media (max-width:1050px){.inv-widget h3{flex-basis:100%;white-space:normal}.inv-w-tools{width:100%;justify-content:flex-start}}

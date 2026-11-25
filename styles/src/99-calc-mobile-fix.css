@@ -1,0 +1,16 @@
+
+/* A.NAV 055 — calculators on narrow screens (pre-existing bug on dev): the main column was laid out as a row,
+   so the tab bar took the width and the workspace collapsed to zero. Stack them vertically. */
+@media (max-width:1050px){
+  #financeApp .main-column{flex-direction:column!important}
+  #financeApp .main-column>.tabs-bar{width:100%;flex:0 0 auto}
+  #financeApp .main-column>.workspace{width:100%;flex:1 1 auto;min-height:0}
+  /* the five calculator tabs get the whole first row; the tools wrap to a second row */
+  #financeApp .tabs-bar>.tabs{flex:1 1 100%;width:100%}
+  #financeApp .tabs-bar>.workspace-tools{flex:1 1 100%;justify-content:flex-start}
+}
+/* 9px tab names were unreadable on phones: larger text, and the colour dot gives way to it */
+@media (max-width:540px){
+  #financeApp .tabs-bar .tab{font-size:11.5px!important;font-weight:650;padding:6px 2px!important}
+  #financeApp .tabs-bar .tab::before{display:none!important}
+}

@@ -1,0 +1,17 @@
+{
+  "version": 55,
+  "date": "2026-11-25",
+  "branch": "feature/investments",
+  "title": "UX pass: fast data entry, remembered views, calculators fixed on phones and tablets",
+  "changes": [
+    "Action form: focus goes to the first field at once, so typing right after opening is not lost (found while entering trades by keyboard)",
+    "Trade field order for keyboard entry: symbol → quantity → price → fee, then the date (a date input takes three Tab stops)",
+    "'Save and add another' keeps the action type, date and market and focuses the symbol",
+    "Sale: 'whole quantity (N)' fills what is held on that date; 'last price' fills the latest known price; 'today' / 'yesterday' for the date; these quick buttons stay out of the Tab order",
+    "Actions table: 'duplicate' opens a new action with the same details dated today",
+    "View choices are remembered between visits: log mode, filter, sort, period, breakdown, performance source, analysis days and pattern (anav.ui.v1)",
+    "Dashboard cards: the title keeps its place and the tools wrap below it on narrow screens",
+    "Calculators on phones and tablets (pre-existing on dev): the main column was laid out as a row and the input panel collapsed to zero width; it now stacks, the five tabs get their own row, and tab names are readable (11.5px instead of 9px)"
+  ],
+  "backup": "backups/2026-11-25T07-48-00Z-ux-pass/"
+}

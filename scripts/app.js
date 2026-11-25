@@ -3965,7 +3965,11 @@
     let pf=E.normalize(readJson(PF_KEY));
     let mk=normalizeMarket(readJson(MK_KEY));
     let calc=null;
-    const ui={logMode:'trades',filter:'all',search:'',sort:{key:'startDate',dir:-1},open:new Set(),range:'all',holdBy:'value',customDays:63,pattern:''};
+    const ui={logMode:'trades',filter:'all',search:'',sort:{key:'startDate',dir:-1},open:new Set(),range:'all',holdBy:'symbol',customDays:63,pattern:''};
+    // Remember view choices (not data) between visits.
+    const UI_KEY='anav.ui.v1',UI_KEEP=['logMode','filter','sort','range','holdBy','customDays','perfSource','pattern'];
+    try{const s=JSON.parse(localStorage.getItem(UI_KEY)||'null');if(s)for(const k of UI_KEEP)if(s[k]!==undefined)ui[k]=s[k];}catch(_){}
+    const saveUi=()=>{try{localStorage.setItem(UI_KEY,JSON.stringify(Object.fromEntries(UI_KEEP.map(k=>[k,ui[k]]))));}catch(_){}};
     function normalizeMarket(raw){
       const m={quotes:{},fx:{},status:{}};
       const meta=v=>({asOf:String(v.asOf||''),source:String(v.source||'manual'),...(v.fetchedAt?{fetchedAt:String(v.fetchedAt)}:{}),...(Number.isFinite(v.previousClose)?{previousClose:v.previousClose}:{})});
@@ -4077,7 +4081,7 @@
         h+='<tr'+(info.ignored?' class="inv-bad" title="לא נכלל בחישוב"':'')+'><td>'+date(t.date)+'</td><td><span class="inv-type inv-type-'+t.type+'">'+TYPE_LABEL[t.type]+'</span></td>'+(nested?'':'<td>'+(t.symbol?sym(t.symbol):DASH)+'</td>')+
           '<td>'+(trade?num(t.qty):DASH)+'</td><td>'+(trade?money(E.cents(t.price),cur):t.type==='fx'?'<small>שער</small> '+num(t.rate,4):DASH)+'</td><td>'+(trade?money(E.cents(t.fee),cur):DASH)+'</td>'+
           '<td>'+(flows||DASH)+'</td><td>'+(info.realized!==undefined?money(info.realized,cur,{signed:true})+(info.realizedIls!==undefined?'<small class="inv-muted"> · ₪ '+money(info.realizedIls,'ILS',{signed:true})+(info.fxEffect?' (מזה דולר '+money(info.fxEffect,'ILS',{signed:true})+')':'')+'</small>':''):DASH)+'</td>'+
-          '<td class="inv-note">'+esc(t.note)+'</td><td class="inv-row-tools"><button type="button" data-act="edit" data-id="'+t.id+'" aria-label="עריכה">עריכה</button><button type="button" data-act="delete" data-id="'+t.id+'" aria-label="מחיקה">מחיקה</button></td></tr>';
+          '<td class="inv-note">'+esc(t.note)+'</td><td class="inv-row-tools"><button type="button" data-act="edit" data-id="'+t.id+'" aria-label="עריכה">עריכה</button><button type="button" data-act="dup" data-id="'+t.id+'" title="פעולה חדשה עם אותם פרטים, בתאריך היום">שכפול</button><button type="button" data-act="delete" data-id="'+t.id+'" aria-label="מחיקה">מחיקה</button></td></tr>';
       }
       return h+'</tbody></table></div>';
     }
@@ -4235,7 +4239,7 @@
       '<form class="tool-content inv-form" id="invTxForm" novalidate><div class="inv-seg" role="radiogroup" aria-label="סוג פעולה">'+
       ['buy','sell','deposit','withdrawal','fx'].map(t=>'<button type="button" role="radio" data-type="'+t+'" aria-checked="false">'+TYPE_LABEL[t]+'</button>').join('')+
       '</div><div class="inv-grid" id="invTxFields"></div><div class="inv-preview" id="invTxPreview" aria-live="polite"></div>'+
-      '<div class="inv-form-actions"><button type="submit" class="tool-primary">שמירה</button><button type="button" class="inv-ghost" data-inv-close>ביטול</button><button type="button" class="inv-danger" id="invTxDelete" hidden>מחיקה</button></div></form></section></div>'+
+      '<div class="inv-form-actions"><button type="submit" class="tool-primary">שמירה</button><button type="submit" class="inv-ghost" data-again title="שומר ופותח טופס חדש עם אותו סוג, תאריך ושוק">שמירה והוספת עוד</button><button type="button" class="inv-ghost" data-inv-close>ביטול</button><button type="button" class="inv-danger" id="invTxDelete" hidden>מחיקה</button></div></form></section></div>'+
       '<div class="tool-overlay inv-overlay" id="invSetOverlay" hidden><section class="tool-dialog inv-dialog" role="dialog" aria-modal="true" aria-labelledby="invSetTitle">'+
       '<header class="tool-head"><div><h2 id="invSetTitle">עמלות ברירת מחדל</h2><p>ממולאות אוטומטית בכל פעולה חדשה, ואפשר לשנות בכל פעולה. שינוי כאן לא משנה פעולות קיימות.</p></div><button type="button" class="tool-close" data-inv-close aria-label="סגירה">×</button></header>'+
       '<form class="tool-content inv-form" id="invSetForm"><div class="inv-grid"></div><div class="inv-form-actions"><button type="submit" class="tool-primary">שמירה</button><button type="button" class="inv-ghost" data-inv-close>ביטול</button></div></form></section></div>'+
@@ -4252,17 +4256,19 @@
     function renderFields(){
       const t=draft.type,trade=t==='buy'||t==='sell';
       form.querySelectorAll('[data-type]').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.type===t)));
-      const dateField=field('date','תאריך',inp('date',draft.date,'type="date" max="'+E.todayIso()+'"'));
+      const yest=new Date(Date.now()-864e5),yIso=yest.getFullYear()+'-'+String(yest.getMonth()+1).padStart(2,'0')+'-'+String(yest.getDate()).padStart(2,'0');
+      const dateField=field('date','תאריך',inp('date',draft.date,'type="date" max="'+E.todayIso()+'"'),'<button type="button" class="inv-mini" tabindex="-1" data-date-set="'+E.todayIso()+'">היום</button> <button type="button" class="inv-mini" tabindex="-1" data-date-set="'+yIso+'">אתמול</button>');
       let h='';
       if(trade){
         const market=draft.market||marketFor(draft.symbol),cur=E.MARKETS[market].currency,c=CUR_LABEL[cur];
         const held=draft.symbol?E.heldOn(pf,E.cleanSymbol(draft.symbol),draft.date||E.todayIso(),editing):null;
         h+=field('symbol','נייר',inp('symbol',draft.symbol,'type="text" list="invSymbols" autocomplete="off" dir="ltr" placeholder="AAPL" autocapitalize="characters"'),t==='sell'&&draft.symbol?'מוחזקות בתאריך: '+held:'');
-        h+=dateField;
         const marketField=field('market','שוק','<select name="market"'+(t==='sell'||pf.instruments[E.cleanSymbol(draft.symbol)]?' disabled':'')+'>'+Object.entries(E.MARKETS).map(([k,m])=>'<option value="'+k+'"'+(k===market?' selected':'')+'>'+m.label+' ('+CUR_LABEL[m.currency]+')</option>').join('')+'</select>');
-        h+=field('qty','כמות',inp('qty',draft.qty));
-        h+=field('price','מחיר ליחידה ('+c+')',inp('price',draft.price));
+        const lastQ=draft.symbol?mk.quotes[E.cleanSymbol(draft.symbol)]:null;
+        h+=field('qty','כמות',inp('qty',draft.qty),t==='sell'&&held>0?'<button type="button" class="inv-mini" tabindex="-1" data-fill-qty="'+held+'">כל הכמות ('+held+')</button>':'');
+        h+=field('price','מחיר ליחידה ('+c+')',inp('price',draft.price),lastQ?'<button type="button" class="inv-mini" tabindex="-1" data-fill-price="'+lastQ.price+'">מחיר אחרון: '+lastQ.price+'</button>':'');
         h+=field('fee','עמלה ('+c+')',inp('fee',draft.fee),'ברירת מחדל ל'+E.MARKETS[market].label+': '+pf.settings.fees[market]+' '+c);
+        h+=dateField;   // after the numbers: symbol → quantity → price → fee, then the date (defaults to today)
         if(cur==='USD')h+=field('fxRate','שער דולר ביום העסקה'+(draft.fxSource==='ecb'?' (ECB)':''),inp('fxRate',draft.fxRate)+'<button type="button" class="inv-mini" data-fx-fill>שער ECB לתאריך</button>',draft.opening?'מומלץ באחזקת פתיחה בדולרים: כך העלות נכנסת להון הפתיחה בשקלים.':'לא חובה. מאפשר לחשב רווח בשקלים ולהפריד את השפעת הדולר.');
         if(t==='buy')h+='<label class="inv-check inv-wide"><input type="checkbox" name="opening"'+(draft.opening?' checked':'')+'><span><b>אחזקה מלפני תחילת התיעוד</b> · לא יורדת מהמזומן, והעלות שלה נספרת כהון שהבאת (לא כרווח)</span></label>';
         h+=marketField;
@@ -4312,15 +4318,20 @@
       opener=document.activeElement;editing=id||null;feeTouched=!!id;
       const t=id&&pf.transactions.find(x=>x.id===id);
       if(t){draft={...t,market:t.symbol?E.instrumentOf(pf,t.symbol).market:undefined,qty:t.qty,price:t.price,fee:t.fee,fxRate:t.fxRate,amount:t.amount,rate:t.rate};}
-      else{draft={type:type||'buy',date:E.todayIso(),note:'',currency:'ILS',from:'ILS'};draft.market='US';draft.fee=pf.settings.fees.US;if(prefill)Object.assign(draft,prefill);}
+      else{draft={type:type||'buy',date:E.todayIso(),note:'',currency:'ILS',from:'ILS'};draft.market='US';draft.fee=pf.settings.fees.US;if(prefill){Object.assign(draft,prefill);if(prefill.market&&prefill.fee===undefined)draft.fee=pf.settings.fees[prefill.market]??draft.fee;}}
       q('invTxTitle').textContent=t?'עריכת '+TYPE_LABEL[t.type]:'פעולה חדשה';
       q('invTxDelete').hidden=!t;
+      form.querySelector('[data-again]').hidden=!!t;
       form.querySelectorAll('.inv-seg button').forEach(b=>b.disabled=!!t&&((t.type==='buy'||t.type==='sell')!==(b.dataset.type==='buy'||b.dataset.type==='sell')));
       renderFields();overlay.hidden=false;document.body.classList.add('schedule-open');
-      setTimeout(()=>form.querySelector(t?'[name="qty"],[name="amount"]':'[name="symbol"],[name="amount"]')?.focus(),30);
+      // Focus at once: fast typists start typing as soon as the form appears.
+      form.querySelector(t?'[name="qty"],[name="amount"]':'[name="symbol"],[name="amount"]')?.focus();
     }
     function closeOverlays(){overlay.hidden=true;q('invSetOverlay').hidden=true;document.body.classList.remove('schedule-open');opener?.focus?.();}
     form.addEventListener('click',async e=>{
+      const quick=e.target.closest('[data-date-set],[data-fill-qty],[data-fill-price]');
+      if(quick){if(quick.dataset.dateSet)draft.date=quick.dataset.dateSet;if(quick.dataset.fillQty)draft.qty=quick.dataset.fillQty;if(quick.dataset.fillPrice)draft.price=quick.dataset.fillPrice;renderFields();
+        form.querySelector(quick.dataset.fillQty?'[name="price"]':quick.dataset.fillPrice?'[name="fee"]':'[name="symbol"],[name="amount"]')?.focus();return;}
       if(e.target.closest('[data-fx-fill]')){const btn=e.target.closest('[data-fx-fill]');btn.disabled=true;
         try{const r=await ecbRates([draft.date]);if(r[draft.date]){draft.fxRate=r[draft.date];draft.fxSource='ecb';renderFields();}else{btn.textContent='אין שער לתאריך';}}catch(_){btn.textContent='הטעינה נכשלה';}return;}
       const b=e.target.closest('.inv-seg [data-type]');if(!b||b.disabled)return;
@@ -4355,7 +4366,11 @@
       }
       form.querySelectorAll('[data-err]').forEach(x=>x.textContent=errors[x.dataset.err]||'');
       if(Object.keys(errors).length){form.querySelector('[data-field="'+Object.keys(errors)[0]+'"] input,[data-field="'+Object.keys(errors)[0]+'"] select')?.focus();return;}
-      pf=E.normalize(st);persist();closeOverlays();refresh();
+      const again=!editing&&e.submitter&&e.submitter.hasAttribute('data-again');
+      const keep={date:tx.date,market:draft.market,currency:draft.currency,from:draft.from};
+      pf=E.normalize(st);persist();
+      if(again){refresh();openTx(tx.type,null,keep);toast(TYPE_LABEL[tx.type]+(tx.symbol?' '+tx.symbol:'')+' נשמרה · אפשר להזין את הבאה');return;}
+      closeOverlays();refresh();
       if(tx.type==='buy'||tx.type==='sell'){const tr=calc.txInfo[tx.id]?.tradeId;if(tr)ui.open.add(tr);renderLog();}
       toast(editing?'הפעולה עודכנה':'הפעולה נשמרה');
     });
@@ -4401,6 +4416,7 @@
       const act=el.dataset.act;
       if(act==='add')openTx(el.dataset.type);
       else if(act==='edit')openTx(null,el.dataset.id);
+      else if(act==='dup'){const t=pf.transactions.find(x=>x.id===el.dataset.id);if(t){const {id,importKey,source,tradePlan,opening,...rest}=t;openTx(t.type,null,{...rest,date:E.todayIso(),note:'',market:t.symbol?E.instrumentOf(pf,t.symbol).market:undefined});}}
       else if(act==='delete')removeTx(el.dataset.id);
       else if(act==='toggle'){const id=el.dataset.id;ui.open.has(id)?ui.open.delete(id):ui.open.add(id);if(ui.logMode!=='trades')ui.logMode='trades';renderLog();
         if(el.tagName==='rect'){activateView('log');q('investBody-log').querySelector('[data-id="'+id+'"].inv-trade')?.scrollIntoView({block:'center'});}}
@@ -4424,6 +4440,8 @@
       else if(act==='pattern'){ui.pattern=el.dataset.val;renderAnalysis();}
       if(el.closest('#invMenu'))setMenu(false);
     });
+    root.addEventListener('click',()=>saveUi());
+    root.addEventListener('change',()=>saveUi());
     root.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr[data-act="toggle"],tr[data-act="analyze"]')){e.preventDefault();e.target.click();}});
     root.addEventListener('input',e=>{if(e.target.id==='invSearch'){ui.search=e.target.value;const pos=e.target.selectionStart;renderLog();const s=q('invSearch');s.focus();s.setSelectionRange(pos,pos);}});
     root.addEventListener('change',e=>{

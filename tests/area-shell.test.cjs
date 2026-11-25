@@ -39,7 +39,9 @@ test('modules load inside the app closure in dependency order, before startup',(
  const js=manifest.javascript,at=n=>js.indexOf(n);
  assert.ok(at('97-portfolio-engine')>-1&&at('97-portfolio-engine')<at('98-investments'));
  assert.ok(at('98-area-shell')>-1&&at('98-area-shell')<at('98-investments')&&at('98-investments')<at('99-startup'));
- assert.deepEqual(manifest.css.slice(-2),['99-area-shell','99-investments']);
+ const css=manifest.css,ci=n=>css.indexOf(n);
+ assert.ok(ci('99-area-shell')>-1&&ci('99-area-shell')<ci('99-investments'),'investments styles load after the area shell');
+ assert.ok(ci('99-investments')>=css.length-2,'investments styles come at the end of the cascade');
 });
 
 // Minimal fake DOM for running the module on its own.
