@@ -122,3 +122,18 @@ test('refresh timing is separate from staleness: a stock price from yesterday is
   assert.equal(M.needsRefresh({ ...q, fetchedAt: '2026-11-25T11:40:00Z' }, 'stock', NOW), true);
   assert.equal(M.needsRefresh({ price: 1, source: 'manual', asOf: '2026-11-25' }, 'stock', NOW), true);
 });
+
+test('history route: daily bars oldest first, agorot to shekels, plan limits passed on', async () => {
+  const { normalizeSeries } = await import('../netlify/functions/market.mjs');
+  const s = normalizeSeries({ meta: { currency: 'ILA' }, values: [{ datetime: '2026-06-02', open: '1600', high: '1650', low: '1590', close: '1620' }, { datetime: '2026-06-01', open: '1500', high: '1610', low: '1490', close: '1600' }], status: 'ok' });
+  assert.equal(s.bars[0][0], '2026-06-01');
+  assert.equal(s.bars[1][4], 16.2);
+  assert.equal(s.currency, 'ILS');
+  const res = await handle(req('?history=AAA&start=2026-06-01&end=2026-06-30'), { TWELVEDATA_API_KEY: 'k' }, () => reply({ code: 403, message: 'available starting with the Pro plan', status: 'error' }), 3e12);
+  const body = await res.json();
+  assert.equal(body.bars.length, 0);
+  assert.match(body.error, /Pro plan/);
+  const limited = await handle(req('?history=BBB&start=2026-06-01&end=2026-06-30'), { TWELVEDATA_API_KEY: 'k' }, () => reply({ code: 429, message: 'limit', status: 'error' }, 429), 3e12);
+  assert.equal(limited.status, 429);
+  assert.equal((await handle(req('?history=AAA&start=bad&end=2026-06-30'), { TWELVEDATA_API_KEY: 'k' })).status, 400);
+});

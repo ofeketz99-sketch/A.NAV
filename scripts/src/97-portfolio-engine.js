@@ -20,6 +20,16 @@
     const uid=p=>(p||'t')+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
     const cleanSymbol=s=>String(s||'').trim().toUpperCase().replace(/\s+/g,'');
 
+    // Trade plan kept on the trade's first buy: reason, tags, target, stop, planned holding days, exit reason.
+    function normalizePlan(p){
+      if(!p||typeof p!=='object')return null;
+      const txt=(v,n)=>String(v??'').trim().slice(0,n);
+      const pos=v=>{const x=Number(v);return Number.isFinite(x)&&x>0?x:null;};
+      const out={reason:txt(p.reason,600),tags:(Array.isArray(p.tags)?p.tags:String(p.tags||'').split(','))
+        .map(x=>txt(x,30)).filter(Boolean).slice(0,10),target:pos(p.target),stop:pos(p.stop),
+        horizonDays:pos(p.horizonDays)?Math.round(pos(p.horizonDays)):null,exitReason:txt(p.exitReason,600)};
+      return out.reason||out.tags.length||out.target||out.stop||out.horizonDays||out.exitReason?out:null;
+    }
     function defaults(){
       return {schema:SCHEMA,settings:{fees:{US:7.5,TASE:7,CRYPTO:0}},instruments:{},transactions:[],snapshots:[]};
     }
@@ -41,7 +51,7 @@
           tx.symbol=cleanSymbol(t.symbol);if(!tx.symbol)continue;
           tx.qty=q8(t.qty);tx.price=Number(t.price)||0;tx.fee=Math.max(0,Number(t.fee)||0);
           if(Number.isFinite(t.fxRate)&&t.fxRate>0)tx.fxRate=t.fxRate;
-          if(t.tradePlan&&typeof t.tradePlan==='object')tx.tradePlan=t.tradePlan;
+          const plan=normalizePlan(t.tradePlan);if(plan)tx.tradePlan=plan;
         }else if(t.type==='fx'){
           tx.from=CURRENCIES.includes(t.from)?t.from:'ILS';tx.amount=Number(t.amount)||0;tx.rate=Number(t.rate)||0;
         }else{
@@ -224,5 +234,5 @@
       }
       return qty;
     }
-    return {SCHEMA,MARKETS,TYPES,defaults,normalize,compute,validate,heldOn,cashFlows,instrumentOf,ordered,cleanSymbol,isDate,todayIso,uid,cents,dayDiff};
+    return {SCHEMA,MARKETS,TYPES,defaults,normalize,normalizePlan,compute,validate,heldOn,cashFlows,instrumentOf,ordered,cleanSymbol,isDate,todayIso,uid,cents,dayDiff};
   })();

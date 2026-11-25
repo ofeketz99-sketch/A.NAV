@@ -2904,6 +2904,16 @@
     const uid=p=>(p||'t')+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
     const cleanSymbol=s=>String(s||'').trim().toUpperCase().replace(/\s+/g,'');
 
+    // Trade plan kept on the trade's first buy: reason, tags, target, stop, planned holding days, exit reason.
+    function normalizePlan(p){
+      if(!p||typeof p!=='object')return null;
+      const txt=(v,n)=>String(v??'').trim().slice(0,n);
+      const pos=v=>{const x=Number(v);return Number.isFinite(x)&&x>0?x:null;};
+      const out={reason:txt(p.reason,600),tags:(Array.isArray(p.tags)?p.tags:String(p.tags||'').split(','))
+        .map(x=>txt(x,30)).filter(Boolean).slice(0,10),target:pos(p.target),stop:pos(p.stop),
+        horizonDays:pos(p.horizonDays)?Math.round(pos(p.horizonDays)):null,exitReason:txt(p.exitReason,600)};
+      return out.reason||out.tags.length||out.target||out.stop||out.horizonDays||out.exitReason?out:null;
+    }
     function defaults(){
       return {schema:SCHEMA,settings:{fees:{US:7.5,TASE:7,CRYPTO:0}},instruments:{},transactions:[],snapshots:[]};
     }
@@ -2925,7 +2935,7 @@
           tx.symbol=cleanSymbol(t.symbol);if(!tx.symbol)continue;
           tx.qty=q8(t.qty);tx.price=Number(t.price)||0;tx.fee=Math.max(0,Number(t.fee)||0);
           if(Number.isFinite(t.fxRate)&&t.fxRate>0)tx.fxRate=t.fxRate;
-          if(t.tradePlan&&typeof t.tradePlan==='object')tx.tradePlan=t.tradePlan;
+          const plan=normalizePlan(t.tradePlan);if(plan)tx.tradePlan=plan;
         }else if(t.type==='fx'){
           tx.from=CURRENCIES.includes(t.from)?t.from:'ILS';tx.amount=Number(t.amount)||0;tx.rate=Number(t.rate)||0;
         }else{
@@ -3108,7 +3118,7 @@
       }
       return qty;
     }
-    return {SCHEMA,MARKETS,TYPES,defaults,normalize,compute,validate,heldOn,cashFlows,instrumentOf,ordered,cleanSymbol,isDate,todayIso,uid,cents,dayDiff};
+    return {SCHEMA,MARKETS,TYPES,defaults,normalize,normalizePlan,compute,validate,heldOn,cashFlows,instrumentOf,ordered,cleanSymbol,isDate,todayIso,uid,cents,dayDiff};
   })();
 
   // Excel import: reads the user's workbook (no libraries), recognises sheets by their headers and turns rows into
@@ -3466,7 +3476,139 @@
       next.lastRefresh=new Date(now).toISOString();
       return {market:next,report};
     }
-    return {refresh,isStale,needsRefresh,kindOf,SOURCES,MAX_AGE,REFRESH_AFTER,providers,CRYPTO};
+    // ---------- daily history for trade analysis ----------
+    // Bars: [date, open, high, low, close]. Stocks through the site function (provider key stays on the server),
+    // crypto from Coinbase in chunks of up to 300 days.
+    async function fetchHistory(symbol,market,from,to,opts){
+      const fetchFn=opts?.fetch||(typeof fetch==='function'?fetch.bind(globalThis):null),endpoint=opts?.endpoint||'/api/market';
+      if(kindOf(symbol,market)==='crypto'){
+        const out=[];let start=from;
+        while(start<=to){
+          const endD=new Date(Date.parse(start+'T00:00:00Z')+289*DAY).toISOString().slice(0,10),stop=endD<to?endD:to;
+          const rows=await once('cbh:'+symbol+start+stop,()=>getJson(fetchFn,'https://api.exchange.coinbase.com/products/'+baseCoin(symbol)+'-USD/candles?granularity=86400&start='+start+'T00:00:00Z&end='+stop+'T23:59:59Z'));
+          for(const r of rows||[])out.push([new Date(r[0]*1000).toISOString().slice(0,10),r[3],r[2],r[1],r[4]]);
+          start=new Date(Date.parse(stop+'T00:00:00Z')+DAY).toISOString().slice(0,10);
+        }
+        return {bars:mergeBars([],out),source:'coinbase'};
+      }
+      const s=market==='TASE'?symbol+':TASE':symbol;
+      const r=await fetchFn(endpoint+'?history='+encodeURIComponent(s)+'&start='+from+'&end='+to);
+      if(r.status===429){const e=new Error('rate-limit');e.rateLimit=true;throw e;}
+      if(r.status===503){const e=new Error('not-configured');e.notConfigured=true;throw e;}
+      if(!r.ok){const e=new Error('HTTP '+r.status);e.status=r.status;throw e;}
+      const j=await r.json();
+      return {bars:Array.isArray(j.bars)?j.bars:[],source:j.provider||'twelvedata',error:j.error||null};
+    }
+    function mergeBars(a,b){const m=new Map();for(const x of a||[])m.set(x[0],x);for(const x of b||[])m.set(x[0],x);return [...m.values()].sort((x,y)=>x[0]<y[0]?-1:1);}
+    // A stored entry covers [from, to] when it was fetched for that range; a range ending today is refreshed after 12 hours.
+    function covers(entry,from,to,today,now){
+      if(!entry)return false;
+      if(entry.from>from||entry.to<to)return false;
+      if(to>=today&&now-Date.parse(entry.fetchedAt||0)>12*HOUR)return false;
+      return true;
+    }
+    return {refresh,isStale,needsRefresh,kindOf,SOURCES,MAX_AGE,REFRESH_AFTER,providers,CRYPTO,fetchHistory,mergeBars,covers};
+  })();
+
+  // Trade analysis on daily bars ([date, open, high, low, close]). Pure calculations, no DOM.
+  // Everything is measured on end-of-day data: highs and lows are the day's extremes, so on the entry and exit days
+  // they may come from before the purchase or after the sale. Results say so instead of claiming intraday precision.
+  const TradeAnalysis=(()=>{
+    // Thresholds for patterns, shown to the user next to each pattern.
+    const TH={upThenLoss:5,ranAfter:10,droppedAfter:-10,nearLevel:0.5};
+    const HORIZONS=[['d1',1,'יום מסחר'],['w1',5,'שבוע (5 ימי מסחר)'],['m1',21,'חודש (21 ימי מסחר)']];
+    const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+    // Range of history a trade needs: a little before entry, and enough after exit for a month plus a custom period.
+    function windowFor(trade,today,customDays){
+      const after=Math.max(45,(customDays||0)+15);
+      const end=trade.endDate?addDays(trade.endDate,after):today;
+      return {from:addDays(trade.startDate,-20),to:end>today?today:end};
+    }
+    const firstAfter=(bars,date)=>{let lo=0,hi=bars.length;while(lo<hi){const m=(lo+hi)>>1;if(bars[m][0]>date)hi=m;else lo=m+1;}return lo;};
+    const firstOnOrAfter=(bars,date)=>{let lo=0,hi=bars.length;while(lo<hi){const m=(lo+hi)>>1;if(bars[m][0]>=date)hi=m;else lo=m+1;}return lo;};
+    const pct=(a,b)=>b?(a/b-1)*100:null;
+
+    function analyze(trade,txs,bars,opts){
+      const today=opts?.today,customDays=opts?.customDays||63;
+      const list=(txs||[]).filter(t=>t&&(t.type==='buy'||t.type==='sell')).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+      const buys=list.filter(t=>t.type==='buy'),sells=list.filter(t=>t.type==='sell');
+      const bq=buys.reduce((s,t)=>s+t.qty,0);
+      const avgEntry=bq?buys.reduce((s,t)=>s+t.qty*t.price,0)/bq:null;
+      const sq=sells.reduce((s,t)=>s+t.qty,0);
+      const avgExit=sq?sells.reduce((s,t)=>s+t.qty*t.price,0)/sq:null;
+      const B=Array.isArray(bars)?bars:[];
+      const end=trade.endDate||today;
+      const hold=B.filter(b=>b[0]>=trade.startDate&&b[0]<=end);
+      const res={tradeId:trade.id,symbol:trade.symbol,currency:trade.currency,status:trade.status,startDate:trade.startDate,endDate:trade.endDate,days:trade.days,
+        net:trade.net,returnPct:trade.returnPct,avgEntry,avgExit,coverage:hold.length?'ok':B.length?'partial':'none',bars:B.length,
+        mfe:null,mae:null,exits:[],after:{},hypothetical:{},plan:null,adherence:{},patterns:[]};
+      if(hold.length&&avgEntry){
+        let hi=hold[0],lo=hold[0];for(const b of hold){if(b[2]>hi[2])hi=b;if(b[3]<lo[3])lo=b;}
+        res.mfe={pct:pct(hi[2],avgEntry),price:hi[2],date:hi[0]};
+        res.mae={pct:pct(lo[3],avgEntry),price:lo[3],date:lo[0]};
+      }
+      // After each sale: k trading days later (close), and a custom number of calendar days.
+      for(const s of sells){
+        const i=firstAfter(B,s.date),row={txId:s.id,date:s.date,qty:s.qty,price:s.price,after:{}};
+        for(const [key,k] of HORIZONS){const b=B[i+k-1];row.after[key]=b?{date:b[0],close:b[4],pct:pct(b[4],s.price)}:null;}
+        const cb=B[firstOnOrAfter(B,addDays(s.date,customDays))];
+        row.after.custom=cb&&cb[0]>s.date?{date:cb[0],close:cb[4],pct:pct(cb[4],s.price),days:customDays}:null;
+        res.exits.push(row);
+      }
+      // Weighted by quantity sold; a horizon counts only exits that already have data, and says how many.
+      for(const key of [...HORIZONS.map(h=>h[0]),'custom']){
+        const have=res.exits.filter(e=>e.after[key]);
+        const q=have.reduce((s,e)=>s+e.qty,0);
+        res.after[key]=have.length?{pct:have.reduce((s,e)=>s+e.qty*e.after[key].pct,0)/q,exits:have.length,of:res.exits.length}:null;
+        // Hypothetical: the sold quantity kept until then, sold at that close. No extra fees, no dividends.
+        res.hypothetical[key]=have.length?{diff:Math.round(have.reduce((s,e)=>s+e.qty*(e.after[key].close-e.price),0)*100),exits:have.length,of:res.exits.length}:null;
+      }
+      // Plan and how the trade followed it (the plan is judged on its own terms, not by what happened later).
+      const p=trade.plan||null;
+      if(p){
+        res.plan=p;
+        const target=Number(p.target)||null,stop=Number(p.stop)||null,tol=TH.nearLevel/100;
+        if(target){const b=hold.find(x=>x[2]>=target);res.adherence.targetReached=b?{date:b[0]}:false;}
+        if(stop){const b=hold.find(x=>x[3]<=stop);res.adherence.stopTouched=b?{date:b[0]}:false;}
+        if(trade.status==='closed'&&avgExit){
+          const last=sells[sells.length-1].price;
+          res.adherence.exit=target&&last>=target*(1-tol)?'target':stop&&last<=stop*(1+tol)?(last<stop*(1-tol)?'below-stop':'stop'):target?'before-target':stop?'above-stop':'no-levels';
+        }
+        if(p.horizonDays>0&&trade.days!==null){
+          const r=trade.days/p.horizonDays;
+          res.adherence.holding=trade.status==='open'?(r>1?'over-plan':'within-plan'):r<0.75?'shorter':r>1.25?'longer':'as-planned';
+        }
+      }
+      // Patterns with explicit definitions (see PATTERNS).
+      if(trade.status==='closed'){
+        if(trade.net<0&&res.mfe&&res.mfe.pct>=TH.upThenLoss)res.patterns.push('upThenLoss');
+        if(res.after.m1&&res.after.m1.pct>=TH.ranAfter)res.patterns.push('ranAfter');
+        if(res.after.m1&&res.after.m1.pct<=TH.droppedAfter)res.patterns.push('droppedAfter');
+        if(res.adherence.exit==='before-target')res.patterns.push('beforeTarget');
+        if(res.adherence.exit==='below-stop')res.patterns.push('belowStop');
+      }
+      if(!p)res.patterns.push('noPlan');
+      return res;
+    }
+    const PATTERNS={
+      upThenLoss:{label:'עלתה ונסגרה בהפסד',def:'עסקה סגורה עם נטו שלילי, שבמהלכה הגבוה היומי הגיע ל־'+TH.upThenLoss+'% ומעלה מעל מחיר הכניסה הממוצע.'},
+      ranAfter:{label:'המשיכה לעלות אחרי היציאה',def:'חודש (21 ימי מסחר) אחרי המכירות, מחיר הסגירה גבוה ב־'+TH.ranAfter+'% ומעלה ממחיר המכירה (ממוצע משוקלל לפי כמות). זו תוצאה בדיעבד, לא בהכרח טעות.'},
+      droppedAfter:{label:'ירדה אחרי היציאה',def:'חודש אחרי המכירות, מחיר הסגירה נמוך ב־'+Math.abs(TH.droppedAfter)+'% ומעלה ממחיר המכירה.'},
+      beforeTarget:{label:'יצאה לפני היעד',def:'נקבע יעד, והמכירה האחרונה הייתה מתחתיו ומעל הסטופ.'},
+      belowStop:{label:'נסגרה מתחת לסטופ',def:'המכירה האחרונה נעשתה במחיר נמוך מהסטופ שנקבע (מעבר לסטייה של '+TH.nearLevel+'%).'},
+      noPlan:{label:'בלי תוכנית',def:'לא נרשמו לעסקה יעד, סטופ, סיבה או תקופה מתוכננת.'}
+    };
+    function summarize(list){
+      const done=list.filter(a=>a.status==='closed');
+      const avg=key=>{const v=done.map(a=>a.after[key]?.pct).filter(x=>x!==null&&x!==undefined);return v.length?{pct:v.reduce((s,x)=>s+x,0)/v.length,n:v.length}:null;};
+      const counts={};for(const k of Object.keys(PATTERNS))counts[k]=list.filter(a=>a.patterns.includes(k)).length;
+      const withMfe=done.filter(a=>a.mfe);
+      return {closed:done.length,withHistory:done.filter(a=>a.coverage!=='none').length,counts,
+        after:{d1:avg('d1'),w1:avg('w1'),m1:avg('m1')},
+        avgMfe:withMfe.length?withMfe.reduce((s,a)=>s+a.mfe.pct,0)/withMfe.length:null,
+        avgMae:withMfe.length?withMfe.reduce((s,a)=>s+a.mae.pct,0)/withMfe.length:null};
+    }
+    return {analyze,summarize,windowFor,PATTERNS,HORIZONS,TH,addDays};
   })();
 
   // Top-level areas: the existing calculators and the investments workspace share one frame (logo, header, footer).
@@ -3478,7 +3620,7 @@
     const AREA_KEY='anav.shell.v1';
     const INVEST_COLOR='#2f6461';
     const areas=['calc','invest'];
-    const views=['log','holdings','performance','cash'];
+    const views=['log','holdings','performance','cash','analysis'];
     let area='calc',view='log';
     try{
       const saved=JSON.parse(localStorage.getItem(AREA_KEY)||'null');
@@ -3563,7 +3705,7 @@
     let pf=E.normalize(readJson(PF_KEY));
     let mk=normalizeMarket(readJson(MK_KEY));
     let calc=null;
-    const ui={logMode:'trades',filter:'all',search:'',sort:{key:'startDate',dir:-1},open:new Set(),range:'all',holdBy:'value'};
+    const ui={logMode:'trades',filter:'all',search:'',sort:{key:'startDate',dir:-1},open:new Set(),range:'all',holdBy:'value',customDays:63,pattern:''};
     function normalizeMarket(raw){
       const m={quotes:{},fx:{},status:{}};
       const meta=v=>({asOf:String(v.asOf||''),source:String(v.source||'manual'),...(v.fetchedAt?{fetchedAt:String(v.fetchedAt)}:{}),...(Number.isFinite(v.previousClose)?{previousClose:v.previousClose}:{})});
@@ -3611,7 +3753,7 @@
     // ---------- rendering ----------
     function refresh(){
       calc=E.compute(pf,mk);
-      renderLog();renderHoldings();renderPerformance();renderCash();
+      renderLog();renderHoldings();renderPerformance();renderCash();renderAnalysis();
       const list=q('invSymbols');if(list)list.innerHTML=Object.keys(pf.instruments).sort().map(s=>'<option value="'+esc(s)+'">').join('');
     }
     function curTotals(map,signed=true){return ['USD','ILS'].filter(c=>map[c]).map(c=>money(map[c],c,{signed})).join(' · ')||money(0,'USD');}
@@ -3659,7 +3801,7 @@
           '<td><span class="inv-status inv-'+t.status+'">'+(t.status==='open'?'פתוחה':'סגורה')+'</span></td><td>'+date(t.startDate)+'</td><td>'+date(t.endDate)+'</td>'+
           '<td>'+num(t.days)+(t.status==='open'?' <small class="inv-muted">עד היום</small>':'')+'</td><td>'+money(t.buyCost,t.currency)+'</td><td>'+money(t.sells?t.sellProceeds:null,t.currency)+'</td>'+
           '<td>'+money(t.fees,t.currency)+'</td><td>'+(t.status==='closed'?money(t.net,t.currency,{signed:true}):'<small class="inv-muted" title="רווח ממומש עד עכשיו לפי עלות ממוצעת">ממומש '+money(t.realized,t.currency,{signed:true})+'</small>')+'</td><td>'+pct(t.returnPct,{signed:true})+'</td></tr>';
-        if(isOpen)h+='<tr class="inv-sub"><td colspan="10">'+actionsTable(t.txIds.map(id=>byId[id]).filter(Boolean),true)+'</td></tr>';
+        if(isOpen)h+='<tr class="inv-sub"><td colspan="10"><button type="button" class="invest-btn inv-sub-btn" data-act="analyze" data-id="'+t.id+'">ניתוח העסקה ותוכנית המסחר</button>'+actionsTable(t.txIds.map(id=>byId[id]).filter(Boolean),true)+'</td></tr>';
       }
       return h+'</tbody></table></div>';
     }
@@ -3696,7 +3838,7 @@
       let h='<div class="invest-kpis">'+
         kpi('שווי תיק (₪)',c.totalIls===null?DASH:money(c.totalIls,'ILS'),c.totalIls===null?(c.missingPrices.length?'חסר מחיר: '+c.missingPrices.map(esc).join(', '):'חסר שער דולר'):'כולל מזומן')+
         kpi('מזומן',money(c.cash.USD,'USD')+' · '+money(c.cash.ILS,'ILS'),c.cash.USD<0?'<span class="inv-neg">מזומן דולרי שלילי: חסרה המרת מט״ח?</span>':'נגזר מכל הפעולות')+
-        kpi('רווח שטרם מומש',unrealKnown?curTotals(unreal):DASH,unrealKnown?'לפי המחירים שהוזנו':'חסרים מחירים')+
+        kpi('רווח שטרם מומש',unrealKnown?curTotals(unreal):DASH,unrealKnown?'לפי המחירים האחרונים':'חסרים מחירים')+
         '<div class="invest-kpi"><span>שער דולר (USDILS)</span><strong><input class="inv-inline" type="text" inputmode="decimal" data-act="fx" value="'+(rate?rate.rate:'')+'" placeholder="הזן שער" aria-label="שער דולר"></strong><small>'+(rate?srcLabel(rate,'fx'):'נדרש לשווי בשקלים')+'</small></div>'+
         '</div>';
       if(!c.holdings.length){box.innerHTML=h+priceBar()+empty(ICON.pie,'אין כרגע אחזקות','אחזקות מחושבות אוטומטית מהקניות והמכירות בלוג.');return;}
@@ -3969,9 +4111,12 @@
       else if(act==='restore')q('invRestoreFile').click();
       else if(act==='settings')openSettings();
       else if(act==='prices')refreshPrices(true);
+      else if(act==='analyze')openTrade(el.dataset.id);
+      else if(act==='hist-load')loadHistory();
+      else if(act==='pattern'){ui.pattern=el.dataset.val;renderAnalysis();}
       if(el.closest('#invMenu'))setMenu(false);
     });
-    root.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr[data-act="toggle"]')){e.preventDefault();e.target.click();}});
+    root.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr[data-act="toggle"],tr[data-act="analyze"]')){e.preventDefault();e.target.click();}});
     root.addEventListener('input',e=>{if(e.target.id==='invSearch'){ui.search=e.target.value;const pos=e.target.selectionStart;renderLog();const s=q('invSearch');s.focus();s.setSelectionRange(pos,pos);}});
     root.addEventListener('change',e=>{
       const el=e.target;
@@ -4144,6 +4289,191 @@
       const c=m.counts;
       toast('יובאו '+c.transactions+' פעולות ו־'+c.snapshots+' רישומי שווי',()=>{pf=before.pf;mk=before.mk;persist();refresh();toast('הייבוא בוטל');});
     });
+
+    // ---------- trade analysis (v051): history, patterns, per-trade detail and trade plan ----------
+    const HIST_KEY='anav.history.v1';
+    let hist=(()=>{const h=readJson(HIST_KEY);return h&&typeof h==='object'?h:{};})();
+    const hs={running:false,done:0,total:0,waitUntil:0,msg:''};
+    const stockCalls=[];
+    const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+    // Wait for the provider limit with a live countdown in the status bar.
+    async function waitLimit(until){
+      hs.waitUntil=until;renderAnalysis();
+      const tick=setInterval(()=>{const el=q('invHistWait');if(el)el.textContent=Math.max(0,Math.ceil((hs.waitUntil-Date.now())/1000));},1000);
+      try{await sleep(Math.max(0,until-Date.now()));}finally{clearInterval(tick);hs.waitUntil=0;}
+    }
+    function saveHist(){try{localStorage.setItem(HIST_KEY,JSON.stringify(hist));}catch(_){hs.msg='אין מקום בדפדפן לשמירת ההיסטוריה. חלק מהניתוח יחושב מחדש בכל טעינה.';}}
+    // The free provider plan allows 8 requests a minute; stay under it and show the wait instead of failing.
+    async function throttle(){
+      for(;;){
+        const now=Date.now();while(stockCalls.length&&now-stockCalls[0]>60000)stockCalls.shift();
+        if(stockCalls.length<7){stockCalls.push(now);hs.waitUntil=0;return;}
+        await waitLimit(stockCalls[0]+60500);
+      }
+    }
+    // One request per symbol, covering every trade in that symbol.
+    function needs(){
+      const today=E.todayIso(),by={};
+      for(const t of calc.trades){const w=TradeAnalysis.windowFor(t,today,ui.customDays);const x=by[t.symbol];by[t.symbol]=x?{from:x.from<w.from?x.from:w.from,to:x.to>w.to?x.to:w.to}:w;}
+      return by;
+    }
+    const hasHist=(s,w)=>MarketData.covers(hist[s],w.from,w.to,E.todayIso(),Date.now());
+    async function loadHistory(symbols){
+      if(hs.running)return;
+      const want=needs(),list=(symbols||Object.keys(want)).filter(s=>want[s]&&!hasHist(s,want[s]));
+      hs.running=true;hs.done=0;hs.total=list.length;hs.msg='';renderAnalysis();
+      for(const s of list){
+        const w=want[s],ins=E.instrumentOf(pf,s),e=hist[s];
+        const from=e&&e.from&&e.from<w.from&&e.bars?.length?e.from:w.from,to=w.to;
+        try{
+          if(MarketData.kindOf(s,ins.market)==='stock')await throttle();
+          let r;
+          try{r=await MarketData.fetchHistory(s,ins.market,from,to,{});}
+          catch(err){if(!err.rateLimit)throw err;stockCalls.length=0;for(let i=0;i<7;i++)stockCalls.push(Date.now());await waitLimit(Date.now()+61000);r=await MarketData.fetchHistory(s,ins.market,from,to,{});}
+          hist[s]={from,to,fetchedAt:new Date().toISOString(),source:r.source,error:r.error||null,bars:MarketData.mergeBars(e?.bars,r.bars)};
+        }catch(err){
+          if(err.notConfigured){hs.msg='ספק מחירי המניות לא מחובר, ולכן אין היסטוריה למניות.';break;}
+          hist[s]={...(e||{}),from:e?.from||from,to:e?.to||to,fetchedAt:new Date().toISOString(),error:String(err.message||err),bars:e?.bars||[]};
+        }
+        hs.done++;saveHist();renderAnalysis();
+      }
+      hs.running=false;hs.waitUntil=0;saveHist();renderAnalysis();
+    }
+    function analyses(){
+      const byId=Object.fromEntries(pf.transactions.map(t=>[t.id,t])),today=E.todayIso();
+      return calc.trades.map(t=>TradeAnalysis.analyze(t,t.txIds.map(id=>byId[id]).filter(Boolean),hist[t.symbol]?.bars||[],{today,customDays:ui.customDays}));
+    }
+    const EXIT_LABEL={target:'יצאה ביעד',stop:'יצאה בסטופ','below-stop':'יצאה מתחת לסטופ','before-target':'יצאה לפני היעד','above-stop':'יצאה מעל הסטופ','no-levels':'בלי יעד וסטופ'};
+    const HOLD_LABEL={shorter:'קצרה מהמתוכנן',longer:'ארוכה מהמתוכנן','as-planned':'לפי התכנון','over-plan':'פתוחה מעבר לתכנון','within-plan':'פתוחה, בתוך התכנון'};
+    const P=TradeAnalysis.PATTERNS;
+    function renderAnalysis(){
+      const box=q('investBody-analysis');if(!box||!calc)return;
+      if(!calc.trades.length){box.innerHTML=empty(ICON.line,'אין עדיין עסקאות לניתוח','הניתוח נבנה מהעסקאות בלוג ומנרות מחיר יומיים.');return;}
+      const list=analyses(),sum=TradeAnalysis.summarize(list),want=needs();
+      const syms=Object.keys(want),have=syms.filter(s=>hasHist(s,want[s])&&hist[s]?.bars?.length),errs=syms.filter(s=>hist[s]?.error);
+      const wait=hs.waitUntil>Date.now()?Math.ceil((hs.waitUntil-Date.now())/1000):0;
+      let h='<div class="inv-pricebar" role="status"><span>היסטוריה יומית: '+have.length+' מתוך '+syms.length+' ניירות</span>'+
+        (hs.running?'<span>טוען '+hs.done+'/'+hs.total+(wait?' · ממתין <b id="invHistWait">'+wait+'</b> שנ׳ למגבלת הספק (8 בקשות לדקה בתוכנית החינמית)':'')+'</span>':'')+
+        (errs.length?'<span class="inv-muted" title="'+esc(errs.map(s=>s+': '+hist[s].error).join('\n'))+'">ללא היסטוריה: '+errs.map(esc).join(', ')+'</span>':'')+
+        (hs.msg?'<span class="inv-neg">'+esc(hs.msg)+'</span>':'')+
+        '<button type="button" class="invest-btn" data-act="hist-load"'+(hs.running||have.length===syms.length?' disabled':'')+'>'+(have.length===syms.length?'ההיסטוריה עדכנית':'טעינת היסטוריה')+'</button></div>';
+      const avgAfter=k=>sum.after[k]?pct(sum.after[k].pct,{signed:true}):DASH;
+      h+='<div class="invest-kpis">'+
+        kpi('עלייה מרבית בזמן ההחזקה',pct(sum.avgMfe,{signed:true,d:1}),'ממוצע לעסקאות סגורות, לפי הגבוה היומי')+
+        kpi('ירידה מרבית בזמן ההחזקה',pct(sum.avgMae,{signed:true,d:1}),'ממוצע, לפי הנמוך היומי')+
+        kpi('אחרי היציאה',avgAfter('d1')+' · '+avgAfter('w1')+' · '+avgAfter('m1'),'יום · שבוע · חודש (ממוצע)')+
+        kpi('עסקאות עם היסטוריה',num(sum.withHistory)+' / '+num(sum.closed),'עסקאות סגורות')+'</div>';
+      h+='<div class="inv-toolbar"><div class="inv-chips inv-patterns" role="group" aria-label="דפוסים">'+
+        '<button type="button" class="inv-chip" data-act="pattern" data-val="" aria-pressed="'+(!ui.pattern)+'">הכול ('+list.length+')</button>'+
+        Object.entries(P).map(([k,p])=>'<button type="button" class="inv-chip" data-act="pattern" data-val="'+k+'" aria-pressed="'+(ui.pattern===k)+'" title="'+esc(p.def)+'">'+p.label+' ('+sum.counts[k]+')</button>').join('')+'</div></div>';
+      h+='<details class="inv-details inv-defs"><summary>איך זה מחושב</summary><ul>'+Object.values(P).map(p=>'<li><b>'+p.label+':</b> '+esc(p.def)+'</li>').join('')+
+        '<li><b>עלייה/ירידה מרבית:</b> הגבוה/הנמוך היומי בתקופת ההחזקה ביחס למחיר הכניסה הממוצע. בימי הכניסה והיציאה הקיצון עשוי להיות לפני הקנייה או אחרי המכירה; אין נתונים תוך־יומיים.</li>'+
+        '<li><b>אחרי היציאה:</b> מחיר הסגירה 1, 5 ו־21 ימי מסחר אחרי כל מכירה, ביחס למחיר המכירה. במכירות חלקיות: ממוצע משוקלל לפי הכמות שנמכרה.</li>'+
+        '<li><b>השוואה להמשך החזקה:</b> היפותטית בלבד: הכמות שנמכרה הייתה נמכרת במחיר הסגירה באותו יום, בלי עמלות נוספות ובלי דיבידנדים.</li></ul></details>';
+      const rows=list.filter(a=>!ui.pattern||a.patterns.includes(ui.pattern)).sort((a,b)=>(b.endDate||'9')>(a.endDate||'9')?1:-1);
+      const af=(a,k)=>a.after[k]?pct(a.after[k].pct,{signed:true,d:1}):DASH;
+      h+=rows.length?'<div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>נייר</th><th>תקופה</th><th>ימים</th><th>נטו</th><th>עלייה מרבית</th><th>ירידה מרבית</th><th>אחרי יום</th><th>אחרי שבוע</th><th>אחרי חודש</th><th>תוכנית</th><th></th></tr></thead><tbody>'+
+        rows.map(a=>'<tr class="inv-trade" data-act="analyze" data-id="'+a.tradeId+'" tabindex="0"><td>'+sym(a.symbol)+(a.status==='open'?' <span class="inv-status inv-open">פתוחה</span>':'')+'</td><td>'+date(a.startDate)+' – '+(a.endDate?date(a.endDate):'היום')+'</td><td>'+num(a.days)+'</td>'+
+          '<td>'+(a.status==='closed'?money(a.net,a.currency,{signed:true}):DASH)+'</td><td>'+(a.mfe?pct(a.mfe.pct,{signed:true,d:1}):a.coverage==='none'?'<small class="inv-muted">אין היסטוריה</small>':DASH)+'</td><td>'+(a.mae?pct(a.mae.pct,{signed:true,d:1}):DASH)+'</td>'+
+          '<td>'+af(a,'d1')+'</td><td>'+af(a,'w1')+'</td><td>'+af(a,'m1')+'</td><td>'+(a.plan?'<span class="inv-type">'+(EXIT_LABEL[a.adherence.exit]||'נקבעה')+'</span>':'<small class="inv-muted">אין</small>')+'</td>'+
+          '<td class="inv-row-tools"><button type="button" data-act="analyze" data-id="'+a.tradeId+'">פירוט</button></td></tr>').join('')+'</tbody></table></div>':'<p class="inv-none">אין עסקאות בדפוס הזה.</p>';
+      box.innerHTML=h;
+      if(taOpen)renderTrade();
+    }
+    // ---------- one trade ----------
+    document.body.insertAdjacentHTML('beforeend','<div class="tool-overlay inv-overlay" id="invTaOverlay" hidden><section class="tool-dialog inv-dialog inv-ta" role="dialog" aria-modal="true" aria-labelledby="invTaTitle">'+
+      '<header class="tool-head"><div><h2 id="invTaTitle"></h2><p id="invTaSub"></p></div><button type="button" class="tool-close" data-ta-close aria-label="סגירה">×</button></header>'+
+      '<div class="tool-content inv-ta-body" id="invTaBody"></div></section></div>');
+    let taOpen=null;
+    async function openTrade(id){
+      taOpen=id;opener=document.activeElement;
+      q('invTaOverlay').hidden=false;document.body.classList.add('schedule-open');renderTrade();
+      const t=calc.trades.find(x=>x.id===id),w=t&&needs()[t.symbol];
+      if(t&&w&&!hasHist(t.symbol,w)&&!hs.running)await loadHistory([t.symbol]);
+    }
+    function closeTrade(){q('invTaOverlay').hidden=true;document.body.classList.remove('schedule-open');taOpen=null;opener?.focus?.();}
+    function renderTrade(){
+      const t=calc.trades.find(x=>x.id===taOpen);if(!t){closeTrade();return;}
+      const a=analyses().find(x=>x.tradeId===t.id),cur=t.currency,H=hist[t.symbol];
+      q('invTaTitle').innerHTML=sym(t.symbol)+' · '+(t.status==='open'?'עסקה פתוחה':'עסקה סגורה');
+      q('invTaSub').textContent=t.startDate.split('-').reverse().join('/')+' – '+(t.endDate?t.endDate.split('-').reverse().join('/'):'היום')+' · '+t.buys+' קניות · '+t.sells+' מכירות';
+      const af=k=>a.after[k]?pct(a.after[k].pct,{signed:true})+(a.after[k].exits<a.after[k].of?' <small class="inv-muted">('+a.after[k].exits+'/'+a.after[k].of+' מכירות)</small>':''):(t.sells?'<small class="inv-muted">עוד לא עבר זמן / אין נתונים</small>':DASH);
+      let h='<div class="invest-kpis">'+
+        kpi('תוצאה בפועל',t.status==='closed'?money(t.net,cur,{signed:true}):'<small>ממומש </small>'+money(t.realized,cur,{signed:true}),t.status==='closed'?'אחרי עמלות · '+(t.returnPct===null?'':pct(t.returnPct,{signed:true})):'העסקה פתוחה')+
+        kpi('משך ההחזקה',num(t.days)+' ימים',a.plan?.horizonDays?'מתוכנן: '+a.plan.horizonDays+' ימים':'')+
+        kpi('עלייה מרבית',a.mfe?pct(a.mfe.pct,{signed:true}):DASH,a.mfe?'גבוה יומי '+date(a.mfe.date):'אין היסטוריה')+
+        kpi('ירידה מרבית',a.mae?pct(a.mae.pct,{signed:true}):DASH,a.mae?'נמוך יומי '+date(a.mae.date):'')+'</div>';
+      h+=taChart(t,a,H?.bars||[]);
+      if(t.sells){
+        h+='<div class="inv-ta-after"><h3>מה קרה אחרי היציאה</h3><div class="invest-kpis">'+kpi('יום מסחר',af('d1'))+kpi('שבוע',af('w1'))+kpi('חודש',af('m1'))+
+          '<div class="invest-kpi"><span>אחרי <input class="inv-inline inv-days" type="number" min="1" max="365" value="'+ui.customDays+'" data-act="custom-days" aria-label="מספר ימים"> ימים</span><strong>'+af('custom')+'</strong><small>ימים קלנדריים</small></div></div>';
+        h+='<div class="inv-table-wrap"><table class="inv-table"><thead><tr><th>מכירה</th><th>כמות</th><th>מחיר</th><th>אחרי יום</th><th>אחרי שבוע</th><th>אחרי חודש</th><th>אחרי '+ui.customDays+' ימים</th></tr></thead><tbody>'+
+          a.exits.map(e=>'<tr><td>'+date(e.date)+'</td><td>'+num(e.qty)+'</td><td>'+money(E.cents(e.price),cur)+'</td>'+['d1','w1','m1','custom'].map(k=>'<td>'+(e.after[k]?pct(e.after[k].pct,{signed:true,d:1})+' <small class="inv-muted">'+money(E.cents(e.after[k].close),cur)+'</small>':DASH)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+        const hy=k=>a.hypothetical[k]?money(a.hypothetical[k].diff,cur,{signed:true}):DASH;
+        h+='<div class="inv-ta-hypo"><b>השוואה היפותטית:</b> אילו הכמות שנמכרה הייתה מוחזקת עוד יום: '+hy('d1')+' · שבוע: '+hy('w1')+' · חודש: '+hy('m1')+' · '+ui.customDays+' ימים: '+hy('custom')+
+          '<br><small>הנחות: מכירה במחיר הסגירה של אותו יום, בלי עמלות נוספות, בלי דיבידנדים ובלי מס. עלייה אחרי המכירה לא מוכיחה לבדה שהמכירה הייתה טעות.</small></div></div>';
+      }
+      const p=a.plan||{};
+      const chips=[];
+      if(a.plan){
+        if(a.adherence.exit)chips.push(EXIT_LABEL[a.adherence.exit]);
+        if(a.adherence.targetReached)chips.push('היעד הושג ב־'+a.adherence.targetReached.date.split('-').reverse().join('/'));else if(a.adherence.targetReached===false)chips.push('היעד לא הושג בזמן ההחזקה');
+        if(a.adherence.stopTouched)chips.push('הסטופ נגע ב־'+a.adherence.stopTouched.date.split('-').reverse().join('/'));
+        if(a.adherence.holding)chips.push('החזקה '+HOLD_LABEL[a.adherence.holding]);
+      }
+      const c=CUR_LABEL[cur];
+      h+='<form class="inv-ta-plan" data-form="plan"><h3>תוכנית המסחר</h3>'+(chips.length?'<div class="inv-ta-chips">'+chips.map(x=>'<span class="inv-type">'+esc(x)+'</span>').join('')+'</div><p class="inv-foot">עמידה בתוכנית נבדקת מול התוכנית עצמה, לא מול מה שקרה אחר כך.</p>':'')+
+        '<div class="inv-grid">'+field('reason','סיבת הכניסה','<textarea name="reason" rows="2" maxlength="600">'+esc(p.reason||'')+'</textarea>')+
+        field('tags','אסטרטגיה / תגיות',inp('tags',(p.tags||[]).join(', '),'type="text" placeholder="מומנטום, דוחות"'),'מופרדות בפסיק')+
+        field('target','יעד רווח ('+c+')',inp('target',p.target??''))+field('stop','סטופ ('+c+')',inp('stop',p.stop??''))+
+        field('horizonDays','תקופת החזקה מתוכננת (ימים)',inp('horizonDays',p.horizonDays??'','type="number" min="1" inputmode="numeric"'))+
+        field('exitReason','סיבת היציאה','<textarea name="exitReason" rows="2" maxlength="600">'+esc(p.exitReason||'')+'</textarea>')+'</div>'+
+        '<div class="inv-form-actions"><button type="submit" class="tool-primary">שמירת התוכנית</button><span class="inv-form-msg" aria-live="polite"></span></div></form>';
+      h+='<p class="inv-foot">מקור המחירים: '+(H?.source?esc((MarketData.SOURCES[H.source]||{label:H.source}).label):'—')+' · נרות יומיים'+(H?.fetchedAt?' · נטען '+ago(H.fetchedAt):'')+(H?.error?' · <span class="inv-neg">'+esc(H.error)+'</span>':'')+'. המחירים לפי ברירת המחדל של הספק; התאמה לפיצולים ולדיבידנדים לא אומתה.</p>';
+      const body=q('invTaBody'),scroll=body.scrollTop;body.innerHTML=h;body.scrollTop=scroll;
+    }
+    // Price line with entries, exits, target and stop. Time runs left to right; one step per trading day.
+    function taChart(t,a,B){
+      if(!B.length)return '<div class="invest-empty inv-ta-empty"><strong>'+(hs.running?'טוען נרות יומיים…':'אין נתוני מחיר לעסקה הזו')+'</strong><p>'+(hist[t.symbol]?.error?esc(hist[t.symbol].error):'הגרף והמדדים יופיעו אחרי טעינת ההיסטוריה.')+'</p></div>';
+      const end=t.endDate||E.todayIso();
+      let i0=B.findIndex(b=>b[0]>=t.startDate);if(i0<0)i0=B.length-1;
+      let i1=B.findIndex(b=>b[0]>end);if(i1<0)i1=B.length;
+      const s=Math.max(0,i0-10),e=Math.min(B.length,i1+30),V=B.slice(s,e);
+      const byId=Object.fromEntries(pf.transactions.map(x=>[x.id,x])),txs=t.txIds.map(id=>byId[id]).filter(Boolean);
+      const p=a.plan||{};
+      const lv=[...V.flatMap(b=>[b[2],b[3]]),...txs.map(x=>x.price),p.target,p.stop].filter(x=>x>0);
+      const lo=Math.min(...lv),hi=Math.max(...lv),span=hi-lo||1;
+      const W=Math.max(320,(q('invTaBody').clientWidth||760)-30),HH=250,L=8,R=58,T=10,Bm=22;
+      const X=i=>L+(V.length<2?0:i/(V.length-1))*(W-L-R),Y=v=>T+(1-(v-lo)/span)*(HH-T-Bm);
+      const idx=d=>{let k=V.findIndex(b=>b[0]>=d);return k<0?V.length-1:k;};
+      const line=V.map((b,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(b[4]).toFixed(1)).join(' ');
+      const hs0=X(Math.max(0,i0-s)),hs1=X(Math.min(V.length-1,i1-1-s));
+      const mk=(x,kind)=>{const cx=X(idx(x.date)),cy=Y(x.price),d=kind==='buy'?'M'+cx+' '+(cy-1)+' l-6 11 h12 z':'M'+cx+' '+(cy+1)+' l-6 -11 h12 z';
+        return '<path d="'+d+'" class="inv-mk-'+kind+'"><title>'+TYPE_LABEL[kind]+' '+x.qty+' × '+x.price+' · '+x.date+'</title></path>';};
+      const lvl=(v,cls,label)=>v>0?'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" class="'+cls+'"/><text x="'+(W-R+4)+'" y="'+(Y(v)+3).toFixed(1)+'" class="inv-tick">'+label+' '+v+'</text>':'';
+      const ticks=[lo,lo+span/2,hi].map(v=>'<text x="'+(W-R+4)+'" y="'+(Y(v)+3).toFixed(1)+'" class="inv-tick">'+(+v.toFixed(v<10?2:1))+'</text>').join('');
+      const dl=[0,Math.floor((V.length-1)/2),V.length-1].map((k,j)=>'<text x="'+X(k).toFixed(1)+'" y="'+(HH-6)+'" class="inv-tick" text-anchor="'+['start','middle','end'][j]+'">'+V[k][0].slice(8,10)+'/'+V[k][0].slice(5,7)+'/'+V[k][0].slice(2,4)+'</text>').join('');
+      return '<figure class="inv-chart inv-ta-chart"><figcaption><span><i class="inv-key inv-key-value"></i>סגירה יומית</span><span><i class="inv-key inv-key-hold"></i>תקופת ההחזקה</span><span>▲ קנייה ▼ מכירה</span>'+(p.target?'<span><i class="inv-key inv-key-target"></i>יעד</span>':'')+(p.stop?'<span><i class="inv-key inv-key-stop"></i>סטופ</span>':'')+'</figcaption>'+
+        '<svg viewBox="0 0 '+W+' '+HH+'" role="img" aria-label="גרף מחיר עם כניסות ויציאות" dir="ltr"><rect x="'+hs0.toFixed(1)+'" y="'+T+'" width="'+Math.max(2,hs1-hs0).toFixed(1)+'" height="'+(HH-T-Bm)+'" class="inv-hold"/>'+
+        ticks+dl+lvl(p.target,'inv-lv-target','יעד')+lvl(p.stop,'inv-lv-stop','סטופ')+'<path d="'+line+'" class="inv-line-value"/>'+txs.map(x=>mk(x,x.type)).join('')+'</svg></figure>';
+    }
+    q('invTaOverlay').addEventListener('click',e=>{if(e.target.closest('[data-ta-close]'))closeTrade();});
+    q('invTaOverlay').addEventListener('pointerdown',e=>{if(e.target===q('invTaOverlay'))closeTrade();});
+    q('invTaOverlay').addEventListener('change',e=>{if(e.target.dataset.act==='custom-days'){const v=Math.round(Number(e.target.value));if(v>=1&&v<=365){ui.customDays=v;renderTrade();renderAnalysis();const t=calc.trades.find(x=>x.id===taOpen);if(t&&!hasHist(t.symbol,needs()[t.symbol]))loadHistory([t.symbol]);}}});
+    q('invTaOverlay').addEventListener('submit',e=>{
+      const f=e.target;if(f.dataset.form!=='plan')return;e.preventDefault();
+      const t=calc.trades.find(x=>x.id===taOpen);if(!t)return;
+      const v=n=>f.elements[n].value;
+      const raw={reason:v('reason'),tags:v('tags'),target:parseNum(v('target')),stop:parseNum(v('stop')),horizonDays:parseNum(v('horizonDays')),exitReason:v('exitReason')};
+      const bad=['target','stop','horizonDays'].filter(k=>raw[k]!==undefined&&!(raw[k]>0));
+      f.querySelectorAll('[data-err]').forEach(x=>x.textContent=bad.includes(x.dataset.err)?'מספר חיובי':'');
+      if(bad.length)return;
+      if(raw.target&&raw.stop&&raw.stop>=raw.target){f.querySelector('[data-err="stop"]').textContent='הסטופ צריך להיות מתחת ליעד';return;}
+      const plan=E.normalizePlan(raw),firstBuy=t.txIds.find(id=>pf.transactions.find(x=>x.id===id)?.type==='buy');
+      pf={...pf,transactions:pf.transactions.map(x=>x.id===firstBuy?(plan?{...x,tradePlan:plan}:(({tradePlan,...rest})=>rest)(x)):x)};
+      persist();refresh();toast(plan?'התוכנית נשמרה':'התוכנית נמחקה');
+    });
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!q('invTaOverlay').hidden){e.preventDefault();closeTrade();}});
 
     // ---------- Excel export: real numbers and dates, one sheet per table ----------
     function exportXlsx(){

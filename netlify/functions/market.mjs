@@ -46,12 +46,48 @@ async function fetchQuotes(symbols, key, fetchFn) {
   return { out, errors };
 }
 
+// Daily bars for trade analysis: [[date, open, high, low, close], …] oldest first. Tel Aviv bars converted from agorot.
+const HISTORY_TTL_MS = 6 * 3600_000;
+const historyCache = new Map();   // "SYMBOL|start|end" → { at, body }
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+export function normalizeSeries(j) {
+  if (!j || j.status === 'error' || j.code) return { error: String(j?.message || 'no data'), code: j?.code || null };
+  const agorot = j.meta?.currency === 'ILA';
+  const k = agorot ? 0.01 : 1;
+  const bars = (j.values || []).map(v => [String(v.datetime).slice(0, 10), +v.open * k, +v.high * k, +v.low * k, +v.close * k])
+    .filter(b => DATE.test(b[0]) && b.slice(1).every(x => Number.isFinite(x) && x > 0))
+    .sort((a, b) => a[0] < b[0] ? -1 : 1);
+  return { bars, currency: agorot ? 'ILS' : (j.meta?.currency || null) };
+}
+async function history(url, key, fetchFn, now) {
+  const symbol = (url.searchParams.get('history') || '').trim().toUpperCase();
+  const start = url.searchParams.get('start') || '', end = url.searchParams.get('end') || '';
+  if (!SYMBOL.test(symbol) || !DATE.test(start) || !DATE.test(end) || start > end) return json({ error: 'bad-request' }, 400);
+  const ck = symbol + '|' + start + '|' + end, c = historyCache.get(ck);
+  if (c && now - c.at < HISTORY_TTL_MS) return json(c.body, 200, { 'cache-control': 'public, max-age=3600' });
+  const tase = symbol.endsWith(':TASE');
+  const params = { symbol: tase ? symbol.slice(0, -5) : symbol, interval: '1day', start_date: start, end_date: end, order: 'ASC', outputsize: '5000', apikey: key };
+  if (tase) params.exchange = 'TASE';
+  const r = await fetchFn('https://api.twelvedata.com/time_series?' + new URLSearchParams(params));
+  const j = await r.json().catch(() => null);
+  if (r.status === 429 || j?.code === 429) return json({ error: 'rate-limit', retryAfter: 60 }, 429, { 'retry-after': '60' });
+  const n = normalizeSeries(j);
+  if (n.error) return json({ symbol, provider: PROVIDER, bars: [], error: n.error }, 200, { 'cache-control': 'no-store' });
+  const body = { symbol, provider: PROVIDER, currency: n.currency, adjusted: 'provider-default', bars: n.bars };
+  historyCache.set(ck, { at: now, body });
+  return json(body, 200, { 'cache-control': 'public, max-age=3600' });
+}
+
 export async function handle(request, env = process.env, fetchFn = fetch, now = Date.now()) {
   if (request.method !== 'GET') return json({ error: 'method' }, 405, { allow: 'GET' });
   const url = new URL(request.url);
   const key = env.TWELVEDATA_API_KEY;
   if (url.searchParams.has('ping')) return json({ ok: !!key, provider: key ? PROVIDER : null }, 200, { 'cache-control': 'no-store' });
   if (!key) return json({ error: 'not-configured' }, 503);
+  if (url.searchParams.has('history')) {
+    try { return await history(url, key, fetchFn, now); }
+    catch (e) { return json({ error: 'provider', message: String(e.message || e) }, 502); }
+  }
   const symbols = [...new Set((url.searchParams.get('symbols') || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean))];
   const bad = symbols.filter(s => !SYMBOL.test(s));
   if (!symbols.length || bad.length || symbols.length > MAX_SYMBOLS) return json({ error: 'bad-symbols', bad }, 400);

@@ -1,0 +1,18 @@
+{
+  "version": 51,
+  "date": "2026-11-25",
+  "branch": "feature/investments",
+  "title": "Trade analysis: during and after each trade, trade plan, patterns",
+  "changes": [
+    "New investments tab 'Trade analysis' built on daily bars (Twelve Data for stocks through /api/market?history=…, Coinbase for crypto); history kept in the browser (anav.history.v1) and loaded within the free plan's 8-per-minute limit, with the wait shown",
+    "Per trade: actual result after fees, holding days, highest high and lowest low while held (against the average entry), change 1 trading day, 1 week, 1 month and a chosen number of days after each sale",
+    "Partial exits: each sale measured on its own; summaries weighted by quantity sold and showing how many sales already have data",
+    "Hypothetical comparison with holding the sold quantity longer, labelled hypothetical with its assumptions (close price, no extra fees, dividends or tax)",
+    "Price chart with entries, exits, holding period, target and stop",
+    "Trade plan per trade: entry reason, strategy tags, target, stop, planned holding days, exit reason; adherence (exit at target / before target / at or below stop, holding vs plan) shown apart from hindsight results",
+    "Patterns with visible definitions and thresholds: went up then closed at a loss, kept rising after exit, dropped after exit, exited before target, closed below stop, no plan",
+    "Daily data only: the analysis says so and does not claim intraday precision; missing history is shown as missing",
+    "Tel Aviv history requires a higher Twelve Data plan; such symbols are marked 'no history'"
+  ],
+  "backup": "backups/2026-11-25T07-21-00Z-trade-analysis/"
+}

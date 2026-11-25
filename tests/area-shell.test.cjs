@@ -5,7 +5,7 @@ const root=path.resolve(__dirname,'..');
 const manifest=require('../tools/manifest.json');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const source=fs.readFileSync(path.join(root,'scripts/src/98-area-shell.js'),'utf8');
-const views=['log','holdings','performance','cash'];
+const views=['log','holdings','performance','cash','analysis'];
 
 test('area switch sits in the header identity and keeps the logo markup intact',()=>{
  const identity=html.match(/<div class="frame-identity">([\s\S]*?)<\/nav><\/div>/);
@@ -100,10 +100,10 @@ test('switching areas hides the calculators, persists, and redraws them on retur
 test('only the chosen investments view is visible, and it is restored after reload',()=>{
  const s=setup();
  s.clickArea('invest');s.clickView('performance');
- assert.deepEqual(s.panels.map(p=>p.hidden),[true,true,false,true]);
+ assert.deepEqual(s.panels.map(p=>p.hidden),[true,true,false,true,true]);
  const again=setup(JSON.parse(s.store.get('anav.shell.v1')));
  assert.equal(again.app.dataset.area,'invest');
- assert.deepEqual(again.panels.map(p=>p.hidden),[true,true,false,true]);
+ assert.deepEqual(again.panels.map(p=>p.hidden),[true,true,false,true,true]);
  assert.equal(again.viewBtns[2].attrs['aria-selected'],'true');
 });
 

@@ -105,5 +105,36 @@
       next.lastRefresh=new Date(now).toISOString();
       return {market:next,report};
     }
-    return {refresh,isStale,needsRefresh,kindOf,SOURCES,MAX_AGE,REFRESH_AFTER,providers,CRYPTO};
+    // ---------- daily history for trade analysis ----------
+    // Bars: [date, open, high, low, close]. Stocks through the site function (provider key stays on the server),
+    // crypto from Coinbase in chunks of up to 300 days.
+    async function fetchHistory(symbol,market,from,to,opts){
+      const fetchFn=opts?.fetch||(typeof fetch==='function'?fetch.bind(globalThis):null),endpoint=opts?.endpoint||'/api/market';
+      if(kindOf(symbol,market)==='crypto'){
+        const out=[];let start=from;
+        while(start<=to){
+          const endD=new Date(Date.parse(start+'T00:00:00Z')+289*DAY).toISOString().slice(0,10),stop=endD<to?endD:to;
+          const rows=await once('cbh:'+symbol+start+stop,()=>getJson(fetchFn,'https://api.exchange.coinbase.com/products/'+baseCoin(symbol)+'-USD/candles?granularity=86400&start='+start+'T00:00:00Z&end='+stop+'T23:59:59Z'));
+          for(const r of rows||[])out.push([new Date(r[0]*1000).toISOString().slice(0,10),r[3],r[2],r[1],r[4]]);
+          start=new Date(Date.parse(stop+'T00:00:00Z')+DAY).toISOString().slice(0,10);
+        }
+        return {bars:mergeBars([],out),source:'coinbase'};
+      }
+      const s=market==='TASE'?symbol+':TASE':symbol;
+      const r=await fetchFn(endpoint+'?history='+encodeURIComponent(s)+'&start='+from+'&end='+to);
+      if(r.status===429){const e=new Error('rate-limit');e.rateLimit=true;throw e;}
+      if(r.status===503){const e=new Error('not-configured');e.notConfigured=true;throw e;}
+      if(!r.ok){const e=new Error('HTTP '+r.status);e.status=r.status;throw e;}
+      const j=await r.json();
+      return {bars:Array.isArray(j.bars)?j.bars:[],source:j.provider||'twelvedata',error:j.error||null};
+    }
+    function mergeBars(a,b){const m=new Map();for(const x of a||[])m.set(x[0],x);for(const x of b||[])m.set(x[0],x);return [...m.values()].sort((x,y)=>x[0]<y[0]?-1:1);}
+    // A stored entry covers [from, to] when it was fetched for that range; a range ending today is refreshed after 12 hours.
+    function covers(entry,from,to,today,now){
+      if(!entry)return false;
+      if(entry.from>from||entry.to<to)return false;
+      if(to>=today&&now-Date.parse(entry.fetchedAt||0)>12*HOUR)return false;
+      return true;
+    }
+    return {refresh,isStale,needsRefresh,kindOf,SOURCES,MAX_AGE,REFRESH_AFTER,providers,CRYPTO,fetchHistory,mergeBars,covers};
   })();
