@@ -1,0 +1,11 @@
+{
+  "version": 56,
+  "date": "2026-11-25",
+  "branch": "feature/investments",
+  "title": "UX pass 2: action form on phones",
+  "changes": [
+    "The save buttons and the live cash-effect preview stay at the bottom of the action form while scrolling (on a phone the save button used to be below the fold)",
+    "Form fields are 16px on phones so iOS does not zoom into the page when a field is tapped"
+  ],
+  "backup": "backups/2026-11-25T07-53-00Z-ux-pass-2/"
+}

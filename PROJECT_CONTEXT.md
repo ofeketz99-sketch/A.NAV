@@ -343,3 +343,5 @@
 - **בטבלת הפעולות:** פעולת `dup` (שכפול).
 - **`anav.ui.v1`:** בחירות התצוגה שנשמרות בין ביקורים (`UI_KEEP` ב-`98-investments.js`).
 - **`styles/src/99-calc-mobile-fix.css`** (אחרון ב-manifest): ב-`max-width:1050px` ה-`.main-column` נערם אנכית, ו-`.tabs` ו-`.workspace-tools` מקבלים כל אחד שורה מלאה. ב-540px הגופן של הלשוניות 11.5px, ונקודת הצבע מוסתרת. זה מתקן באג שהיה קיים כבר ב-`dev`. הכלל לא חל על מחשב שולחני.
+
+- **v056:** ב-`#invTxForm` ה-`.inv-form-actions` וה-`.inv-preview` נשארים מוצמדים לתחתית הטופס (`position:sticky`). בטלפון השדות בגודל 16px.
