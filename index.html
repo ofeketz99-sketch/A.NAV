@@ -157,6 +157,7 @@
         <button type="button" role="tab" id="investTab-performance" data-invest-view="performance" aria-controls="investView-performance" aria-selected="false" tabindex="-1">ביצועים</button>
         <button type="button" role="tab" id="investTab-cash" data-invest-view="cash" aria-controls="investView-cash" aria-selected="false" tabindex="-1">תנועות כספיות</button>
         <button type="button" role="tab" id="investTab-analysis" data-invest-view="analysis" aria-controls="investView-analysis" aria-selected="false" tabindex="-1">ניתוח עסקאות</button>
+        <button type="button" role="tab" id="investTab-boards" data-invest-view="boards" aria-controls="investView-boards" aria-selected="false" tabindex="-1">לוחות וגרפים</button>
       </nav>
       <div class="invest-tools" id="investTools">
         <button type="button" class="invest-btn invest-primary" id="invAdd"><span aria-hidden="true">+</span> פעולה</button>
@@ -194,6 +195,10 @@
       <section class="invest-view" id="investView-analysis" role="tabpanel" aria-labelledby="investTab-analysis" data-view="analysis" hidden>
         <header class="invest-head"><h2>ניתוח עסקאות</h2><p>מה קרה במהלך ההחזקה ואחרי היציאה, מול תוכנית המסחר. לפי נרות מחיר יומיים.</p></header>
         <div class="invest-body" id="investBody-analysis"></div>
+      </section>
+      <section class="invest-view" id="investView-boards" role="tabpanel" aria-labelledby="investTab-boards" data-view="boards" hidden>
+        <header class="invest-head"><h2>לוחות וגרפים</h2><p>לוח סקירה מוכן, ולוחות אישיים עם גרפים שבונים בעצמך מכל נתוני האתר.</p></header>
+        <div class="invest-body" id="investBody-boards"></div>
       </section>
     </div>
   </section>

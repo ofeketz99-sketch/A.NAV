@@ -8,7 +8,7 @@
     const AREA_KEY='anav.shell.v1';
     const INVEST_COLOR='#2f6461';
     const areas=['calc','invest'];
-    const views=['log','holdings','performance','cash','analysis'];
+    const views=['log','holdings','performance','cash','analysis','boards'];
     let area='calc',view='log';
     try{
       const saved=JSON.parse(localStorage.getItem(AREA_KEY)||'null');

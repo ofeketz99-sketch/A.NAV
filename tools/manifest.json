@@ -43,8 +43,10 @@
     "97-market-data",
     "97-trade-analysis",
     "97-daily-performance",
+    "97-chart-data",
     "98-area-shell",
     "98-investments",
+    "98-dashboards",
     "99-startup"
   ],
   "css": [

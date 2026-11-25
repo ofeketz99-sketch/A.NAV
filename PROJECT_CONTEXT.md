@@ -318,3 +318,18 @@
   - הגורם מחושב לכל תקופת החזקה (ב-`DailyPerformance` לפי `periods`), ומופעל על הנרות לפני הניתוח והשווי.
 - **גשר על פער:** `pending` מצטבר עד היום המלא הבא, ו-`since` מציין את התאריך שאליו משווים.
 - **אימות מול נתוני המשתמש (מקומית):** תשואה מחושבת לעומת רישומי הברוקר באותה תקופה, הפרש של כ-0.3 נקודות אחוז.
+
+## לוחות ובונה גרפים — 2026-11-25 (v054, ענף `feature/investments`)
+- **`scripts/src/97-chart-data.js`** (`ChartData`, בלי DOM):
+  - `build(ctx)` בונה חמישה מקורות נתונים: trades, actions, holdings, daily, broker. לכל שדה מוגדר `type` (date, cat או num) ויחידה (ILS, USD, pct, days או count). `level:true` מסמן שדה של רמה, כמו שווי.
+  - `check()` מחזיר שגיאות, סוגי גרף מותרים, וסיבה לכל סוג שנחסם.
+  - `suggest()` מציע סוג גרף מתאים.
+  - `compute(cfg, ds, {from, to})` מחזיר סדרות, ולכל נקודה את `ids` של הרשומות שמאחוריה, לצורך פירוט.
+  - `aggsFor()` קובע אילו עיבודים מותרים: אחוזים ושדות רמה לא נסכמים.
+- **`InvestAPI`:** ממשק לקריאה בלבד ש-`98-investments.js` חושף. כולל getters ל-pf, calc, hist, mk, פונקציות עיצוב, `toast`, `openTrade`, `onRefresh` ו-`daily()`.
+- **`scripts/src/98-dashboards.js`** נטען אחרי `98-investments`. כולל:
+  - לוח ברירת מחדל ושמירה ב-`anav.dashboards.v1`: `{version, active, boards:[{id, name, range, widgets:[{id, size(s|m|l), cfg}]}]}`.
+  - רינדור SVG עם צבעים בתוך הקוד, כדי שייצוא SVG ו-PNG ישמור על הצבעים.
+  - פירוט, בונה גרפים ב-`#invChOverlay` וייצוא.
+  - כל גרף מצויר ברוחב המדוד של הכרטיס שלו.
+- **לשונית `boards`:** נוספה ל-`views` ב-`98-area-shell.js` ולבדיקות.

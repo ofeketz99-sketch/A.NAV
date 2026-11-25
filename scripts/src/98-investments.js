@@ -2,6 +2,8 @@
   // Investments workspace: the Excel workflow as screens. Every number on screen comes from PortfolioEngine.compute(),
   // so the log, holdings, cash, charts and the Excel export always agree.
   // Storage: anav.portfolio.v1 (user data), anav.market.v1 (prices typed by the user, later a price provider).
+  // InvestAPI: a narrow read-only view for later modules (dashboards); set once the workspace is ready.
+  let InvestAPI=null;
   (function(){
     const root=q('investApp');
     if(!root||typeof PortfolioEngine==='undefined')return;
@@ -57,9 +59,11 @@
     const PALETTE=['#2f6461','#c08a3e','#5b6fa8','#9a5b7a','#6b8f4e','#b4654a','#4f8a9a','#7d6b9e','#a08f4a','#5f7f6a'];
 
     // ---------- rendering ----------
+    const refreshHooks=[];
     function refresh(){
       calc=E.compute(pf,mk);
       renderLog();renderHoldings();renderPerformance();renderCash();renderAnalysis();
+      for(const f of refreshHooks)try{f();}catch(e){console.error(e);}
       const list=q('invSymbols');if(list)list.innerHTML=Object.keys(pf.instruments).sort().map(s=>'<option value="'+esc(s)+'">').join('');
     }
     function curTotals(map,signed=true){return ['USD','ILS'].filter(c=>map[c]).map(c=>money(map[c],c,{signed})).join(' · ')||money(0,'USD');}
@@ -996,6 +1000,9 @@
       return new Blob([...parts,...central,new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(size),...u32(off),...u16(0)])]);
     }
 
+    InvestAPI={get pf(){return pf;},get calc(){return calc;},get hist(){return hist;},get mk(){return mk;},E,
+      fmt:{money,pct,num,date,sym,esc,compact,kpi,empty,DASH,NF},ICON,PALETTE,toast,openTrade,onRefresh:f=>refreshHooks.push(f),
+      daily:()=>DailyPerformance.compute(pf,hist,{today:E.todayIso()})};
     refresh();
     if(!root.hidden)setTimeout(autoPrices,600);
   })();

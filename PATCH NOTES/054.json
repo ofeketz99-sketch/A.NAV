@@ -1,0 +1,16 @@
+{
+  "version": 54,
+  "date": "2026-11-25",
+  "branch": "feature/investments",
+  "title": "Dashboards and a chart builder over all investment data",
+  "changes": [
+    "New investments tab 'Boards and charts' with a ready overview board: holdings value, net of closed trades, average trade return, portfolio value over time, net by month, breakdown by sector, deposits by month, cumulative fees, holding days vs return, results by symbol",
+    "Chart builder: data source (trades, actions, holdings, computed daily value, broker entries), X axis with date resolution, grouping, up to two metrics with aggregation (sum, average, count, cumulative, last, min, max), filter, chart type, title, colour, legend, value labels, size, live preview",
+    "Rules prevent meaningless charts: percentages and levels are never summed, shekels and dollars are never mixed, at most two units (second on a right axis); unavailable chart types are disabled with the reason, and a 'suggested type' button picks a fitting one",
+    "Chart types: line, area, bars, stacked bars, donut, scatter, heatmap, metric card, summary table",
+    "Clicking a bar, point, slice, cell or card lists the records behind it; trades open their analysis",
+    "Several personal boards: create, rename, delete with undo; add, edit, remove (with undo), reorder and resize charts; a shared period filter for all dated charts; everything saved in the browser (anav.dashboards.v1)",
+    "Export of any chart as SVG or PNG, stamped with title and date"
+  ],
+  "backup": "backups/2026-11-25T07-41-00Z-charts-dashboards/"
+}
