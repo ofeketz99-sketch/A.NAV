@@ -1,0 +1,11 @@
+{
+  "version": 57,
+  "date": "2026-11-28",
+  "branch": "dev",
+  "title": "Illustrated A.NAV app icon",
+  "changes": [
+    "Replaced the letter tile in the site header with the rounded illustrated A.NAV icon",
+    "Added matching PNG favicon and Apple touch icon assets with even diffuse lighting and no corner spotlight"
+  ],
+  "backup": "backups/2026-11-28T00-00-00Z-pre-icon-057/"
+}

@@ -3218,6 +3218,16 @@ html.splash-run .splash-word .splash-dot{
 .market-strip .mk,.market-strip .mk-px,.market-strip .mk-fng{flex:1 1 0;min-width:200px;max-width:none}
 .mk-fng .mk-dial{left:12px;top:3px;width:86px;height:44px}
 .mk-fng b,.mk-fng .mk-val{inset-inline-start:110px}
+/* A.NAV illustrated app icon: final cascade override for all responsive modes. */
+.frame-monogram{
+  display:block!important;
+  object-fit:contain;
+  background:none!important;
+  color:transparent!important;
+  border-radius:12px;
+  box-shadow:0 4px 12px #3f2b1d26!important;
+}
+.frame-monogram::after{display:none!important}
 
 /* A.NAV 047 — top-level areas (calculators / investments) inside one frame.
    The header, logo, footer and frame stay identical; only the content below the header changes. */

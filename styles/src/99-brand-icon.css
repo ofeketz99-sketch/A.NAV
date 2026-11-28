@@ -1,0 +1,10 @@
+/* A.NAV illustrated app icon: final cascade override for all responsive modes. */
+.frame-monogram{
+  display:block!important;
+  object-fit:contain;
+  background:none!important;
+  color:transparent!important;
+  border-radius:12px;
+  box-shadow:0 4px 12px #3f2b1d26!important;
+}
+.frame-monogram::after{display:none!important}
